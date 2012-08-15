@@ -444,7 +444,7 @@ answer_to_connection (void *cls, struct MHD_Connection *connection,
 int
 main ()
 {
-/*
+
   // Create an autonomous process
   pid_t pid, sid;
   // Fork off the parent process
@@ -484,7 +484,7 @@ main ()
   close(STDIN_FILENO);
   close(STDOUT_FILENO);
   close(STDERR_FILENO);
-*/
+ 
   struct MHD_Daemon *daemon;
 
   daemon = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY, PORT, NULL, NULL,
