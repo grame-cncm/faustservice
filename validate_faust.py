@@ -62,6 +62,10 @@ def _copy_contents_to_tmp(filename, tmpdir) :
       if (ext == 'dsp') :
         dsp_file = subfile
     archive.close()
+    ### TEST
+    fff = file(os.path.join(tmpdir,dsp_file),'r')
+    aaa = fff.read()
+    fff.close()
     return dsp_file
   else :
     _cleanup(tmpdir)
@@ -75,5 +79,5 @@ if __name__ == '__main__' :
   filename = _copy_contents_to_tmp(filename, tmpdir)
   p = subprocess.Popen(["faust", "-a","plot.cpp", filename], cwd=tmpdir, stdout=subprocess.PIPE)
   p.wait()
-  _cleanup(tmpdir)
+  #_cleanup(tmpdir)
   sys.exit(p.returncode)

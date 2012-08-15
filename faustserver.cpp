@@ -222,7 +222,8 @@ int validate_faust(connection_info_struct *con_info)
     }
   // for debugging, add print commands to the python script
   // and do cout << result << endl;
-  return pclose(pipe);
+  int exitstatus = pclose(pipe);
+  return exitstatus;
 }
 
 int make_initial_faust_directory(connection_info_struct *con_info, string sha1, string original_filename)
@@ -245,7 +246,8 @@ int make_initial_faust_directory(connection_info_struct *con_info, string sha1, 
     }
   // for debugging, add print commands to the python script
   // and do cout << result << endl;
-  return pclose(pipe);
+  int exitstatus = pclose(pipe);
+  return exitstatus;
 }
 
 string_and_exitstatus generate_sha1(connection_info_struct *con_info)
@@ -442,6 +444,7 @@ answer_to_connection (void *cls, struct MHD_Connection *connection,
 int
 main ()
 {
+/*
   // Create an autonomous process
   pid_t pid, sid;
   // Fork off the parent process
@@ -467,21 +470,21 @@ main ()
       exit(EXIT_FAILURE);
   }
   
-  /*
+  
   // We need to keep the cwd where it is
   // which is why all of this is commented out.
   // Change the current working directory
-  if ((chdir("/")) < 0) {
+  //if ((chdir("/")) < 0) {
       // Log the failure
-      exit(EXIT_FAILURE);
-  }
-  */
+      //exit(EXIT_FAILURE);
+  //}
+  
 
   // Close out the standard file descriptors
   close(STDIN_FILENO);
   close(STDOUT_FILENO);
   close(STDERR_FILENO);
-
+*/
   struct MHD_Daemon *daemon;
 
   daemon = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY, PORT, NULL, NULL,
