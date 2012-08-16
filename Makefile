@@ -1,2 +1,17 @@
-faustserver : faustserver.cpp
-	g++ -lboost_random -lmicrohttpd -o faustserver faustserver.cpp
+objects = main.o server.o utilities.o
+
+faustserver : $(objects)
+	g++ -lboost_random -lmicrohttpd -o faustserver $(objects)
+
+main.o : main.cpp
+	g++ -c main.cpp
+
+server.o : server.cpp server.hh
+	g++ -c server.cpp
+
+utilities.o : utilities.cpp utilities.hh
+	g++ -c utilities.cpp
+
+.PHONY : clean
+clean :
+	-rm faustserver $(objects)

@@ -1,54 +1,11 @@
 #include <sstream>
-#include <iostream>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <string>
-#include <cstdlib>   // for rand()
-#include <cctype>    // for isalnum()
-#include <algorithm> // for back_inserter
-#include <sys/types.h>
-#include <sys/select.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <dirent.h>
+
 #include <microhttpd.h>
 
-#include <boost/random/random_device.hpp>
-#include <boost/random/uniform_int_distribution.hpp>
-
-#include <vector>
-#include <map>
-
-#define PORT            8888
-#define POSTBUFFERSIZE  512
-#define MAXCLIENTS      2
-
-#define GET             0
-#define POST            1
+#include "utilities.hh"
+#include "server.hh"
 
 using namespace std;
-
-typedef map<string, string> TArgs;
-
-static unsigned int nr_of_uploading_clients = 0;
-
-struct connection_info_struct
-{
-  int connectiontype;
-  struct MHD_PostProcessor *postprocessor;
-  FILE *fp;
-  string tmppath;
-  string answerstring;
-  int answercode;
-};
-
-struct string_and_exitstatus
-{
-  string str;
-  int exitstatus;
-};
 
 string askpage_head = "<html><body>\n\
                        Upload a Faust file, please.<br>\n\
@@ -110,47 +67,97 @@ string servererrorpage =
 string fileexistspage =
   "<html><body>This file already exists.</body></html>";
 
-string boost_random(int size)
+int
+validate_faust (connection_info_struct *con_info)
 {
-    stringstream ss;
-    std::string chars(
-        "abcdefghijklmnopqrstuvwxyz"
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "1234567890");
-
-    boost::random::random_device rng;
-    boost::random::uniform_int_distribution<> index_dist(0, chars.size() - 1);
-    for(int i = 0; i < 8; ++i) {
-        ss << chars[index_dist(rng)];
+  FILE *pipe = popen (("python validate_faust.py "+con_info->tmppath).c_str (), "r");
+  string result = "";
+  if (!pipe)
+    con_info->answerstring = completebuterrorpage;
+  else
+    {
+      // Bleed off the pipe
+      char buffer[128];
+      while (!feof (pipe))
+        {
+          if (fgets (buffer, 128, pipe) != NULL)
+            result += buffer;
+        }
     }
-    return ss.str();
+  // for debugging, add print commands to the python script
+  // and do cout << result << endl;
+  int exitstatus = pclose (pipe);
+  if (exitstatus)
+    con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+  return exitstatus;
 }
 
-vector<string> getdir (string dir)
+string_and_exitstatus
+generate_sha1 (connection_info_struct *con_info)
 {
-    DIR *dp;
-    vector<string> files;
-    struct dirent *dirp;
-    if((dp  = opendir(dir.c_str())) == NULL) {
-        return files;
+  FILE *pipe = popen (("python generate_sha1.py "+con_info->tmppath).c_str (), "r");
+  string result = "";
+  if (!pipe)
+    {
+      con_info->answerstring = completebuterrorpage;
     }
-
-    while ((dirp = readdir(dp)) != NULL) {
-        files.push_back(string(dirp->d_name));
+  else
+    {
+      char buffer[128];
+      while (!feof (pipe))
+        {
+          if (fgets (buffer, 128, pipe) != NULL)
+            result += buffer;
+        }
     }
-    closedir(dp);
-    return files;
+  string_and_exitstatus res;
+  res.exitstatus = pclose (pipe);
+  res.str = result;
+  if (res.exitstatus)
+    con_info->answerstring = completebutnohash;
+  return res;
 }
 
-static int _get_params (void *cls, enum MHD_ValueKind , const char *key, const char *data)
+int
+make_initial_faust_directory (connection_info_struct *con_info, string sha1, string original_filename)
+{
+  FILE *pipe = popen (("python make_initial_faust_directory.py "+con_info->tmppath+" "+sha1+" "+original_filename).c_str (), "r");
+  string result = "";
+  if (!pipe)
+    {
+      con_info->answerstring = completebuterrorpage;
+    }
+  else
+    {
+      // Bleed off the pipe
+      char buffer[128];
+      while (!feof (pipe))
+        {
+          if (fgets (buffer, 128, pipe) != NULL)
+            result += buffer;
+        }
+    }
+  // for debugging, add print commands to the python script
+  // and do cout << result << endl;
+  int exitstatus = pclose (pipe);
+  if (exitstatus)
+     con_info->answerstring = completebutalreadythere_head + sha1 + completebutalreadythere_tail;
+  else
+     con_info->answerstring = completepage_head + sha1 + completepage_tail;
+
+  return exitstatus;
+}
+
+int
+FaustServer::get_params (void *cls, enum MHD_ValueKind , const char *key, const char *data)
 {
   TArgs* args = (TArgs*)cls;
-  args->insert (pair<string,string> (string(key), string(data)));
+  args->insert (pair<string,string> (string (key), string (data)));
   return MHD_YES;
 }
 
-static int
-send_page (struct MHD_Connection *connection, string page,
+int
+FaustServer::send_page (struct MHD_Connection *connection, string page,
            int status_code)
 {
   int ret;
@@ -168,132 +175,8 @@ send_page (struct MHD_Connection *connection, string page,
   return ret;
 }
 
-static int
-faustGet(struct MHD_Connection *connection, TArgs &args)
-{
-  if (args["sha1"].empty ())
-    return send_page(connection, nosha1present, MHD_HTTP_BAD_REQUEST);
-
-  // need more sophisticated error messages below - need ot verify that sha1 exists, for example...
-
-  string architecture_file = args["a"];
-  if (architecture_file.empty())
-    architecture_file = "plot.cpp";
-
-  // lists all the files in the directory
-  vector<string> filesindir = getdir(args["sha1"]);
-  // we've already verified that there is only 1 dsp file in the python script, so we find that
-  string dspfile;
-  for (unsigned int i = 0; i < filesindir.size (); i++)
-    {
-      string fn = filesindir[i];
-      if(fn.substr(fn.find_last_of(".") + 1) == "dsp")
-        {
-          dspfile = fn;
-          break;
-        }
-    }
-  FILE *pipe = popen(("faust -a "+architecture_file+" "+args["sha1"]+"/"+dspfile).c_str (), "r");
-  string result = "";
-  if (!pipe)
-    return send_page(connection, cannotcompile, MHD_HTTP_BAD_REQUEST);
-  else
-    {
-      // Bleed off the pipe
-      char buffer[128];
-      while(!feof(pipe))
-        {
-          if(fgets(buffer, 128, pipe) != NULL)
-            result += buffer;
-        }
-    }
-
-  if (pclose(pipe))
-    return send_page(connection, cannotcompile, MHD_HTTP_BAD_REQUEST);
-
-  return send_page(connection, result, MHD_HTTP_OK);
-}
-
-int validate_faust(connection_info_struct *con_info)
-{
-  FILE *pipe = popen(("python validate_faust.py "+con_info->tmppath).c_str (), "r");
-  string result = "";
-  if (!pipe)
-    con_info->answerstring = completebuterrorpage;
-  else
-    {
-      // Bleed off the pipe
-      char buffer[128];
-      while(!feof(pipe))
-        {
-          if(fgets(buffer, 128, pipe) != NULL)
-            result += buffer;
-        }
-    }
-  // for debugging, add print commands to the python script
-  // and do cout << result << endl;
-  int exitstatus = pclose(pipe);
-  if (exitstatus)
-    con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
-  return exitstatus;
-}
-
-string_and_exitstatus generate_sha1(connection_info_struct *con_info)
-{
-  FILE *pipe = popen(("python generate_sha1.py "+con_info->tmppath).c_str (), "r");
-  string result = "";
-  if (!pipe)
-    {
-      con_info->answerstring = completebuterrorpage;
-    }
-  else
-    {
-      char buffer[128];
-      while(!feof(pipe))
-        {
-          if(fgets(buffer, 128, pipe) != NULL)
-            result += buffer;
-        }
-    }
-  string_and_exitstatus res;
-  res.exitstatus = pclose(pipe);
-  res.str = result;
-  if (res.exitstatus)
-    con_info->answerstring = completebutnohash;
-  return res;
-}
-
-int make_initial_faust_directory(connection_info_struct *con_info, string sha1, string original_filename)
-{
-  FILE *pipe = popen(("python make_initial_faust_directory.py "+con_info->tmppath+" "+sha1+" "+original_filename).c_str (), "r");
-  string result = "";
-  if (!pipe)
-    {
-      con_info->answerstring = completebuterrorpage;
-    }
-  else
-    {
-      // Bleed off the pipe
-      char buffer[128];
-      while(!feof(pipe))
-        {
-          if(fgets(buffer, 128, pipe) != NULL)
-            result += buffer;
-        }
-    }
-  // for debugging, add print commands to the python script
-  // and do cout << result << endl;
-  int exitstatus = pclose(pipe);
-  if (exitstatus)
-     con_info->answerstring = completebutalreadythere_head + sha1 + completebutalreadythere_tail;
-  else
-     con_info->answerstring = completepage_head + sha1 + completepage_tail;
-
-  return exitstatus;
-}
-
-static int
-iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
+int
+FaustServer::iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
               const char *filename, const char *content_type,
               const char *transfer_encoding, const char *data, uint64_t off,
               size_t size)
@@ -302,7 +185,7 @@ iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
   FILE *fp;
 
   if (con_info->tmppath.empty ())
-    con_info->tmppath = "/tmp/faust" + boost_random(10) + filename;
+    con_info->tmppath = "/tmp/faust" + boost_random (10) + filename;
 
   con_info->answerstring = servererrorpage;
   con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
@@ -312,7 +195,7 @@ iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
 
   if (!con_info->fp)
     {
-      if (NULL != (fp = fopen (con_info->tmppath.c_str(), "rb")))
+      if (NULL != (fp = fopen (con_info->tmppath.c_str (), "rb")))
         {
           fclose (fp);
           con_info->answerstring = fileexistspage;
@@ -320,7 +203,7 @@ iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
           return MHD_NO;
         }
 
-      con_info->fp = fopen (con_info->tmppath.c_str(), "ab");
+      con_info->fp = fopen (con_info->tmppath.c_str (), "ab");
       if (!con_info->fp)
         return MHD_NO;
     }
@@ -330,13 +213,13 @@ iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
       if (!fwrite (data, size, sizeof (char), con_info->fp))
         return MHD_NO;
     }
-  fclose(con_info->fp);
+  fclose (con_info->fp);
 
-  if (!validate_faust(con_info))
+  if (!validate_faust (con_info))
     {
-      string_and_exitstatus sha1 = generate_sha1(con_info);
+      string_and_exitstatus sha1 = generate_sha1 (con_info);
       if (!sha1.exitstatus)
-        (void) make_initial_faust_directory(con_info, sha1.str, string (filename));
+        (void) make_initial_faust_directory (con_info, sha1.str, string (filename));
     }
     
   con_info->answercode = MHD_HTTP_OK;
@@ -344,8 +227,8 @@ iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
   return MHD_YES;
 }
 
-static void
-request_completed (void *cls, struct MHD_Connection *connection,
+void
+FaustServer::request_completed (void *cls, struct MHD_Connection *connection,
                    void **con_cls, enum MHD_RequestTerminationCode toe)
 {
   struct connection_info_struct *con_info = (connection_info_struct *)*con_cls;
@@ -370,11 +253,11 @@ request_completed (void *cls, struct MHD_Connection *connection,
 }
 
 
-static int
-answer_to_connection (void *cls, struct MHD_Connection *connection,
-                      const char *url, const char *method,
-                      const char *version, const char *upload_data,
-                      size_t *upload_data_size, void **con_cls)
+int
+FaustServer::answer_to_connection (void *cls, struct MHD_Connection *connection,
+                       const char *url, const char *method,
+                       const char *version, const char *upload_data,
+                       size_t *upload_data_size, void **con_cls)
 {
   if (NULL == *con_cls)
     {
@@ -418,14 +301,14 @@ answer_to_connection (void *cls, struct MHD_Connection *connection,
   if (0 == strcmp (method, "GET"))
     {
       TArgs args;
-      MHD_get_connection_values (connection, MHD_GET_ARGUMENT_KIND, _get_params, &args);
+      MHD_get_connection_values (connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
       if (!args.size ())
         {
           stringstream ss;
           ss << askpage_head << nr_of_uploading_clients << askpage_tail;
           return send_page (connection, ss.str (), MHD_HTTP_OK);
         }
-      return faustGet(connection, args);
+      return faustGet (connection, args);
     }
 
   if (0 == strcmp (method, "POST"))
@@ -448,62 +331,74 @@ answer_to_connection (void *cls, struct MHD_Connection *connection,
   return send_page (connection, errorpage, MHD_HTTP_BAD_REQUEST);
 }
 
+unsigned int FaustServer::nr_of_uploading_clients = 0;
+
 int
-main ()
+FaustServer::faustGet (struct MHD_Connection *connection, TArgs &args)
 {
+  if (args["sha1"].empty ())
+    return send_page (connection, nosha1present, MHD_HTTP_BAD_REQUEST);
 
-  // Create an autonomous process
-  pid_t pid, sid;
-  // Fork off the parent process
-  pid = fork();
-  if (pid < 0) {
-      exit(EXIT_FAILURE);
-  }
-  // If we got a good PID, then we can exit the parent process.
-  if (pid > 0) {
-      exit(EXIT_SUCCESS);
-  }
- 
-  // Change the file mode mask
-  umask(0);
-  
-  // Open any logs here
-  
-  // Create a new SID for the child process
-  sid = setsid();
-  
-  if (sid < 0) {
-      // Log the failure
-      exit(EXIT_FAILURE);
-  }
-  
-  
-  // We need to keep the cwd where it is
-  // which is why all of this is commented out.
-  // Change the current working directory
-  //if ((chdir("/")) < 0) {
-      // Log the failure
-      //exit(EXIT_FAILURE);
-  //}
-  
+  // need more sophisticated error messages below - need ot verify that sha1 exists, for example...
 
-  // Close out the standard file descriptors
-  close(STDIN_FILENO);
-  close(STDOUT_FILENO);
-  close(STDERR_FILENO);
- 
-  struct MHD_Daemon *daemon;
+  string architecture_file = args["a"];
+  if (architecture_file.empty ())
+    architecture_file = "plot.cpp";
 
-  daemon = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY, PORT, NULL, NULL,
-                             &answer_to_connection, NULL,
-                             MHD_OPTION_NOTIFY_COMPLETED, request_completed,
-                             NULL, MHD_OPTION_END);
-  if (NULL == daemon)
-    return 1;
+  // lists all the files in the directory
+  vector<string> filesindir = getdir (args["sha1"]);
+  // we've already verified that there is only 1 dsp file in the python script, so we find that
+  string dspfile;
+  for (unsigned int i = 0; i < filesindir.size (); i++)
+    {
+      string fn = filesindir[i];
+      if (fn.substr (fn.find_last_of (".") + 1) == "dsp")
+        {
+          dspfile = fn;
+          break;
+        }
+    }
+  FILE *pipe = popen (("faust -a "+architecture_file+" "+args["sha1"]+"/"+dspfile).c_str (), "r");
+  string result = "";
+  if (!pipe)
+    return send_page (connection, cannotcompile, MHD_HTTP_BAD_REQUEST);
+  else
+    {
+      // Bleed off the pipe
+      char buffer[128];
+      while (!feof (pipe))
+        {
+          if (fgets (buffer, 128, pipe) != NULL)
+            result += buffer;
+        }
+    }
 
-  getchar ();
+  if (pclose (pipe))
+    return send_page (connection, cannotcompile, MHD_HTTP_BAD_REQUEST);
 
-  MHD_stop_daemon (daemon);
+  return send_page (connection, result, MHD_HTTP_OK);
+}
 
-  return 0;
+bool
+FaustServer::start ()
+{
+  daemon_ = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY, port_, NULL, NULL,
+                              &answer_to_connection, NULL,
+                              MHD_OPTION_NOTIFY_COMPLETED, request_completed,
+                              NULL, MHD_OPTION_END);
+  return daemon_ != NULL;
+}
+
+void
+FaustServer::stop ()
+{
+  if (daemon_)
+    MHD_stop_daemon (daemon_);
+
+  daemon_ = 0;
+}
+
+
+FaustServer::FaustServer (int port) : port_ (port)
+{
 }
