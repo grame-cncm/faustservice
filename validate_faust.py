@@ -73,7 +73,10 @@ if __name__ == '__main__' :
   tmpdir = os.path.join('/tmp',dirname)
   os.mkdir(tmpdir)
   filename = _copy_contents_to_tmp(filename, tmpdir)
-  p = subprocess.Popen(["faust", "-a","plot.cpp", filename], cwd=tmpdir, stdout=subprocess.PIPE)
+  p = subprocess.Popen(["faust", "-a","plot.cpp", filename], cwd=tmpdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   p.wait()
+  out, err = p.communicate()
+  print "STDOUT:", out
+  print "STDERR:", err
   _cleanup(tmpdir)
   sys.exit(p.returncode)

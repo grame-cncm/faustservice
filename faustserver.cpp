@@ -77,11 +77,17 @@ string completebuterrorpage =
 string completebutnohash =
   "<html><body>The upload is completed but we could not generate a hash for your file.</body></html>";
 
-string completebutcorrupt =
-  "<html><body>The upload is completed but the file you uploaded is not a valid Faust file. \
+string completebutcorrupt_head =
+  "<html><body><p>The upload is completed but the file you uploaded is not a valid Faust file. \
   Make sure that it is either a file with an extension .dsp or an archive (tar.gz, tar.bz, tar \
   or zip) containing one .dsp file and potentially .lib files included by the .dsp file. \
-  Furthermore, the code in these files must be valid faust code.</body></html>";
+  Furthermore, the code in these files must be valid faust code.</p> \
+  <p>Below is the STDOUT and STDERR for the Faust code you tried to compile. \
+  If the two are empty, then your file structure is wrong. Otherwise, they will tell you \
+  why Faust failed.</p>";
+
+string completebutcorrupt_tail =
+  "</body></html>";
 
 string completebutalreadythere_head =
   "<html><body>The upload is completed but it looks like you have already uploaded this file.<br />Here is its SHA1 key: ";
@@ -229,6 +235,8 @@ int validate_faust(connection_info_struct *con_info)
   // for debugging, add print commands to the python script
   // and do cout << result << endl;
   int exitstatus = pclose(pipe);
+  if (exitstatus)
+    con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
   return exitstatus;
 }
 
@@ -338,8 +346,6 @@ iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
       else
         con_info->answerstring = completebutnohash;
     }
-  else
-    con_info->answerstring = completebutcorrupt;
     
   con_info->answercode = MHD_HTTP_OK;
 
