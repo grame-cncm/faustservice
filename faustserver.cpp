@@ -219,9 +219,7 @@ int validate_faust(connection_info_struct *con_info)
   FILE *pipe = popen(("python validate_faust.py "+con_info->tmppath).c_str (), "r");
   string result = "";
   if (!pipe)
-    {
-      con_info->answerstring = completebuterrorpage;
-    }
+    con_info->answerstring = completebuterrorpage;
   else
     {
       // Bleed off the pipe
@@ -237,30 +235,6 @@ int validate_faust(connection_info_struct *con_info)
   int exitstatus = pclose(pipe);
   if (exitstatus)
     con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
-  return exitstatus;
-}
-
-int make_initial_faust_directory(connection_info_struct *con_info, string sha1, string original_filename)
-{
-  FILE *pipe = popen(("python make_initial_faust_directory.py "+con_info->tmppath+" "+sha1+" "+original_filename).c_str (), "r");
-  string result = "";
-  if (!pipe)
-    {
-      con_info->answerstring = completebuterrorpage;
-    }
-  else
-    {
-      // Bleed off the pipe
-      char buffer[128];
-      while(!feof(pipe))
-        {
-          if(fgets(buffer, 128, pipe) != NULL)
-            result += buffer;
-        }
-    }
-  // for debugging, add print commands to the python script
-  // and do cout << result << endl;
-  int exitstatus = pclose(pipe);
   return exitstatus;
 }
 
@@ -284,10 +258,39 @@ string_and_exitstatus generate_sha1(connection_info_struct *con_info)
   string_and_exitstatus res;
   res.exitstatus = pclose(pipe);
   res.str = result;
+  if (res.exitstatus)
+    con_info->answerstring = completebutnohash;
   return res;
 }
 
+int make_initial_faust_directory(connection_info_struct *con_info, string sha1, string original_filename)
+{
+  FILE *pipe = popen(("python make_initial_faust_directory.py "+con_info->tmppath+" "+sha1+" "+original_filename).c_str (), "r");
+  string result = "";
+  if (!pipe)
+    {
+      con_info->answerstring = completebuterrorpage;
+    }
+  else
+    {
+      // Bleed off the pipe
+      char buffer[128];
+      while(!feof(pipe))
+        {
+          if(fgets(buffer, 128, pipe) != NULL)
+            result += buffer;
+        }
+    }
+  // for debugging, add print commands to the python script
+  // and do cout << result << endl;
+  int exitstatus = pclose(pipe);
+  if (exitstatus)
+     con_info->answerstring = completebutalreadythere_head + sha1 + completebutalreadythere_tail;
+  else
+     con_info->answerstring = completepage_head + sha1 + completepage_tail;
 
+  return exitstatus;
+}
 
 static int
 iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
@@ -329,22 +332,11 @@ iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
     }
   fclose(con_info->fp);
 
-  int exitstatus = validate_faust(con_info);
-  // if 0, we generate our sha key for the file
-  if (!exitstatus)
+  if (!validate_faust(con_info))
     {
       string_and_exitstatus sha1 = generate_sha1(con_info);
-      exitstatus = sha1.exitstatus;
       if (!sha1.exitstatus)
-        {
-          exitstatus = make_initial_faust_directory(con_info, sha1.str, string (filename));
-          if (exitstatus)
-            con_info->answerstring = completebutalreadythere_head + sha1.str + completebutalreadythere_tail;
-          else
-            con_info->answerstring = completepage_head + sha1.str + completepage_tail;
-        }
-      else
-        con_info->answerstring = completebutnohash;
+        (void) make_initial_faust_directory(con_info, sha1.str, string (filename));
     }
     
   con_info->answercode = MHD_HTTP_OK;
