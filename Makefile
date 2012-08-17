@@ -1,7 +1,7 @@
 objects = main.o server.o utilities.o
 
 faustserver : $(objects)
-	g++ -lboost_random -lmicrohttpd -o faustserver $(objects)
+	g++ -lboost_random -lboost_system -lboost_filesystem -lmicrohttpd -o faustserver $(objects)
 
 main.o : main.cpp
 	g++ -c main.cpp

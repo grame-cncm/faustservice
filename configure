@@ -565,7 +565,7 @@ PACKAGE_STRING='faustserver 0.0'
 PACKAGE_BUGREPORT='faustbug@grame.fr'
 PACKAGE_URL=''
 
-ac_unique_file="faustserver.cpp"
+ac_unique_file="main.cpp"
 # Factoring default headers for most tests.
 ac_includes_default="\
 #include <stdio.h>
@@ -3316,6 +3316,96 @@ if test "x$ac_cv_lib_boost_random_generate_uniform_int" = xyes; then :
 _ACEOF
 
   LIBS="-lboost_random $LIBS"
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for replace_extension in -lboost_filesystem" >&5
+$as_echo_n "checking for replace_extension in -lboost_filesystem... " >&6; }
+if ${ac_cv_lib_boost_filesystem_replace_extension+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lboost_filesystem  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char replace_extension ();
+int
+main ()
+{
+return replace_extension ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_boost_filesystem_replace_extension=yes
+else
+  ac_cv_lib_boost_filesystem_replace_extension=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_boost_filesystem_replace_extension" >&5
+$as_echo "$ac_cv_lib_boost_filesystem_replace_extension" >&6; }
+if test "x$ac_cv_lib_boost_filesystem_replace_extension" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBBOOST_FILESYSTEM 1
+_ACEOF
+
+  LIBS="-lboost_filesystem $LIBS"
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for system_error::what in -lboost_system" >&5
+$as_echo_n "checking for system_error::what in -lboost_system... " >&6; }
+if ${ac_cv_lib_boost_system_system_error__what+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lboost_system  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char system_error::what ();
+int
+main ()
+{
+return system_error::what ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_boost_system_system_error__what=yes
+else
+  ac_cv_lib_boost_system_system_error__what=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_boost_system_system_error__what" >&5
+$as_echo "$ac_cv_lib_boost_system_system_error__what" >&6; }
+if test "x$ac_cv_lib_boost_system_system_error__what" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBBOOST_SYSTEM 1
+_ACEOF
+
+  LIBS="-lboost_system $LIBS"
 
 fi
 

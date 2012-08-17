@@ -1,11 +1,61 @@
 #include <sys/stat.h>
+#include <iostream>
 
 #include "server.hh"
 #include "utilities.hh"
 
-int
-main ()
+int gPort = 8888;
+int gMaxClients = 2;
+string gDirectory = "";
+
+//-- command line tools
+
+static bool isCmd(const char* cmd, const char* kw1)
 {
+  return (strcmp(cmd, kw1) == 0);
+}
+
+static bool isCmd(const char* cmd, const char* kw1, const char* kw2)
+{
+  return (strcmp(cmd, kw1) == 0) || (strcmp(cmd, kw2) == 0);
+}
+
+void
+process_cmdline (int argc, char* argv[])
+{
+  int i = 1;
+
+  while (i < argc)
+    {
+      if (isCmd(argv[i], "-p", "--port"))
+        {
+          gPort = atoi (argv[i+1]);
+          i += 2;
+        }
+      else if (isCmd(argv[i], "-p", "--port"))
+        {
+          gMaxClients = atoi (argv[i+1]);
+          i += 2;
+        }
+      else if (isCmd(argv[i], "-d", "--directory"))
+        {
+          gDirectory = string (argv[i+1]);
+          i += 2;
+        }
+      else
+        {
+          //cerr << "faust: unrecognized option \"" << argv[i] <<"\"" << endl;
+          i++;
+          //err++;
+        }
+    }
+}
+
+int
+main (int argc, char* argv[])
+{
+
+  process_cmdline(argc, argv);
 
   // Create an autonomous process
   pid_t pid, sid;
@@ -43,11 +93,11 @@ main ()
   
 
   // Close out the standard file descriptors
-  close (STDIN_FILENO);
-  close (STDOUT_FILENO);
-  close (STDERR_FILENO);
+  //close (STDIN_FILENO);
+  //close (STDOUT_FILENO);
+  //close (STDERR_FILENO);
 
-  FaustServer server (PORT);
+  FaustServer server (gPort, gMaxClients, gDirectory);
 
   if (!server.start ())
     return 1;

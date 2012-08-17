@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.68])
 AC_INIT([faustserver], [0.0], [faustbug@grame.fr])
-AC_CONFIG_SRCDIR([faustserver.cpp])
+AC_CONFIG_SRCDIR([main.cpp])
 AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
@@ -11,6 +11,8 @@ AC_PROG_CXX
 
 # Checks for libraries.
 AC_CHECK_LIB([boost_random], [generate_uniform_int])
+AC_CHECK_LIB([boost_filesystem], [replace_extension])
+AC_CHECK_LIB([boost_system], [system_error::what])
 AC_CHECK_LIB([microhttpd], [MHD_queue_response])
 AC_CHECK_PROG(HASPYTHON,[python],yes,no)
 

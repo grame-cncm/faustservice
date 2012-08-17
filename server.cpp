@@ -1,11 +1,14 @@
 #include <sstream>
+#include <iostream>
 
 #include <microhttpd.h>
+#include <boost/filesystem.hpp>
 
 #include "utilities.hh"
 #include "server.hh"
 
 using namespace std;
+namespace fs = boost::filesystem;
 
 string askpage_head = "<html><body>\n\
                        Upload a Faust file, please.<br>\n\
@@ -121,7 +124,7 @@ generate_sha1 (connection_info_struct *con_info)
 int
 make_initial_faust_directory (connection_info_struct *con_info, string sha1, string original_filename)
 {
-  FILE *pipe = popen (("python make_initial_faust_directory.py "+con_info->tmppath+" "+sha1+" "+original_filename).c_str (), "r");
+  FILE *pipe = popen (("python make_initial_faust_directory.py "+con_info->tmppath+" "+sha1+" "+original_filename+" "+con_info->directory).c_str (), "r");
   string result = "";
   if (!pipe)
     {
@@ -259,14 +262,18 @@ FaustServer::answer_to_connection (void *cls, struct MHD_Connection *connection,
                        const char *version, const char *upload_data,
                        size_t *upload_data_size, void **con_cls)
 {
+  FaustServer *server = (FaustServer *)cls;
+
   if (NULL == *con_cls)
     {
-      struct connection_info_struct *con_info;
+      struct connection_info_struct *con_info;    
 
-      if (nr_of_uploading_clients >= MAXCLIENTS)
+      if (nr_of_uploading_clients >= server->getMaxClients ())
         return send_page (connection, busypage, MHD_HTTP_SERVICE_UNAVAILABLE);
 
       con_info = new connection_info_struct ();
+      con_info->directory = server->getDirectory ();
+
       if (NULL == con_info)
         return MHD_NO;
 
@@ -308,7 +315,7 @@ FaustServer::answer_to_connection (void *cls, struct MHD_Connection *connection,
           ss << askpage_head << nr_of_uploading_clients << askpage_tail;
           return send_page (connection, ss.str (), MHD_HTTP_OK);
         }
-      return faustGet (connection, args);
+      return faustGet (connection, args, server->getDirectory ());
     }
 
   if (0 == strcmp (method, "POST"))
@@ -334,7 +341,7 @@ FaustServer::answer_to_connection (void *cls, struct MHD_Connection *connection,
 unsigned int FaustServer::nr_of_uploading_clients = 0;
 
 int
-FaustServer::faustGet (struct MHD_Connection *connection, TArgs &args)
+FaustServer::faustGet (struct MHD_Connection *connection, TArgs &args, string directory)
 {
   if (args["sha1"].empty ())
     return send_page (connection, nosha1present, MHD_HTTP_BAD_REQUEST);
@@ -346,7 +353,7 @@ FaustServer::faustGet (struct MHD_Connection *connection, TArgs &args)
     architecture_file = "plot.cpp";
 
   // lists all the files in the directory
-  vector<string> filesindir = getdir (args["sha1"]);
+  vector<string> filesindir = getdir ((fs::path (directory) / fs::path (args["sha1"])).string ());
   // we've already verified that there is only 1 dsp file in the python script, so we find that
   string dspfile;
   for (unsigned int i = 0; i < filesindir.size (); i++)
@@ -358,7 +365,8 @@ FaustServer::faustGet (struct MHD_Connection *connection, TArgs &args)
           break;
         }
     }
-  FILE *pipe = popen (("faust -a "+architecture_file+" "+args["sha1"]+"/"+dspfile).c_str (), "r");
+  cout << ("faust -a "+architecture_file+" "+(fs::path (directory) / fs::path (args["sha1"]) / fs::path (dspfile)).string ()) << endl;
+  FILE *pipe = popen (("faust -a "+architecture_file+" "+(fs::path (directory) / fs::path (args["sha1"]) / fs::path (dspfile)).string ()).c_str (), "r");
   string result = "";
   if (!pipe)
     return send_page (connection, cannotcompile, MHD_HTTP_BAD_REQUEST);
@@ -379,11 +387,23 @@ FaustServer::faustGet (struct MHD_Connection *connection, TArgs &args)
   return send_page (connection, result, MHD_HTTP_OK);
 }
 
+const int
+FaustServer::getMaxClients ()
+{
+  return max_clients_;
+}
+
+const string
+FaustServer::getDirectory ()
+{
+  return directory_;
+}
+
 bool
 FaustServer::start ()
 {
   daemon_ = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY, port_, NULL, NULL,
-                              &answer_to_connection, NULL,
+                              &answer_to_connection, this,
                               MHD_OPTION_NOTIFY_COMPLETED, request_completed,
                               NULL, MHD_OPTION_END);
   return daemon_ != NULL;
@@ -399,6 +419,7 @@ FaustServer::stop ()
 }
 
 
-FaustServer::FaustServer (int port) : port_ (port)
+FaustServer::FaustServer (int port, int max_clients, string directory)
+  : port_ (port), max_clients_ (max_clients), directory_ (directory)
 {
 }

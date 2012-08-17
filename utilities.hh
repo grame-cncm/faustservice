@@ -7,12 +7,10 @@
 
 using namespace std;
 
-#define PORT            8888
-#define POSTBUFFERSIZE  512
-#define MAXCLIENTS      2
+#define POSTBUFFERSIZE 512
 
-#define GET             0
-#define POST            1
+#define GET 0
+#define POST 1
 
 typedef map<string, string> TArgs;
 

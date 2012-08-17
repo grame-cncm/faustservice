@@ -26,6 +26,7 @@ _SHA1_ALREADY_PRESENT = 5
 FILENAME = sys.argv[1]
 SHA1 = sys.argv[2]
 ORIGINAL_FILENAME = sys.argv[3]
+PATH_TO_SHA1 = sys.argv[4]
 
 def _copy_contents_to_real(filename, realdir, original_filename) :
   '''
@@ -58,8 +59,9 @@ def _copy_contents_to_real(filename, realdir, original_filename) :
 
 if __name__ == '__main__' :
   try :
-    os.mkdir(SHA1)
+    print os.path.join(PATH_TO_SHA1, SHA1)
+    os.mkdir(os.path.join(PATH_TO_SHA1, SHA1))
   except :
     sys.exit(_SHA1_ALREADY_PRESENT)
-  _copy_contents_to_real(FILENAME, SHA1, ORIGINAL_FILENAME)
+  _copy_contents_to_real(FILENAME, os.path.join(PATH_TO_SHA1, SHA1), ORIGINAL_FILENAME)
   sys.exit(_SUCCESS)

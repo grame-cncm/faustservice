@@ -14,6 +14,7 @@ struct connection_info_struct
   string tmppath;
   string answerstring;
   int answercode;
+  string directory;
 };
 
 struct string_and_exitstatus
@@ -24,10 +25,13 @@ struct string_and_exitstatus
 
 class FaustServer {
   int port_;
+  int max_clients_;
+  string directory_;
+
   struct MHD_Daemon* daemon_;
 
   static unsigned int nr_of_uploading_clients;
-  static int faustGet (struct MHD_Connection *connection, TArgs &args);
+  static int faustGet (struct MHD_Connection *connection, TArgs &args, string directory);
   static int get_params (void *cls, enum MHD_ValueKind , const char *key, const char *data);
   static int send_page (struct MHD_Connection *connection, string page, int status_code);
   static int iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
@@ -42,8 +46,10 @@ class FaustServer {
                        size_t *upload_data_size, void **con_cls);
 
   public :
-    FaustServer (int port);
-    virtual ~FaustServer() {};
+    FaustServer (int port, int max_cleints, string directory);
+    virtual ~FaustServer () {};
+    const int getMaxClients ();
+    const string getDirectory ();
     bool start ();
     void stop ();
 };
