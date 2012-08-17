@@ -10,10 +10,16 @@ AC_CONFIG_HEADERS([config.h])
 AC_PROG_CXX
 
 # Checks for libraries.
-AC_CHECK_LIB([boost_random], [generate_uniform_int])
-AC_CHECK_LIB([boost_filesystem], [replace_extension])
-AC_CHECK_LIB([boost_system], [system_error::what])
-AC_CHECK_LIB([microhttpd], [MHD_queue_response])
+AC_LANG_PUSH([C++])
+AC_CHECK_HEADERS([boost/foreach.hpp], [],
+    [AC_MSG_ERROR(You need the Boost libraries.)])
+    AC_LANG_POP([C++])
+
+AC_CHECK_LIB([microhttpd], [MHD_queue_response],,libmicrohttpd=no) 
+if test "x$libmicrohttpd" == "xno"; then
+	AC_MSG_ERROR([libmicrohttpd is needed to compile])
+fi
+
 AC_CHECK_PROG(HASPYTHON,[python],yes,no)
 
 if test "x$HAXPYTHON" == "xno"; then
