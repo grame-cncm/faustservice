@@ -12,6 +12,7 @@ struct connection_info_struct
   struct MHD_PostProcessor *postprocessor;
   FILE *fp;
   string tmppath;
+  string filename;
   string answerstring;
   int answercode;
   string directory;

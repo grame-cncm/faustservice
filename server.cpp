@@ -85,57 +85,41 @@ string fileexistspage =
 int
 validate_faust (connection_info_struct *con_info)
 {
-  /*
-  FILE *pipe = popen (("python validate_faust.py "+con_info->tmppath).c_str (), "r");
-  string result = "";
-  if (!pipe)
-    con_info->answerstring = completebuterrorpage;
-  else
-    {
-      // Bleed off the pipe
-      char buffer[128];
-      while (!feof (pipe))
-        {
-          if (fgets (buffer, 128, pipe) != NULL)
-            result += buffer;
-        }
-    }
-  // for debugging, add print commands to the python script
-  // and do cout << result << endl;
-  */
-  fs::path tmpdir = fs::temp_directory_path() / fs::path (boost_random (10));
+  fs::path tmpdir = fs::temp_directory_path () / fs::unique_path ("%%%%-%%%%-%%%%-%%%%");
   fs::create_directory (tmpdir);
-  fs::path filename = fs::path (con_info->tmppath);
+  fs::path filename = fs::path (con_info->filename);
+  fs::path old_full_filename = fs::path (con_info->tmppath) / filename;
+
   // libarchive stuff
   struct archive *my_archive;
   struct archive_entry *my_entry;
-  
+
   my_archive = archive_read_new();
   archive_read_support_filter_all(my_archive);
   archive_read_support_format_all(my_archive);
-  int archive_status = archive_read_open_filename(my_archive, filename.string ().c_str (), 10240);
+  int archive_status = archive_read_open_filename(my_archive, old_full_filename.string ().c_str (), 10240);
   // fix later...
   string result = "";
 
   // prepare for the tar
-  //_copy_contents_to_tmp(filename, tmpdir)
-  if (!fs::is_regular_file (filename))
+
+  if (!fs::is_regular_file (old_full_filename))
     {
       fs::remove_all (tmpdir);
       con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
       return 1;
     }
-  else if (con_info->tmppath.substr (con_info->tmppath.find_last_of (".") + 1) == "dsp")
+  else if (old_full_filename.string ().substr (old_full_filename.string ().find_last_of (".") + 1) == "dsp")
     {
-      fs::copy_file (filename, tmpdir / filename);
+      fs::copy_file (old_full_filename, tmpdir / filename);
     }
-  else if (archive_status != ARCHIVE_OK)
+  else if (archive_status == ARCHIVE_OK)
     {
       string dsp_file;
       while (archive_read_next_header(my_archive, &my_entry) == ARCHIVE_OK)
         {
           fs::path current_file = fs::path (archive_entry_pathname (my_entry));
-          if (current_file.string ().substr (con_info->tmppath.find_last_of (".") + 1) == "dsp")
+          if (current_file.string ().substr (current_file.string ().find_last_of (".") + 1) == "dsp")
             {
               if (!dsp_file.empty ())
                 {
@@ -173,6 +157,7 @@ validate_faust (connection_info_struct *con_info)
       con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
       return 1;    
     }
+
   //_copy_contents_to_tmp(filename, tmpdir)
   FILE *pipe = popen (("faust -a plot.cpp " + (tmpdir / filename).string () + " 2>&1").c_str (), "r");
   if (!pipe)
@@ -188,6 +173,7 @@ validate_faust (connection_info_struct *con_info)
         }
     }
   // need to check stderr...find a way to do this
+
   int exitstatus = pclose (pipe);
   fs::remove_all (tmpdir);
 
@@ -200,7 +186,8 @@ string_and_exitstatus
 generate_sha1 (connection_info_struct *con_info)
 {
   CryptoPP::SHA1 sha1;
-  string source = con_info->tmppath;
+  fs::path old_full_filename = fs::path (con_info->tmppath) / fs::path (con_info->filename);
+  string source = old_full_filename.string ();
   string hash = "";
   try
     {
@@ -215,34 +202,69 @@ generate_sha1 (connection_info_struct *con_info)
   return res;
 }
 
+
+// merge with validate function...
 int
-make_initial_faust_directory (connection_info_struct *con_info, string sha1, string original_filename)
+make_initial_faust_directory (connection_info_struct *con_info, string sha1)
 {
-  FILE *pipe = popen (("python make_initial_faust_directory.py "+con_info->tmppath+" "+sha1+" "+original_filename+" "+con_info->directory).c_str (), "r");
-  string result = "";
-  if (!pipe)
+  fs::path sha1path = fs::path (con_info->directory) / fs::path (sha1);
+  if (fs::is_directory (sha1path))
     {
-      con_info->answerstring = completebuterrorpage;
+      con_info->answerstring = completebutalreadythere_head + sha1 + completebutalreadythere_tail;
+      return 1;    
     }
-  else
+
+  fs::create_directory (sha1path);
+  fs::path filename (con_info->filename);
+  fs::path old_full_filename = fs::path (con_info->tmppath) / filename;
+
+  // libarchive stuff
+  struct archive *my_archive;
+  struct archive_entry *my_entry;
+
+  my_archive = archive_read_new();
+  archive_read_support_filter_all(my_archive);
+  archive_read_support_format_all(my_archive);
+  int archive_status = archive_read_open_filename(my_archive, old_full_filename.string ().c_str (), 10240);
+  // fix later...
+  string result = "";
+
+  // prepare for the tar
+
+  if (!fs::is_regular_file (old_full_filename))
     {
-      // Bleed off the pipe
-      char buffer[128];
-      while (!feof (pipe))
+      con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+      return 1;
+    }
+  else if (filename.string ().substr (filename.string ().find_last_of (".") + 1) == "dsp")
+    {
+      fs::copy_file (old_full_filename, sha1path / filename);
+    }
+  else if (archive_status == ARCHIVE_OK)
+    {
+      string dsp_file;
+      while (archive_read_next_header(my_archive, &my_entry) == ARCHIVE_OK)
         {
-          if (fgets (buffer, 128, pipe) != NULL)
-            result += buffer;
+          fs::path current_file = fs::path (archive_entry_pathname (my_entry));
+          string newpath = fs::path (sha1path / current_file).string ();
+          archive_entry_set_pathname (my_entry, newpath.c_str ());
+          archive_read_extract(my_archive, my_entry, ARCHIVE_EXTRACT_PERM);
+        }
+      archive_status = archive_read_free (my_archive);
+      if (archive_status != ARCHIVE_OK)
+        {
+          con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+          return 1;
         }
     }
-  // for debugging, add print commands to the python script
-  // and do cout << result << endl;
-  int exitstatus = pclose (pipe);
-  if (exitstatus)
-     con_info->answerstring = completebutalreadythere_head + sha1 + completebutalreadythere_tail;
   else
-     con_info->answerstring = completepage_head + sha1 + completepage_tail;
+    {
+      con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+      return 1;
+    }
 
-  return exitstatus;
+  con_info->answerstring = completepage_head + sha1 + completepage_tail;
+  return 0;
 }
 
 int
@@ -282,7 +304,13 @@ FaustServer::iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const cha
   FILE *fp;
 
   if (con_info->tmppath.empty ())
-    con_info->tmppath = "/tmp/faust" + boost_random (10) + filename;
+    {
+      con_info->filename = filename;
+      con_info->tmppath = (fs::temp_directory_path () / fs::unique_path ("%%%%-%%%%-%%%%-%%%%")).string ();
+      fs::create_directory (con_info->tmppath);
+    }
+
+  string full_path = (fs::path (con_info->tmppath) / fs::path (con_info->filename)).string ();
 
   con_info->answerstring = servererrorpage;
   con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
@@ -292,7 +320,7 @@ FaustServer::iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const cha
 
   if (!con_info->fp)
     {
-      if (NULL != (fp = fopen (con_info->tmppath.c_str (), "rb")))
+      if (NULL != (fp = fopen (full_path.c_str (), "rb")))
         {
           fclose (fp);
           con_info->answerstring = fileexistspage;
@@ -300,7 +328,7 @@ FaustServer::iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const cha
           return MHD_NO;
         }
 
-      con_info->fp = fopen (con_info->tmppath.c_str (), "ab");
+      con_info->fp = fopen (full_path.c_str (), "ab");
       if (!con_info->fp)
         return MHD_NO;
     }
@@ -316,9 +344,9 @@ FaustServer::iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const cha
     {
       string_and_exitstatus sha1 = generate_sha1 (con_info);
       if (!sha1.exitstatus)
-        (void) make_initial_faust_directory (con_info, sha1.str, string (filename));
+        (void) make_initial_faust_directory (con_info, sha1.str);
     }
-    
+
   con_info->answercode = MHD_HTTP_OK;
 
   return MHD_YES;
