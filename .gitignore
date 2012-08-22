@@ -19,5 +19,7 @@ missing
 stamp-h1
 .deps/
 
+build/
+
 *.o
 *~
