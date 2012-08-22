@@ -1,8 +1,20 @@
 #include <sstream>
 #include <iostream>
 
+// libmicrohttpd
 #include <microhttpd.h>
+
+// Boost libraries
 #include <boost/filesystem.hpp>
+
+// libcryptopp
+#include <cryptopp/sha.h>
+#include <cryptopp/files.h>
+#include <cryptopp/hex.h>
+
+// libarchive
+#include <archive.h>
+#include <archive_entry.h>
 
 #include "utilities.hh"
 #include "server.hh"
@@ -73,6 +85,7 @@ string fileexistspage =
 int
 validate_faust (connection_info_struct *con_info)
 {
+  /*
   FILE *pipe = popen (("python validate_faust.py "+con_info->tmppath).c_str (), "r");
   string result = "";
   if (!pipe)
@@ -89,7 +102,95 @@ validate_faust (connection_info_struct *con_info)
     }
   // for debugging, add print commands to the python script
   // and do cout << result << endl;
+  */
+  fs::path tmpdir = fs::temp_directory_path() / fs::path (boost_random (10));
+  fs::create_directory (tmpdir);
+  fs::path filename = fs::path (con_info->tmppath);
+  // libarchive stuff
+  struct archive *my_archive;
+  struct archive_entry *my_entry;
+  
+  my_archive = archive_read_new();
+  archive_read_support_filter_all(my_archive);
+  archive_read_support_format_all(my_archive);
+  int archive_status = archive_read_open_filename(my_archive, filename.string ().c_str (), 10240);
+  // fix later...
+  string result = "";
+
+  // prepare for the tar
+  //_copy_contents_to_tmp(filename, tmpdir)
+  if (!fs::is_regular_file (filename))
+    {
+      fs::remove_all (tmpdir);
+      con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+      return 1;
+    }
+  else if (con_info->tmppath.substr (con_info->tmppath.find_last_of (".") + 1) == "dsp")
+    {
+      fs::copy_file (filename, tmpdir / filename);
+    }
+  else if (archive_status != ARCHIVE_OK)
+    {
+      string dsp_file;
+      while (archive_read_next_header(my_archive, &my_entry) == ARCHIVE_OK)
+        {
+          fs::path current_file = fs::path (archive_entry_pathname (my_entry));
+          if (current_file.string ().substr (con_info->tmppath.find_last_of (".") + 1) == "dsp")
+            {
+              if (!dsp_file.empty ())
+                {
+                  archive_status = archive_read_free (my_archive);
+                  fs::remove_all (tmpdir);
+                  con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+                  return 1;
+                }
+              dsp_file = current_file.string ();
+              filename = dsp_file;
+            }
+          string newpath = fs::path (tmpdir / current_file).string ();
+          archive_entry_set_pathname (my_entry, newpath.c_str ());
+          archive_read_extract(my_archive, my_entry, ARCHIVE_EXTRACT_PERM);
+        }
+      archive_status = archive_read_free (my_archive);
+      if (archive_status != ARCHIVE_OK)
+        {
+          fs::remove_all (tmpdir);
+          con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+          return 1;
+        }
+    }
+  else
+    {
+      fs::remove_all (tmpdir);
+      con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+      return 1;
+    }
+
+  // in case a dsp file wasn't found
+  if (filename.string () == "")
+    {
+      fs::remove_all (tmpdir);
+      con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+      return 1;    
+    }
+  //_copy_contents_to_tmp(filename, tmpdir)
+  FILE *pipe = popen (("faust -a plot.cpp " + (tmpdir / filename).string () + " 2>&1").c_str (), "r");
+  if (!pipe)
+    con_info->answerstring = completebuterrorpage;
+  else
+    {
+      // Bleed off the pipe
+      char buffer[128];
+      while (!feof (pipe))
+        {
+          if (fgets (buffer, 128, pipe) != NULL)
+            result += buffer;
+        }
+    }
+  // need to check stderr...find a way to do this
   int exitstatus = pclose (pipe);
+  fs::remove_all (tmpdir);
+
   if (exitstatus)
     con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
   return exitstatus;
@@ -98,24 +199,17 @@ validate_faust (connection_info_struct *con_info)
 string_and_exitstatus
 generate_sha1 (connection_info_struct *con_info)
 {
-  FILE *pipe = popen (("python generate_sha1.py "+con_info->tmppath).c_str (), "r");
-  string result = "";
-  if (!pipe)
+  CryptoPP::SHA1 sha1;
+  string source = con_info->tmppath;
+  string hash = "";
+  try
     {
-      con_info->answerstring = completebuterrorpage;
+      CryptoPP::FileSource(source.c_str (), true, new CryptoPP::HashFilter(sha1, new CryptoPP::HexEncoder(new CryptoPP::StringSink(hash))));
     }
-  else
-    {
-      char buffer[128];
-      while (!feof (pipe))
-        {
-          if (fgets (buffer, 128, pipe) != NULL)
-            result += buffer;
-        }
-    }
+  catch (...) { }
   string_and_exitstatus res;
-  res.exitstatus = pclose (pipe);
-  res.str = result;
+  res.exitstatus = hash.length () == 40 ? 0 : 1;
+  res.str = hash;
   if (res.exitstatus)
     con_info->answerstring = completebutnohash;
   return res;

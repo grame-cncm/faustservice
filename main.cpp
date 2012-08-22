@@ -56,7 +56,7 @@ main (int argc, char* argv[])
 {
 
   process_cmdline(argc, argv);
-
+/*
   // Create an autonomous process
   pid_t pid, sid;
   // Fork off the parent process
@@ -96,7 +96,7 @@ main (int argc, char* argv[])
   //close (STDIN_FILENO);
   //close (STDOUT_FILENO);
   //close (STDERR_FILENO);
-
+*/
   FaustServer server (gPort, gMaxClients, gDirectory);
 
   if (!server.start ())

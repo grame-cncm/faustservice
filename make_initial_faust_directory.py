@@ -26,7 +26,10 @@ _SHA1_ALREADY_PRESENT = 5
 FILENAME = sys.argv[1]
 SHA1 = sys.argv[2]
 ORIGINAL_FILENAME = sys.argv[3]
-PATH_TO_SHA1 = sys.argv[4]
+PATH_TO_SHA1 = ""
+try :
+  PATH_TO_SHA1 = dsys.argv[4]
+except : pass
 
 def _copy_contents_to_real(filename, realdir, original_filename) :
   '''
