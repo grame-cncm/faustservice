@@ -14,6 +14,4 @@ using namespace std;
 
 typedef map<string, string> TArgs;
 
-vector<string> getdir(string dir);
-
 #endif

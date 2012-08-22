@@ -451,18 +451,20 @@ FaustServer::faustGet(struct MHD_Connection *connection, TArgs &args, string dir
 		architecture_file = "plot.cpp";
 
 	// lists all the files in the directory
-	vector<string> filesindir = getdir((fs::path(directory) / fs::path(args["sha1"])).string());
-	// we've already verified that there is only 1 dsp file in the python script, so we find that
-	string dspfile;
-	for (unsigned int i = 0; i < filesindir.size(); i++) {
-		string fn = filesindir[i];
-		if (fn.substr(fn.find_last_of(".") + 1) == "dsp") {
-			dspfile = fn;
-			break;
-		}
-	}
+	fs::path my_dir = fs::path(directory) / fs::path(args["sha1"]);
+	fs::directory_iterator end_iter;
 
-	FILE *pipe = popen(("faust -a " + architecture_file + " " + (fs::path(directory) / fs::path(args["sha1"]) / fs::path(dspfile)).string()).c_str(), "r");
+        string dspfile;
+	if (fs::exists(my_dir) && fs::is_directory(my_dir)) {
+		for (fs::directory_iterator dir_iter(my_dir); dir_iter != end_iter; ++dir_iter) {
+			if (dir_iter->path().string ().substr(dir_iter->path().string ().find_last_of(".") + 1) == "dsp") {
+                                dspfile = dir_iter->path().string ();
+                                break;
+                        }
+                }
+        }
+
+	FILE *pipe = popen(("faust -a " + architecture_file + " " + (fs::path(directory) / fs::path(dspfile)).string()).c_str(), "r");
 	string result = "";
 	if (!pipe)
 		return send_page(connection, cannotcompile, MHD_HTTP_BAD_REQUEST);
