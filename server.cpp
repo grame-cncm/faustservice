@@ -22,6 +22,10 @@
 using namespace std;
 namespace fs = boost::filesystem;
 
+/*
+ * Various responses to GET requests
+ */
+
 string askpage_head = "<html><body>\n\
                        Upload a Faust file, please.<br>\n\
                        There are ";
@@ -96,6 +100,12 @@ string servererrorpage =
 
 string fileexistspage =
 	"<html><body>This file already exists.</body></html>";
+
+/*
+ * Validates that a Faust file or archive is sane and returns 0 for success
+ * or 1 for failure.  If the evaluation fails, the appropriate error message
+ * is set.  More info on the con_info structure is in server.hh.
+ */
 
 int
 validate_faust(connection_info_struct *con_info)
@@ -181,6 +191,13 @@ validate_faust(connection_info_struct *con_info)
 	return exitstatus;
 }
 
+/*
+ * Generates an SHA-1 key for Faust file or archive and returns 0 for success
+ * or 1 for failure along with the key in the string_and_exitstatus structure.
+ * If the evaluation fails, the appropriate error message is set. More info
+ * on the con_info structure is in server.hh.
+ */
+
 string_and_exitstatus
 generate_sha1(connection_info_struct *con_info)
 {
@@ -201,6 +218,13 @@ generate_sha1(connection_info_struct *con_info)
 	return res;
 }
 
+
+/*
+ * Makes an initial directory whose name is the SHA-1 key passed in for
+ * a Faust file or archive, returning 0 for success or 1 for failure.
+ * If the evaluation fails, the appropriate error message is set.
+ * More info on the con_info structure is in server.hh.
+ */
 
 // TODO: merge with validate function if possible...
 int
@@ -224,7 +248,6 @@ make_initial_faust_directory(connection_info_struct *con_info, string sha1)
 	archive_read_support_filter_all(my_archive);
 	archive_read_support_format_all(my_archive);
 	int archive_status = archive_read_open_filename(my_archive, old_full_filename.string().c_str(), 10240);
-	// fix later...
 	string result = "";
 
 	// prepare for the tar
@@ -256,6 +279,11 @@ make_initial_faust_directory(connection_info_struct *con_info, string sha1)
 	return 0;
 }
 
+/*
+ * Callback that puts GET parameters in a TArgs.  The TArgs typedef is defined
+ * in utilities.hh.
+ */
+
 int
 FaustServer::get_params(void *cls, enum MHD_ValueKind, const char *key, const char *data)
 {
@@ -263,6 +291,11 @@ FaustServer::get_params(void *cls, enum MHD_ValueKind, const char *key, const ch
 	args->insert(pair<string, string> (string(key), string(data)));
 	return MHD_YES;
 }
+
+/*
+ * Function that sends a response to the MHD_Connection after a POST or GET
+ * is effectuated.
+ */
 
 int
 FaustServer::send_page(struct MHD_Connection *connection, string page,
@@ -282,6 +315,12 @@ FaustServer::send_page(struct MHD_Connection *connection, string page,
 
 	return ret;
 }
+
+/*
+ * Callback called every time a POST request comes in by the postprocessor.
+ * To understand more about how postprocessors work, consult the microhttpd
+ * documentation.
+ */
 
 int
 FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
@@ -329,6 +368,13 @@ FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const char
 	return MHD_YES;
 }
 
+/*
+ * Callback called every time a GET or POST request is completed.
+ * Note that this is NOT necessarily called once the entirety of
+ * POST data is transfered. If the data is transfered in chunks,
+ * this is called after every chunk.
+ */
+
 void
 FaustServer::request_completed(void *cls, struct MHD_Connection *connection,
 			       void **con_cls, enum MHD_RequestTerminationCode toe)
@@ -351,6 +397,10 @@ FaustServer::request_completed(void *cls, struct MHD_Connection *connection,
 	*con_cls = NULL;
 }
 
+/*
+ * Callback called every time a GET or POST request is received.
+ * by the server.
+ */
 
 int
 FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connection,
@@ -436,7 +486,14 @@ FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connection,
 	return send_page(connection, errorpage, MHD_HTTP_BAD_REQUEST);
 }
 
+// Number of clients currently uploading
+
 unsigned int FaustServer::nr_of_uploading_clients = 0;
+
+/*
+ * Function that handles all get requests, sending back the
+ * appropriate response.
+ */
 
 int
 FaustServer::faustGet(struct MHD_Connection *connection, TArgs &args, string directory)
@@ -483,17 +540,23 @@ FaustServer::faustGet(struct MHD_Connection *connection, TArgs &args, string dir
 	return send_page(connection, result, MHD_HTTP_OK);
 }
 
+// Get the maximum number of clients allowed to connect at a given time.
+
 const int
 FaustServer::getMaxClients()
 {
 	return max_clients_;
 }
 
+// Get the directory to which the uploaded files are being written.
+
 const string
 FaustServer::getDirectory()
 {
 	return directory_;
 }
+
+// Start the Faust server - shallow wrapper around MHD_start_daemon
 
 bool
 FaustServer::start()
@@ -505,6 +568,8 @@ FaustServer::start()
 	return daemon_ != NULL;
 }
 
+// Stop the Faust server - shallow wrapper around MHD_stop_daemon
+
 void
 FaustServer::stop()
 {
@@ -514,6 +579,8 @@ FaustServer::stop()
 	daemon_ = 0;
 }
 
+
+// Constructor for the Faust server
 
 FaustServer::FaustServer (int port, int max_clients, string directory)
 	: port_(port), max_clients_(max_clients), directory_(directory)

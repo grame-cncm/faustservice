@@ -7,14 +7,14 @@
 using namespace std;
 
 struct connection_info_struct {
-	int connectiontype;
-	struct MHD_PostProcessor *postprocessor;
-	FILE *fp;
-	string tmppath;
-	string filename;
-	string answerstring;
-	int answercode;
-	string directory;
+	int connectiontype; // GET or POST
+	struct MHD_PostProcessor *postprocessor; // the POST processor used internally by microhttpd
+	FILE *fp; // a pointer to the file to which the data is being written
+	string tmppath; // the path in which the provisional file exists
+	string filename; // the name of the file
+	string answerstring; // the answer sent to the user after upload
+	int answercode; // used internally by microhttpd to see where things went wrong or right
+	string directory; // the path in which the final file exists
 };
 
 struct string_and_exitstatus {
