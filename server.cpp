@@ -46,6 +46,21 @@ string busypage =
 string completebuterrorpage =
   "<html><body>The upload has been completed but your Faust file is corrupt. It has not been registered.</body></html>";
 
+string completebutmorethanoneDSPfile =
+  "<html><body>The upload has been completed but there is more than one DSP file in your archive. Only one is allowed..</body></html>";
+
+string completebutnoDSPfile =
+  "<html><body>The upload has been completed but there is no DSP file in your archive. You must have one and only one.</body></html>";
+
+string completebutdecompressionproblem =
+  "<html><body>The upload has been completed but the server could not decompress the archive.</body></html>";
+
+string completebutendoftheworld =
+  "<html><body>An internal server error of epic proportions has occurred. This likely portends the end of the world.</body></html>";
+
+string completebutnopipe =
+  "<html><body>Could not create a PIPE to faust on the server.</body></html>";
+
 string completebutnohash =
   "<html><body>The upload is completed but we could not generate a hash for your file.</body></html>";
 
@@ -98,15 +113,13 @@ validate_faust (connection_info_struct *con_info)
   archive_read_support_filter_all(my_archive);
   archive_read_support_format_all(my_archive);
   int archive_status = archive_read_open_filename(my_archive, old_full_filename.string ().c_str (), 10240);
-  // fix later...
-  string result = "";
 
   // prepare for the tar
 
   if (!fs::is_regular_file (old_full_filename))
     {
       fs::remove_all (tmpdir);
-      con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+      con_info->answerstring = completebuterrorpage;
       return 1;
     }
   else if (old_full_filename.string ().substr (old_full_filename.string ().find_last_of (".") + 1) == "dsp")
@@ -125,7 +138,7 @@ validate_faust (connection_info_struct *con_info)
                 {
                   archive_status = archive_read_free (my_archive);
                   fs::remove_all (tmpdir);
-                  con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+                  con_info->answerstring = completebutmorethanoneDSPfile;
                   return 1;
                 }
               dsp_file = current_file.string ();
@@ -139,14 +152,14 @@ validate_faust (connection_info_struct *con_info)
       if (archive_status != ARCHIVE_OK)
         {
           fs::remove_all (tmpdir);
-          con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+          con_info->answerstring = completebutdecompressionproblem;
           return 1;
         }
     }
   else
     {
       fs::remove_all (tmpdir);
-      con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+      con_info->answerstring = completebutendoftheworld;
       return 1;
     }
 
@@ -154,14 +167,14 @@ validate_faust (connection_info_struct *con_info)
   if (filename.string () == "")
     {
       fs::remove_all (tmpdir);
-      con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+      con_info->answerstring = completebutnoDSPfile;
       return 1;    
     }
 
-  //_copy_contents_to_tmp(filename, tmpdir)
+  string result = "";
   FILE *pipe = popen (("faust -a plot.cpp " + (tmpdir / filename).string () + " 2>&1").c_str (), "r");
   if (!pipe)
-    con_info->answerstring = completebuterrorpage;
+    con_info->answerstring = completebutnopipe;
   else
     {
       // Bleed off the pipe
@@ -172,13 +185,13 @@ validate_faust (connection_info_struct *con_info)
             result += buffer;
         }
     }
-  // need to check stderr...find a way to do this
 
   int exitstatus = pclose (pipe);
   fs::remove_all (tmpdir);
 
   if (exitstatus)
     con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+
   return exitstatus;
 }
 
@@ -203,7 +216,7 @@ generate_sha1 (connection_info_struct *con_info)
 }
 
 
-// merge with validate function...
+// TODO: merge with validate function if possible...
 int
 make_initial_faust_directory (connection_info_struct *con_info, string sha1)
 {
@@ -233,7 +246,7 @@ make_initial_faust_directory (connection_info_struct *con_info, string sha1)
 
   if (!fs::is_regular_file (old_full_filename))
     {
-      con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+      con_info->answerstring = completebuterrorpage;
       return 1;
     }
   else if (filename.string ().substr (filename.string ().find_last_of (".") + 1) == "dsp")
@@ -253,13 +266,13 @@ make_initial_faust_directory (connection_info_struct *con_info, string sha1)
       archive_status = archive_read_free (my_archive);
       if (archive_status != ARCHIVE_OK)
         {
-          con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+          con_info->answerstring = completebutdecompressionproblem;
           return 1;
         }
     }
   else
     {
-      con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+      con_info->answerstring = completebutendoftheworld;
       return 1;
     }
 
