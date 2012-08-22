@@ -104,7 +104,7 @@ validate_faust (connection_info_struct *con_info)
   fs::create_directory (tmpdir);
   fs::path filename = fs::path (con_info->filename);
   fs::path old_full_filename = fs::path (con_info->tmppath) / filename;
-
+cout << old_full_filename.string () << endl;
   // libarchive stuff
   struct archive *my_archive;
   struct archive_entry *my_entry;
@@ -351,14 +351,6 @@ FaustServer::iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const cha
       if (!fwrite (data, size, sizeof (char), con_info->fp))
         return MHD_NO;
     }
-  fclose (con_info->fp);
-
-  if (!validate_faust (con_info))
-    {
-      string_and_exitstatus sha1 = generate_sha1 (con_info);
-      if (!sha1.exitstatus)
-        (void) make_initial_faust_directory (con_info, sha1.str);
-    }
 
   con_info->answercode = MHD_HTTP_OK;
 
@@ -381,7 +373,6 @@ FaustServer::request_completed (void *cls, struct MHD_Connection *connection,
           MHD_destroy_post_processor (con_info->postprocessor);
           nr_of_uploading_clients--;
         }
-      // shouldn't happen - paranoia check
       if (con_info->fp)
         fclose (con_info->fp);
     }
@@ -466,8 +457,21 @@ FaustServer::answer_to_connection (void *cls, struct MHD_Connection *connection,
           return MHD_YES;
         }
       else
-        return send_page (connection, con_info->answerstring,
-                          con_info->answercode);
+        {
+          // need to close the file before request_completed
+          // so that it can be opened by the methods below
+          if (con_info->fp)
+            fclose (con_info->fp);
+
+          if (!validate_faust (con_info))
+            {
+              string_and_exitstatus sha1 = generate_sha1 (con_info);
+              if (!sha1.exitstatus)
+                (void) make_initial_faust_directory (con_info, sha1.str);
+            }
+          return send_page (connection, con_info->answerstring,
+                            con_info->answercode);
+        }
     }
 
   return send_page (connection, errorpage, MHD_HTTP_BAD_REQUEST);
@@ -500,7 +504,7 @@ FaustServer::faustGet (struct MHD_Connection *connection, TArgs &args, string di
           break;
         }
     }
-  cout << ("faust -a "+architecture_file+" "+(fs::path (directory) / fs::path (args["sha1"]) / fs::path (dspfile)).string ()) << endl;
+
   FILE *pipe = popen (("faust -a "+architecture_file+" "+(fs::path (directory) / fs::path (args["sha1"]) / fs::path (dspfile)).string ()).c_str (), "r");
   string result = "";
   if (!pipe)
