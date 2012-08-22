@@ -4601,7 +4601,7 @@ CPPFLAGS=$boost_save_CPPFLAGS
 
 
 # hack...
-LIBS="$LIBS -lboost_filesystem -lboost_system"
+LIBS="$LIBS -lboost_filesystem -lboost_system -lboost_program_options"
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing MHD_queue_response" >&5
 $as_echo_n "checking for library containing MHD_queue_response... " >&6; }

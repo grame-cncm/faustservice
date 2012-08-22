@@ -1,6 +1,10 @@
 #include <sys/stat.h>
 #include <iostream>
 
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/parsers.hpp>
+#include <boost/program_options/variables_map.hpp>
+
 #include "server.hh"
 #include "utilities.hh"
 
@@ -8,21 +12,13 @@ int gPort = 8888;
 int gMaxClients = 2;
 string gDirectory = "";
 
-//-- command line tools
+namespace po = boost::program_options;
 
-static bool isCmd(const char* cmd, const char* kw1)
-{
-	return(strcmp(cmd, kw1) == 0);
-}
-
-static bool isCmd(const char* cmd, const char* kw1, const char* kw2)
-{
-	return (strcmp(cmd, kw1) == 0) || (strcmp(cmd, kw2) == 0);
-}
-
+// Processes command line arguments using boost/parse_options
 void
 process_cmdline(int argc, char* argv[])
 {
+/*
 	int i = 1;
 
 	while (i < argc) {
@@ -41,6 +37,35 @@ process_cmdline(int argc, char* argv[])
 			//err++;
 		}
 	}
+*/
+	po::options_description desc("faustserver program options.");
+	desc.add_options()
+		("directory,d", po::value<string>(), "directory in which files will be written")
+	    ("help,h", "produce this help message")
+		("max-clients,m", po::value<int>(), "maximum number of clients allowed to concurrently upload")
+	    ("port,p", po::value<int>(), "the listening port");
+
+	po::variables_map vm;
+	po::store(po::parse_command_line(argc, argv, desc), vm);
+	po::notify(vm);    
+
+	if (vm.count("help")) {
+            	cout << desc << endl;
+    	return;
+	}
+
+	if (vm.count("port")) {
+		gPort = vm["port"].as<int>();
+	}
+
+	if (vm.count("max-clients")) {
+		gMaxClients = vm["max-clients"].as<int>();
+	}
+
+	if (vm.count("directory")) {
+		gDirectory = vm["directory"].as<string>();
+	}
+
 }
 
 int

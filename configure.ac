@@ -16,7 +16,7 @@ AC_PROG_CC
 BOOST_REQUIRE([1.50.0])
 
 # hack...
-LIBS="$LIBS -lboost_filesystem -lboost_system"
+LIBS="$LIBS -lboost_filesystem -lboost_system -lboost_program_options"
 
 AC_SEARCH_LIBS([MHD_queue_response], [microhttpd], [], [
   AC_MSG_ERROR([Unable to find libmicrohttpd])
