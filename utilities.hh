@@ -14,7 +14,7 @@ using namespace std;
 
 typedef map<string, string> TArgs;
 
-string boost_random (int size);
-vector<string> getdir (string dir);
+string boost_random(int size);
+vector<string> getdir(string dir);
 
 #endif
