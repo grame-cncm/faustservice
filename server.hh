@@ -26,6 +26,7 @@ class FaustServer {
 	int port_;
 	int max_clients_;
 	string directory_;
+	string logfile_;
 
 	struct MHD_Daemon* daemon_;
 
@@ -45,12 +46,13 @@ class FaustServer {
 					size_t *upload_data_size, void **con_cls);
 
 public:
-	FaustServer(int port, int max_cleints, string directory);
+	FaustServer(int port, int max_cleints, string directory, string logfile);
 	virtual ~FaustServer ()
 	{
 	};
 	const int getMaxClients();
 	const string getDirectory();
+	const string getLogfile();
 	bool start();
 	void stop();
 };

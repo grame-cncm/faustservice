@@ -1,6 +1,8 @@
 #include <sys/stat.h>
 #include <iostream>
 
+#include <boost/filesystem.hpp>
+
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
@@ -11,8 +13,10 @@
 int gPort = 8888;
 int gMaxClients = 2;
 string gDirectory = "";
+string gLogfile = "faustserver.log";
 bool gDaemon = false;
 
+namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 
 // Processes command line arguments using boost/parse_options
@@ -48,6 +52,10 @@ process_cmdline(int argc, char* argv[])
 		gMaxClients = vm["max-clients"].as<int>();
 	}
 
+	if (vm.count("logfile")) {
+		gLogfile = vm["logfile"].as<string>();
+	}
+
 	if (vm.count("directory")) {
 		gDirectory = vm["directory"].as<string>();
 	}
@@ -81,7 +89,10 @@ main(int argc, char* argv[])
             sid = setsid ();
 
             if (sid < 0) {
-               // Log the failure
+               FILE *f = fopen ((fs::path (gDirectory) / fs::path (gLogfile)).string().c_str(), "ab");
+               const char *error = "Could not create an SID for the process.";
+               fwrite (error, strlen(error), sizeof (char), f);
+               fclose (f);
                exit (EXIT_FAILURE);
             }
 
@@ -100,7 +111,7 @@ main(int argc, char* argv[])
             close (STDERR_FILENO);
         }
  
-	FaustServer server(gPort, gMaxClients, gDirectory);
+	FaustServer server(gPort, gMaxClients, gDirectory, gLogfile);
 
 	if (!server.start())
 		return 1;

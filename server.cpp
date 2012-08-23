@@ -556,6 +556,12 @@ FaustServer::getDirectory()
 	return directory_;
 }
 
+const string
+FaustServer::getLogfile()
+{
+	return logfile_;
+}
+
 // Start the Faust server - shallow wrapper around MHD_start_daemon
 
 bool
@@ -582,7 +588,7 @@ FaustServer::stop()
 
 // Constructor for the Faust server
 
-FaustServer::FaustServer (int port, int max_clients, string directory)
-	: port_(port), max_clients_(max_clients), directory_(directory)
+FaustServer::FaustServer (int port, int max_clients, string directory, string logfile)
+	: port_(port), max_clients_(max_clients), directory_(directory), logfile_(logfile)
 {
 }
