@@ -322,14 +322,14 @@ FaustServer::get_params(void *cls, enum MHD_ValueKind, const char *key, const ch
  */
 
 int
-FaustServer::send_page(struct MHD_Connection *connection, string page,
+FaustServer::send_page(struct MHD_Connection *connection, const char *page, int length,
                        int status_code)
 {
     int ret;
     struct MHD_Response *response;
 
     response =
-        MHD_create_response_from_buffer(page.size(), (void*)page.c_str(),
+        MHD_create_response_from_buffer(length, (void*)page,
                                         MHD_RESPMEM_PERSISTENT);
     if (!response) {
         return MHD_NO;
@@ -444,7 +444,7 @@ FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connection,
         struct connection_info_struct *con_info;
 
         if (nr_of_uploading_clients >= server->getMaxClients()) {
-            return send_page(connection, busypage, MHD_HTTP_SERVICE_UNAVAILABLE);
+            return send_page(connection, busypage.c_str (), busypage.size (), MHD_HTTP_SERVICE_UNAVAILABLE);
         }
 
         con_info = new connection_info_struct();
@@ -487,7 +487,7 @@ FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connection,
         if (!args.size()) {
             stringstream ss;
             ss << askpage_head << nr_of_uploading_clients << askpage_tail;
-            return send_page(connection, ss.str(), MHD_HTTP_OK);
+            return send_page(connection, ss.str().c_str (), ss.str().size(), MHD_HTTP_OK);
         }
         return faustGet(connection, url, args, server->getDirectory());
     }
@@ -514,12 +514,12 @@ FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connection,
                     (void)make_initial_faust_directory(con_info, sha1.str);
                 }
             }
-            return send_page(connection, con_info->answerstring,
-                             con_info->answercode);
+            return send_page(connection, con_info->answerstring.c_str(),
+                             con_info->answerstring.size(), con_info->answercode);
         }
     }
 
-    return send_page(connection, errorpage, MHD_HTTP_BAD_REQUEST);
+    return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST);
 }
 
 // Number of clients currently uploading
@@ -542,7 +542,7 @@ int
 FaustServer::faustGet(struct MHD_Connection *connection, const char *url, TArgs &args, string directory)
 {
     if (args["sha1"].empty()) {
-        return send_page(connection, nosha1present, MHD_HTTP_BAD_REQUEST);
+        return send_page(connection, nosha1present.c_str(), nosha1present.size(), MHD_HTTP_BAD_REQUEST);
     }
 
     // need more sophisticated error messages below - need ot verify that sha1 exists, for example...
@@ -569,7 +569,7 @@ FaustServer::faustGet(struct MHD_Connection *connection, const char *url, TArgs 
     FILE *pipe = popen(("faust -a " + architecture_file + " " + (fs::path(directory) / fs::path(dspfile)).string()).c_str(), "r");
     string result = "";
     if (!pipe) {
-        return send_page(connection, cannotcompile, MHD_HTTP_BAD_REQUEST);
+        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST);
     } else {
         // Bleed off the pipe
         char buffer[128];
@@ -581,10 +581,10 @@ FaustServer::faustGet(struct MHD_Connection *connection, const char *url, TArgs 
     }
 
     if (pclose(pipe)) {
-        return send_page(connection, cannotcompile, MHD_HTTP_BAD_REQUEST);
+        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST);
     }
 
-    return send_page(connection, result, MHD_HTTP_OK);
+    return send_page(connection, result.c_str(), result.size(), MHD_HTTP_OK);
 }
 
 // Get the maximum number of clients allowed to connect at a given time.
