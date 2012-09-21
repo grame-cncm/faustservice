@@ -221,90 +221,27 @@ generate_sha1(connection_info_struct *con_info)
 
 /*
  * Creates an arboreal structure in root with the appropriate makefiles.
- *
  */
 
 void
 create_file_tree(fs::path sha1path, fs::path makefile_directory)
 {
-    // Linux
-    fs::create_directory(sha1path / fs::path("linux"));
-
-    const int N_LINUX_ARCHITECTURES = 25;
-    string linux_architectures[N_LINUX_ARCHITECTURES] = {
-        "alsa-gtk-32bits",
-        "alsa-gtk-64bits",
-        "alsa-qt-64bits",
-        "csound-32bits",
-        "csound-64bits",
-        "dssi-32bits",
-        "dssi-64bits",
-        "jack-console-32bits",
-        "jack-console-64bits",
-        "jack-gtk-32bits",
-        "jack-gtk-64bits",
-        "jack-qt-64bits",
-        "ladspa-32bits",
-        "ladspa-64bits",
-        "lv2-32bits",
-        "lv2-64bits",
-        "lv2synth-32bits",
-        "lv2synth-64bits",
-        "matlabplot-32bits",
-        "matlabplot-64bits",
-        "none",
-        "pure-64bits",
-        "puredata-32bits",
-        "puredata-64bits",
-        "supercollider-64bits"
-    };
-
-    for (int i = 0; i < N_LINUX_ARCHITECTURES; i++) {
-        fs::create_directory(sha1path / fs::path("linux") / fs::path(linux_architectures[i]));
-        fs::copy_file(makefile_directory / fs::path("linux") / fs::path("Makefile." + linux_architectures[i]),
-                      sha1path / fs::path("linux") / fs::path(linux_architectures[i]) / fs::path("Makefile"));
+    fs::directory_iterator end_iter;
+    for (fs::directory_iterator os_iter(makefile_directory); os_iter != end_iter; ++os_iter) {
+        fs::path os_dir = os_iter->path().filename();
+        if (fs::is_directory(os_iter->path())) {
+            fs::create_directory(sha1path / os_dir);
+            for (fs::directory_iterator dir_iter(os_iter->path()); dir_iter != end_iter; ++dir_iter) {
+                string fname = dir_iter->path().filename().string();
+                if (fname.substr(0, fname.find_first_of(".")) == "Makefile") {
+                    string dirname = fname.substr(fname.find_last_of(".") + 1);
+                    fs::create_directory(sha1path / os_dir / fs::path (dirname));
+                    fs::copy_file(makefile_directory / dir_iter->path(),
+                                  sha1path / os_dir / fs::path(dirname) / fs::path("Makefile"));
+                }
+            }
+        }
     }
-
-    // Mac OS X
-    fs::create_directory(sha1path / fs::path("osx"));
-
-    const int N_OSX_ARCHITECTURES = 9;
-    string osx_architectures[N_OSX_ARCHITECTURES] = {
-        "coreaudio-qt",
-        "csound",
-        "jack-qt",
-        "max-msp",
-        "none",
-        "puredata",
-        "supercollider",
-        "vst",
-        "vsti"
-    };
-
-    for (int i = 0; i < N_OSX_ARCHITECTURES; i++) {
-        fs::create_directory(sha1path / fs::path("osx") / fs::path(osx_architectures[i]));
-        fs::copy_file(makefile_directory / fs::path("osx") / fs::path("Makefile." + osx_architectures[i]),
-                      sha1path / fs::path("osx") / fs::path(osx_architectures[i]) / fs::path("Makefile"));
-    }
-
-    // Mac OS X
-    fs::create_directory(sha1path / fs::path("windows"));
-
-    const int N_WINDOWS_ARCHITECTURES = 5;
-    string windows_architectures[N_OSX_ARCHITECTURES] = {
-        "max-msp",
-        "none",
-        "puredata",
-        "vst",
-        "vsti"
-    };
-
-    for (int i = 0; i < N_WINDOWS_ARCHITECTURES; i++) {
-        fs::create_directory(sha1path / fs::path("windows") / fs::path(windows_architectures[i]));
-        fs::copy_file(makefile_directory / fs::path("windows") / fs::path("Makefile." + windows_architectures[i]),
-                      sha1path / fs::path("windows") / fs::path(windows_architectures[i]) / fs::path("Makefile"));
-    }
-
 }
 
 /*
@@ -622,8 +559,8 @@ FaustServer::faustGet(struct MHD_Connection *connection, const char *url, TArgs 
     string dspfile;
     if (fs::exists(my_dir) && fs::is_directory(my_dir)) {
         for (fs::directory_iterator dir_iter(my_dir); dir_iter != end_iter; ++dir_iter) {
-            if (dir_iter->path().string ().substr(dir_iter->path().string ().find_last_of(".") + 1) == "dsp") {
-                dspfile = dir_iter->path().string ();
+            if (dir_iter->path().string().substr(dir_iter->path().string().find_last_of(".") + 1) == "dsp") {
+                dspfile = dir_iter->path().string();
                 break;
             }
         }
