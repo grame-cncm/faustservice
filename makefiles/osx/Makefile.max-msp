@@ -1,6 +1,7 @@
 ### The behaviour of this Makefile will only be correct if
 ### only one .dsp file exists in the folder
 
+faustfile	:= $(wildcard *.dsp)
 system 		:= $(shell uname -s)
 applname 	:= $(faustfile:.dsp=)
 cppfile 	:= $(faustfile:.dsp=.cpp)

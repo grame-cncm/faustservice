@@ -4,6 +4,7 @@
 PROCARCH := 64bits
 OS := OSX
 
+faustfile	:= $(wildcard *.dsp)
 applname := $(faustfile:.dsp=)
 cppfile := $(faustfile:.dsp=.cpp)
 readme := ../../../images/element/README

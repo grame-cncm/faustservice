@@ -606,14 +606,14 @@ FaustServer::faustGet(struct MHD_Connection *connection, connection_info_struct 
   // dangerous operation...but have to do it for makefiles
   fs::path old_path(fs::current_path());
   fs::current_path(basedir / url.parent_path());
-  /*
+
   string cmd("make");
-  vector<std::string> args;
-  args.push_back(url.filename());
+  vector<string> args_to_make;
+  args_to_make.push_back(url.filename().string());
   Poco::Pipe outPipe;
-  ProcessHandle ph = Process::launch(cmd, args, 0, &outPipe, 0);
+  ProcessHandle ph = Process::launch(cmd, args_to_make, 0, &outPipe, 0);
   Poco::PipeInputStream istr(outPipe);
-  */
+
   fs::current_path(old_path);
   return send_page(connection, debugstub.c_str(), debugstub.size(), MHD_HTTP_BAD_REQUEST);
 
