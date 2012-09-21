@@ -35,6 +35,19 @@ LDFLAGS=$SAVED_LDFLAGS
 AC_LANG_POP([C++])
 AC_MSG_RESULT([-lcryptopp])
 
+AC_MSG_CHECKING([for library containing Poco::Process])
+AC_LANG_PUSH([C++])
+SAVED_LDFLAGS=$LDFLAGS
+LDFLAGS="$LDFLAGS -lpocofoundation"
+AC_LINK_IFELSE(
+  [AC_LANG_PROGRAM([#include <Poco/Pipe.h>],
+                   [Poco::Pipe outPipe;])],
+  [LIBS="$LIBS -lpocofoundation"] [HAVE_POCO=1],
+  [AC_MSG_ERROR([poco is not installed.])])
+LDFLAGS=$SAVED_LDFLAGS
+AC_LANG_POP([C++])
+AC_MSG_RESULT([-lpocofoundation])
+
 AC_SEARCH_LIBS([archive_read_support_filter_all], [archive], [], [
   AC_MSG_ERROR([Unable to find libarchive])
 ])

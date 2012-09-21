@@ -2,7 +2,7 @@
 #HTTPD_ALLOWED
 ### The behaviour of this Makefile will only be correct if
 ### only one .dsp file exists in the folder
-faustfile := karplus.dsp
+
 system 		:= $(shell uname -s)
 applname 	:= $(faustfile:.dsp=)
 cppfile 	:= $(faustfile:.dsp=.cpp)
@@ -48,11 +48,6 @@ $(svgfile) : $(cppfile)
 	faust $(faustfile) $(OPT) -svg >/dev/null 2> errors.log
 
 $(binaryfile) : $(cppfile)
-	ssh mikesol@faust.grame.fr "mkdir onlineComp/$(SESSIONID)"
-	scp $(faustfile) mikesol@faust.grame.fr:onlineComp/$(SESSIONID)
-	ssh mikesol@faust.grame.fr "/usr/local/bin/faust2caqt $(OPT) $(oscOPT) onlineComp/$(SESSIONID)/$(faustfile)"
-	scp -r mikesol@faust.grame.fr:onlineComp/$(SESSIONID)/$(binaryfile) .
-	ssh mikesol@faust.grame.fr "rm -rf onlineComp/$(SESSIONID)"
+	faust2caqt $(OPT) $(oscOPT) $(faustfile)
 	zip -r $(compBinaryfile) $(binaryfile)
 	rm -r $(binaryfile)
-

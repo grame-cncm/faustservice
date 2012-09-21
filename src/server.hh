@@ -34,7 +34,7 @@ class FaustServer
     struct MHD_Daemon* daemon_;
 
     static unsigned int nr_of_uploading_clients;
-    static int faustGet(struct MHD_Connection *connection, const char *url, TArgs &args, string directory);
+    static int faustGet(struct MHD_Connection *connection, connection_info_struct *con_info, const char *raw_url, TArgs &args, string directory);
     static int get_params(void *cls, enum MHD_ValueKind, const char *key, const char *data);
     static int send_page(struct MHD_Connection *connection, const char *page, int length, int status_code);
     static int iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const char *key,

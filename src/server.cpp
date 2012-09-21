@@ -16,11 +16,18 @@
 #include <archive.h>
 #include <archive_entry.h>
 
+// POCO
+#include "Poco/Process.h"
+#include "Poco/PipeStream.h"
+#include "Poco/StreamCopier.h"
+
 #include "utilities.hh"
 #include "server.hh"
 
 using namespace std;
 namespace fs = boost::filesystem;
+using Poco::Process;
+using Poco::ProcessHandle;
 
 /*
  * Various responses to GET requests
@@ -43,6 +50,13 @@ string cannotcompile =
 
 string nosha1present =
     "<html><body>The given SHA1 key is not present in the directory.</body></html>";
+
+string invalidosorarchitecture =
+    "<html><body>You have entered either an invalid operating system, an invalid architecture, or an invalid makefile command.\
+    Requests should be of the form:<br/>os/architecture/command<br/>For example:<br/>osx/csound/binary</body></html>";
+
+string invalidinstruction =
+    "<html><body>The server only can generate binary, source, or svg for a given architecture.</body></html>";
 
 string busypage =
     "<html><body>This server is busy, please try again later.</body></html>";
@@ -100,6 +114,9 @@ string servererrorpage =
 
 string fileexistspage =
     "<html><body>This file already exists.</body></html>";
+
+string debugstub =
+    "<html><body>Rien ne s'est cass&eacute; la figure. F&eacute;licitations !</body></html>";
 
 /*
  * Validates that a Faust file or archive is sane and returns 0 for success
@@ -229,7 +246,12 @@ create_file_tree(fs::path sha1path, fs::path makefile_directory)
     fs::directory_iterator end_iter;
     for (fs::directory_iterator os_iter(makefile_directory); os_iter != end_iter; ++os_iter) {
         fs::path os_dir = os_iter->path().filename();
-        if (fs::is_directory(os_iter->path())) {
+        // hack for root Makefile
+        if (os_dir.string() == "Makefile.none") {
+          fs::copy_file(os_iter->path(),
+                        sha1path / fs::path("Makefile"));
+        }
+        else if (fs::is_directory(os_iter->path())) {
             fs::create_directory(sha1path / os_dir);
             for (fs::directory_iterator dir_iter(os_iter->path()); dir_iter != end_iter; ++dir_iter) {
                 string fname = dir_iter->path().filename().string();
@@ -238,6 +260,14 @@ create_file_tree(fs::path sha1path, fs::path makefile_directory)
                     fs::create_directory(sha1path / os_dir / fs::path (dirname));
                     fs::copy_file(makefile_directory / dir_iter->path(),
                                   sha1path / os_dir / fs::path(dirname) / fs::path("Makefile"));
+                    for (fs::directory_iterator faust_iter(sha1path); faust_iter != end_iter; ++faust_iter) {
+                        string maybe_link_me = faust_iter->path().filename().string();
+                        if (maybe_link_me.substr(maybe_link_me.find_last_of(".") + 1) == "dsp"
+                            || maybe_link_me.substr(maybe_link_me.find_last_of(".") + 1) == "lib") {
+                            fs::create_symlink(faust_iter->path(),
+                                               sha1path / os_dir / fs::path(dirname) / faust_iter->path().filename ());
+                        }
+                    }
                 }
             }
         }
@@ -301,6 +331,21 @@ make_initial_faust_directory(connection_info_struct *con_info, string sha1)
     create_file_tree(sha1path, fs::path(con_info->makefile_directory));
     con_info->answerstring = completepage_head + sha1 + completepage_tail;
     return 0;
+}
+
+/*
+ * returns the number of elements in a path
+ * an implementation using directory_iterators was leading to an abort trap
+ * should investigate further...
+ */
+
+int
+pathsize(fs::path path, int n = 0)
+{
+  if (path.string()=="/" || path.string()=="." || path.string()=="")
+    return n;
+
+  return pathsize(path.parent_path(), n+1);
 }
 
 /*
@@ -484,12 +529,13 @@ FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connection,
     if (0 == strcmp(method, "GET")) {
         TArgs args;
         MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
-        if (!args.size()) {
+        if (!args.size() && strcmp(url, "/") == 0) {
             stringstream ss;
             ss << askpage_head << nr_of_uploading_clients << askpage_tail;
             return send_page(connection, ss.str().c_str (), ss.str().size(), MHD_HTTP_OK);
         }
-        return faustGet(connection, url, args, server->getDirectory());
+        struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
+        return faustGet(connection, con_info, url, args, server->getDirectory());
     }
 
     if (0 == strcmp(method, "POST")) {
@@ -539,8 +585,39 @@ unsigned int FaustServer::nr_of_uploading_clients = 0;
  */
 
 int
-FaustServer::faustGet(struct MHD_Connection *connection, const char *url, TArgs &args, string directory)
+FaustServer::faustGet(struct MHD_Connection *connection, connection_info_struct *con_info, const char *raw_url, TArgs &args, string directory)
 {
+
+  // The parent_path of the URL must be valid in the file tree
+  // we examine.
+  fs::path basedir(con_info->directory);
+  fs::path url(raw_url);
+  int nelts = pathsize(url);
+
+  if (!fs::is_directory(basedir / url.parent_path())
+      || !(nelts == 2 || nelts == 4))
+    return send_page(connection, invalidosorarchitecture.c_str(), invalidosorarchitecture.size(), MHD_HTTP_BAD_REQUEST);
+
+  if (url.filename() != "binary"
+      && url.filename() != "source"
+      && url.filename() != "svg")
+    return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST);
+
+  // dangerous operation...but have to do it for makefiles
+  fs::path old_path(fs::current_path());
+  fs::current_path(basedir / url.parent_path());
+  /*
+  string cmd("make");
+  vector<std::string> args;
+  args.push_back(url.filename());
+  Poco::Pipe outPipe;
+  ProcessHandle ph = Process::launch(cmd, args, 0, &outPipe, 0);
+  Poco::PipeInputStream istr(outPipe);
+  */
+  fs::current_path(old_path);
+  return send_page(connection, debugstub.c_str(), debugstub.size(), MHD_HTTP_BAD_REQUEST);
+
+/*
     if (args["sha1"].empty()) {
         return send_page(connection, nosha1present.c_str(), nosha1present.size(), MHD_HTTP_BAD_REQUEST);
     }
@@ -585,6 +662,7 @@ FaustServer::faustGet(struct MHD_Connection *connection, const char *url, TArgs 
     }
 
     return send_page(connection, result.c_str(), result.size(), MHD_HTTP_OK);
+*/
 }
 
 // Get the maximum number of clients allowed to connect at a given time.
