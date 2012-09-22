@@ -26,12 +26,12 @@ process_cmdline(int argc, char* argv[])
 {
     po::options_description desc("faustserver program options.");
     desc.add_options()
-        ("daemon", "run the server in mode daemon")
-        ("directory,d", po::value<string>(), "directory in which files will be written")
-        ("help,h", "produce this help message")
-        ("makefile-directory", po::value<string>(), "directory containing the makefiles for the server")
-        ("max-clients,m", po::value<int>(), "maximum number of clients allowed to concurrently upload")
-        ("port,p", po::value<int>(), "the listening port");
+    ("daemon", "run the server in mode daemon")
+    ("directory,d", po::value<string>(), "directory in which files will be written")
+    ("help,h", "produce this help message")
+    ("makefile-directory", po::value<string>(), "directory containing the makefiles for the server")
+    ("max-clients,m", po::value<int>(), "maximum number of clients allowed to concurrently upload")
+    ("port,p", po::value<int>(), "the listening port");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);

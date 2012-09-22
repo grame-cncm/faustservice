@@ -132,7 +132,7 @@ validate_faust(connection_info_struct *con_info)
     fs::create_directory(tmpdir);
     fs::path filename = fs::path(con_info->filename);
     fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
-    
+
     // libarchive stuff
     struct archive *my_archive;
     struct archive_entry *my_entry;
@@ -249,10 +249,9 @@ create_file_tree(fs::path sha1path, fs::path makefile_directory)
         fs::path os_dir = os_iter->path().filename();
         // hack for root Makefile
         if (os_dir.string() == "Makefile.none") {
-          fs::copy_file(os_iter->path(),
-                        sha1path / fs::path("Makefile"));
-        }
-        else if (fs::is_directory(os_iter->path())) {
+            fs::copy_file(os_iter->path(),
+                          sha1path / fs::path("Makefile"));
+        } else if (fs::is_directory(os_iter->path())) {
             fs::create_directory(sha1path / os_dir);
             for (fs::directory_iterator dir_iter(os_iter->path()); dir_iter != end_iter; ++dir_iter) {
                 string fname = dir_iter->path().filename().string();
@@ -264,7 +263,7 @@ create_file_tree(fs::path sha1path, fs::path makefile_directory)
                     for (fs::directory_iterator faust_iter(sha1path); faust_iter != end_iter; ++faust_iter) {
                         string maybe_link_me = faust_iter->path().filename().string();
                         if (maybe_link_me.substr(maybe_link_me.find_last_of(".") + 1) == "dsp"
-                            || maybe_link_me.substr(maybe_link_me.find_last_of(".") + 1) == "lib") {
+                                || maybe_link_me.substr(maybe_link_me.find_last_of(".") + 1) == "lib") {
                             fs::create_symlink(faust_iter->path(),
                                                sha1path / os_dir / fs::path(dirname) / faust_iter->path().filename ());
                         }
@@ -343,10 +342,11 @@ make_initial_faust_directory(connection_info_struct *con_info, string sha1)
 int
 pathsize(fs::path path, int n = 0)
 {
-  if (path.string()=="/" || path.string()=="." || path.string()=="")
-    return n;
+    if (path.string()=="/" || path.string()=="." || path.string()=="") {
+        return n;
+    }
 
-  return pathsize(path.parent_path(), n+1);
+    return pathsize(path.parent_path(), n+1);
 }
 
 /*
@@ -590,70 +590,71 @@ int
 FaustServer::faustGet(struct MHD_Connection *connection, connection_info_struct *con_info, const char *raw_url, TArgs &args, string directory)
 {
 
-  // The parent_path of the URL must be valid in the file tree
-  // we examine.
-  fs::path basedir(con_info->directory);
-  fs::path url(raw_url);
-  int nelts = pathsize(url);
+    // The parent_path of the URL must be valid in the file tree
+    // we examine.
+    fs::path basedir(con_info->directory);
+    fs::path url(raw_url);
+    int nelts = pathsize(url);
 
-  if (!fs::is_directory(basedir / url.parent_path())
-      || !(nelts == 2 || nelts == 4))
-    return send_page(connection, invalidosorarchitecture.c_str(), invalidosorarchitecture.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+    if (!fs::is_directory(basedir / url.parent_path())
+            || !(nelts == 2 || nelts == 4)) {
+        return send_page(connection, invalidosorarchitecture.c_str(), invalidosorarchitecture.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+    }
 
-  if (url.filename() != "binary"
-      && url.filename() != "source"
-      && url.filename() != "svg")
-    return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+    if (url.filename() != "binary"
+            && url.filename() != "source"
+            && url.filename() != "svg") {
+        return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+    }
 
-  // dangerous operation...but have to do it for makefiles
-  fs::path old_path(fs::current_path());
-  fs::current_path(basedir / url.parent_path());
+    // dangerous operation...but have to do it for makefiles
+    fs::path old_path(fs::current_path());
+    fs::current_path(basedir / url.parent_path());
 
-  string cmd("make");
-  vector<string> args_to_make;
-  args_to_make.push_back(url.filename().string());
-  Poco::Pipe outPipe;
-  ProcessHandle ph = Process::launch(cmd, args_to_make, 0, &outPipe, 0);
-  Poco::PipeInputStream istr(outPipe);
-  stringstream ostr;
-  Poco::StreamCopier::copyStream(istr, ostr);
-  //ugh...even with the line below, it looks like the processes
-  //are sticking around. how to really kill them off?
-  Process::kill(ph);
+    string cmd("make");
+    vector<string> args_to_make;
+    args_to_make.push_back(url.filename().string());
+    Poco::Pipe outPipe;
+    ProcessHandle ph = Process::launch(cmd, args_to_make, 0, &outPipe, 0);
+    Poco::PipeInputStream istr(outPipe);
+    stringstream ostr;
+    Poco::StreamCopier::copyStream(istr, ostr);
+    //ugh...even with the line below, it looks like the processes
+    //are sticking around. how to really kill them off?
+    Process::kill(ph);
 
-  vector<string> lines;
-  string filename = "";
+    vector<string> lines;
+    string filename = "";
 
-  fs::directory_iterator end_iter;
-  for (fs::directory_iterator os_iter(basedir / url.parent_path()); os_iter != end_iter; ++os_iter) {
-      string os_dir = os_iter->path().string();
-      if (os_dir.substr(os_dir.find_last_of(".") + 1) == "dsp") {
-        filename = os_dir;
-        break;
-      }
-  }
+    fs::directory_iterator end_iter;
+    for (fs::directory_iterator os_iter(basedir / url.parent_path()); os_iter != end_iter; ++os_iter) {
+        string os_dir = os_iter->path().string();
+        if (os_dir.substr(os_dir.find_last_of(".") + 1) == "dsp") {
+            filename = os_dir;
+            break;
+        }
+    }
 
-  string mimetype = "text/plain";
-  if (url.filename() == "binary") {
-      filename = filename.substr(0,filename.find_first_of("."))+".zip";
-      mimetype = "application/zip";
-  }
-  else if (url.filename() == "source") {
-      filename = filename.substr(0,filename.find_first_of("."))+".cpp";
-  }
+    string mimetype = "text/plain";
+    if (url.filename() == "binary") {
+        filename = filename.substr(0,filename.find_first_of("."))+".zip";
+        mimetype = "application/zip";
+    } else if (url.filename() == "source") {
+        filename = filename.substr(0,filename.find_first_of("."))+".cpp";
+    }
 
-  ifstream myFile (filename.c_str (), ios::in | ios::binary);
-  myFile.seekg (0, ios::end);
-  int length = myFile.tellg();
-  myFile.seekg (0, ios::beg);
+    ifstream myFile (filename.c_str (), ios::in | ios::binary);
+    myFile.seekg (0, ios::end);
+    int length = myFile.tellg();
+    myFile.seekg (0, ios::beg);
 
-  char result[length];
-  // read data as a block:
-  myFile.read (result, length);
-  myFile.close();
+    char result[length];
+    // read data as a block:
+    myFile.read (result, length);
+    myFile.close();
 
-  fs::current_path(old_path);
-  return send_page(connection, result, length, MHD_HTTP_OK, mimetype.c_str ());
+    fs::current_path(old_path);
+    return send_page(connection, result, length, MHD_HTTP_OK, mimetype.c_str ());
 
 }
 
