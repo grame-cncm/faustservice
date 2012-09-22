@@ -6,7 +6,6 @@
 
 // Boost libraries
 #include <boost/filesystem.hpp>
-#include <boost/algorithm/string.hpp>
 
 // libcryptopp
 #include <cryptopp/sha.h>
