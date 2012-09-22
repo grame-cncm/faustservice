@@ -132,7 +132,7 @@ validate_faust(connection_info_struct *con_info)
     fs::create_directory(tmpdir);
     fs::path filename = fs::path(con_info->filename);
     fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
-    cout << old_full_filename.string() << endl;
+    
     // libarchive stuff
     struct archive *my_archive;
     struct archive_entry *my_entry;
@@ -491,7 +491,7 @@ FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connection,
         struct connection_info_struct *con_info;
 
         if (nr_of_uploading_clients >= server->getMaxClients()) {
-            return send_page(connection, busypage.c_str (), busypage.size (), MHD_HTTP_SERVICE_UNAVAILABLE);
+            return send_page(connection, busypage.c_str (), busypage.size (), MHD_HTTP_SERVICE_UNAVAILABLE, "text/html");
         }
 
         con_info = new connection_info_struct();
@@ -534,7 +534,7 @@ FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connection,
         if (!args.size() && strcmp(url, "/") == 0) {
             stringstream ss;
             ss << askpage_head << nr_of_uploading_clients << askpage_tail;
-            return send_page(connection, ss.str().c_str (), ss.str().size(), MHD_HTTP_OK);
+            return send_page(connection, ss.str().c_str (), ss.str().size(), MHD_HTTP_OK, "text/html");
         }
         struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
         return faustGet(connection, con_info, url, args, server->getDirectory());
@@ -563,11 +563,11 @@ FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connection,
                 }
             }
             return send_page(connection, con_info->answerstring.c_str(),
-                             con_info->answerstring.size(), con_info->answercode);
+                             con_info->answerstring.size(), con_info->answercode, "text/html");
         }
     }
 
-    return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST);
+    return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 }
 
 // Number of clients currently uploading
@@ -598,12 +598,12 @@ FaustServer::faustGet(struct MHD_Connection *connection, connection_info_struct 
 
   if (!fs::is_directory(basedir / url.parent_path())
       || !(nelts == 2 || nelts == 4))
-    return send_page(connection, invalidosorarchitecture.c_str(), invalidosorarchitecture.size(), MHD_HTTP_BAD_REQUEST);
+    return send_page(connection, invalidosorarchitecture.c_str(), invalidosorarchitecture.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 
   if (url.filename() != "binary"
       && url.filename() != "source"
       && url.filename() != "svg")
-    return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST);
+    return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 
   // dangerous operation...but have to do it for makefiles
   fs::path old_path(fs::current_path());
