@@ -58,6 +58,9 @@ string invalidosorarchitecture =
 string invalidinstruction =
     "<html><body>The server only can generate binary, source, or svg for a given architecture.</body></html>";
 
+string compilationfailure =
+    "<html><body>The compilation failed for the given instruction.</body></html>";
+
 string busypage =
     "<html><body>This server is busy, please try again later.</body></html>";
 
@@ -610,9 +613,10 @@ FaustServer::faustGet(struct MHD_Connection *connection, connection_info_struct 
     fs::path old_path(fs::current_path());
     fs::current_path(basedir / url.parent_path());
 
-    string cmd("make");
+    string cmd = "make";
     vector<string> args_to_make;
     args_to_make.push_back(url.filename().string());
+
     Poco::Pipe outPipe;
     ProcessHandle ph = Process::launch(cmd, args_to_make, 0, &outPipe, 0);
     Poco::PipeInputStream istr(outPipe);
@@ -622,7 +626,6 @@ FaustServer::faustGet(struct MHD_Connection *connection, connection_info_struct 
     //are sticking around. how to really kill them off?
     Process::kill(ph);
 
-    vector<string> lines;
     string filename = "";
 
     fs::directory_iterator end_iter;
