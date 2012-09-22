@@ -618,7 +618,7 @@ FaustServer::faustGet(struct MHD_Connection *connection, connection_info_struct 
     args_to_make.push_back(url.filename().string());
 
     Poco::Pipe outPipe;
-    ProcessHandle ph = Process::launch(cmd, args_to_make, 0, &outPipe, 0);
+    ProcessHandle ph = Process::launch(cmd, args_to_make, 0, &outPipe, 0, args);
     Poco::PipeInputStream istr(outPipe);
     stringstream ostr;
     Poco::StreamCopier::copyStream(istr, ostr);
