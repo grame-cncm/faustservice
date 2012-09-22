@@ -6,6 +6,7 @@
 
 // Boost libraries
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 
 // libcryptopp
 #include <cryptopp/sha.h>
@@ -368,7 +369,7 @@ FaustServer::get_params(void *cls, enum MHD_ValueKind, const char *key, const ch
 
 int
 FaustServer::send_page(struct MHD_Connection *connection, const char *page, int length,
-                       int status_code)
+                       int status_code, const char * type = 0)
 {
     int ret;
     struct MHD_Response *response;
@@ -380,6 +381,7 @@ FaustServer::send_page(struct MHD_Connection *connection, const char *page, int 
         return MHD_NO;
     }
 
+    MHD_add_response_header (response, "Content-Type", type ? type : "text/plain");
     ret = MHD_queue_response(connection, status_code, response);
     MHD_destroy_response(response);
 
@@ -613,56 +615,46 @@ FaustServer::faustGet(struct MHD_Connection *connection, connection_info_struct 
   Poco::Pipe outPipe;
   ProcessHandle ph = Process::launch(cmd, args_to_make, 0, &outPipe, 0);
   Poco::PipeInputStream istr(outPipe);
+  stringstream ostr;
+  Poco::StreamCopier::copyStream(istr, ostr);
+  //ugh...even with the line below, it looks like the processes
+  //are sticking around. how to really kill them off?
+  Process::kill(ph);
+
+  vector<string> lines;
+  string filename = "";
+
+  fs::directory_iterator end_iter;
+  for (fs::directory_iterator os_iter(basedir / url.parent_path()); os_iter != end_iter; ++os_iter) {
+      string os_dir = os_iter->path().string();
+      if (os_dir.substr(os_dir.find_last_of(".") + 1) == "dsp") {
+        filename = os_dir;
+        break;
+      }
+  }
+
+  string mimetype = "text/plain";
+  if (url.filename() == "binary") {
+      filename = filename.substr(0,filename.find_first_of("."))+".zip";
+      mimetype = "application/zip";
+  }
+  else if (url.filename() == "source") {
+      filename = filename.substr(0,filename.find_first_of("."))+".cpp";
+  }
+
+  ifstream myFile (filename.c_str (), ios::in | ios::binary);
+  myFile.seekg (0, ios::end);
+  int length = myFile.tellg();
+  myFile.seekg (0, ios::beg);
+
+  char result[length];
+  // read data as a block:
+  myFile.read (result, length);
+  myFile.close();
 
   fs::current_path(old_path);
-  return send_page(connection, debugstub.c_str(), debugstub.size(), MHD_HTTP_BAD_REQUEST);
+  return send_page(connection, result, length, MHD_HTTP_OK, mimetype.c_str ());
 
-/*
-    if (args["sha1"].empty()) {
-        return send_page(connection, nosha1present.c_str(), nosha1present.size(), MHD_HTTP_BAD_REQUEST);
-    }
-
-    // need more sophisticated error messages below - need ot verify that sha1 exists, for example...
-
-    string architecture_file = args["a"];
-    if (architecture_file.empty()) {
-        architecture_file = "plot.cpp";
-    }
-
-    // lists all the files in the directory
-    fs::path my_dir = fs::path(directory) / fs::path(args["sha1"]);
-    fs::directory_iterator end_iter;
-
-    string dspfile;
-    if (fs::exists(my_dir) && fs::is_directory(my_dir)) {
-        for (fs::directory_iterator dir_iter(my_dir); dir_iter != end_iter; ++dir_iter) {
-            if (dir_iter->path().string().substr(dir_iter->path().string().find_last_of(".") + 1) == "dsp") {
-                dspfile = dir_iter->path().string();
-                break;
-            }
-        }
-    }
-
-    FILE *pipe = popen(("faust -a " + architecture_file + " " + (fs::path(directory) / fs::path(dspfile)).string()).c_str(), "r");
-    string result = "";
-    if (!pipe) {
-        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST);
-    } else {
-        // Bleed off the pipe
-        char buffer[128];
-        while (!feof(pipe)) {
-            if (fgets(buffer, 128, pipe) != NULL) {
-                result += buffer;
-            }
-        }
-    }
-
-    if (pclose(pipe)) {
-        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST);
-    }
-
-    return send_page(connection, result.c_str(), result.size(), MHD_HTTP_OK);
-*/
 }
 
 // Get the maximum number of clients allowed to connect at a given time.

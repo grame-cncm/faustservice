@@ -39,12 +39,7 @@ $(svgfile) : $(cppfile)
 	faust $(faustfile) $(OPT) -svg >/dev/null 2> errors.log
 
 $(binaryfile) : $(cppfile)
-	ssh faust@macyann "mkdir onlineComp/$(SESSIONID)"
-	scp $(faustfile) faust@macyann:onlineComp/$(SESSIONID)
-	ssh faust@macyann "/usr/local/bin/faust2supercollider $(OPT) $(oscOPT) onlineComp/$(SESSIONID)/$(faustfile)"
-	scp -r faust@macyann:onlineComp/$(SESSIONID) files
-	ssh faust@macyann "rm -r onlineComp/$(SESSIONID)"
-	rm files/$(faustfile)
+	faust2supercollider $(OPT) $(oscOPT) $(faustfile)
 	zip -r $(compBinaryfile) files
 	rm -r files
 

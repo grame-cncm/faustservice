@@ -24,7 +24,6 @@ ARCH		:= ca-qt.cpp
 TMP 		:= ./tmp/$(applname)
 
 binary : $(binaryfile)
-	echo $(compBinaryfile) > binaryfilename.txt
 
 source : $(cppfile)
 

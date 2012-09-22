@@ -121,14 +121,9 @@ $(applname)~.pd_darwin : $(cppfile)
 
 else
 
-#cross compiling via ssh
+# no ssh yet, so this doesn't do anything...
 $(applname)~.pd_darwin : $(cppfile)
-	-ssh faust@macyann "[ -d onlineComp/$(SESSIONID) ] && rm -rf onlineComp/$(SESSIONID)"
-	ssh faust@macyann "mkdir onlineComp/$(SESSIONID)"
-	scp $(cppfile) faust@macyann:~/onlineComp/$(SESSIONID)
-	ssh faust@macyann "cd onlineComp/$(SESSIONID) && g++ $(ARCHPROC) -O3 -mfpmath=sse -msse -ffast-math $(LIB) -Dmydsp=$(applname) -o $@ $(cppfile)"
-	scp faust@macyann:~/onlineComp/$(SESSIONID)/$@ .
-	ssh faust@macyann "rm -r onlineComp/$(SESSIONID)"
+	g++ $(ARCHPROC) -O3 -mfpmath=sse -msse -ffast-math $(LIB) -Dmydsp=$(applname) -o $@ $(cppfile)
 
 endif
 

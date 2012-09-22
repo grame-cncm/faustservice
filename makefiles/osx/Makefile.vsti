@@ -39,11 +39,7 @@ $(svgfile) : $(cppfile)
 	faust $(faustfile) $(OPT) -svg >/dev/null 2> errors.log
 
 $(binaryfile) : $(cppfile)
-	ssh faust@macyann "mkdir onlineComp/$(SESSIONID)"
-	scp $(faustfile) faust@macyann:onlineComp/$(SESSIONID)
-	ssh faust@macyann "/usr/local/bin/faust2vst $(OPT) -vsti onlineComp/$(SESSIONID)/$(faustfile)"
-	scp -r faust@macyann:onlineComp/$(SESSIONID)/$(binaryfile) .
-	ssh faust@macyann "rm -rf onlineComp/$(SESSIONID)"
+	faust2vst $(OPT) -vsti $(faustfile)
 	zip -r $(compBinaryfile) $(binaryfile)
 	rm -r $(binaryfile)
 
