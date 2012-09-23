@@ -58,9 +58,6 @@ string invalidosorarchitecture =
 string invalidinstruction =
     "<html><body>The server only can generate binary, source, or svg for a given architecture.</body></html>";
 
-string compilationfailure =
-    "<html><body>The compilation failed for the given instruction.</body></html>";
-
 string busypage =
     "<html><body>This server is busy, please try again later.</body></html>";
 
@@ -643,8 +640,14 @@ FaustServer::faustGet(struct MHD_Connection *connection, connection_info_struct 
         mimetype = "application/zip";
     } else if (url.filename() == "source") {
         filename = filename.substr(0,filename.find_first_of("."))+".cpp";
+    } else if (url.filename() == "svg") {
+        filename = filename.substr(0,filename.find_first_of("."))+"-svg.zip";
     }
 
+    if (!fs::is_regular_file(filename)) {
+        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+    }
+    
     ifstream myFile (filename.c_str (), ios::in | ios::binary);
     myFile.seekg (0, ios::end);
     int length = myFile.tellg();

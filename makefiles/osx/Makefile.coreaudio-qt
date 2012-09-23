@@ -7,10 +7,11 @@ faustfile	:= $(wildcard *.dsp)
 system 		:= $(shell uname -s)
 applname 	:= $(faustfile:.dsp=)
 cppfile 	:= $(faustfile:.dsp=.cpp)
-svgdir 		:= $(faustfile)-svg
+svgdir 		:= $(faustfile:.dsp=-svg)
 svgfile 	:= $(svgdir)/process.svg
 binaryfile 	:= $(applname).app
 compBinaryfile 	:= $(applname).zip
+compSvgfile	:= $(svgdir).zip
 
 ifeq ($(OSC),1)
 oscOPT := -osc
@@ -38,7 +39,7 @@ mdoc : $(cppfile)
 	faust2mathdoc $(faustfile)
 
 clean :
-	rm -rf $(svgdir) $(pkgdir) $(binaryfile) $(compBinaryfile) $(cppfile) $(binaryfile)-svg
+	rm -rf $(svgdir) $(pkgdir) $(binaryfile) $(compBinaryfile) $(compSvgfile) $(cppfile) $(binaryfile)-svg
 	
 $(cppfile) : $(faustfile)
 	if test -d $(DSPDEPTS);then dep=0;else cp $(DSPDEPTS) .;fi
@@ -46,6 +47,7 @@ $(cppfile) : $(faustfile)
 	
 $(svgfile) : $(cppfile)
 	faust $(faustfile) $(OPT) -svg >/dev/null 2> errors.log
+	zip -r $(compSvgfile) $(svgdir)
 
 $(binaryfile) : $(cppfile)
 	faust2caqt $(OPT) $(oscOPT) $(faustfile)
