@@ -11,9 +11,9 @@ readme := ../../../images/element/README
 xmlfile := $(faustfile).xml
 pkgdir := $(faustfile:.dsp=-pkg)
 pkgfile := $(pkgdir).zip
-svgdir := $(faustfile)-svg
-svgfile := $(svgdir)/process.svg
-
+svgdir 		:= $(faustfile:.dsp=-svg)
+svgfile 	:= $(svgdir)/process.svg
+compSvgfile	:= $(svgdir).zip
 
 #binpkgdir  := $(faustfile:.dsp=-bin)
 binpkg     := $(faustfile:.dsp=-bin.zip)
@@ -102,7 +102,9 @@ $(cppfile) : $(faustfile)
 	faust -xml -a $(ARCH) $(faustfile) $(OPT) -o $(cppfile) 2> errors.log
 	
 $(svgfile) : $(cppfile)
-	faust $(faustfile) -svg $(OPT) >/dev/null 2> errors.log
+	faust $(faustfile) $(OPT) -svg >/dev/null 2> errors.log
+	zip -r $(compSvgfile) $(svgdir)
+
 	
 # compile for linux
 $(applname)~.pd_linux : $(cppfile)

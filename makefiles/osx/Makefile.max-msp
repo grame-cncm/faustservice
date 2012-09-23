@@ -5,10 +5,11 @@ faustfile	:= $(wildcard *.dsp)
 system 		:= $(shell uname -s)
 applname 	:= $(faustfile:.dsp=)
 cppfile 	:= $(faustfile:.dsp=.cpp)
-svgdir 		:= $(faustfile)-svg
+svgdir 		:= $(faustfile:.dsp=-svg)
 svgfile 	:= $(svgdir)/process.svg
 binaryfile 	:= $(applname)~.mxo
 compBinaryfile 	:= $(applname).zip
+compSvgfile	:= $(svgdir).zip
 
 ARCH		:= max-msp.cpp
 TMP 		:= ./tmp/$(applname)
@@ -37,6 +38,7 @@ $(cppfile) : $(faustfile)
 	
 $(svgfile) : $(cppfile)
 	faust $(faustfile) $(OPT) -svg >/dev/null 2> errors.log
+	zip -r $(compSvgfile) $(svgdir)
 
 $(binaryfile) : $(cppfile)
 	faust2msp $(OPT) $(faustfile)
