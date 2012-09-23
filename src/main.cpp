@@ -111,8 +111,9 @@ main(int argc, char* argv[])
         close (STDERR_FILENO);
     }
 
-    if (!fs::is_directory(gMakefileDirectory))
+    if (!fs::is_directory(gMakefileDirectory)) {
         gMakefileDirectory = PKGDATADIR;
+    }
 
     FaustServer server(gPort, gMaxClients, gDirectory, gMakefileDirectory, gLogfile);
 

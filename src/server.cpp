@@ -647,7 +647,7 @@ FaustServer::faustGet(struct MHD_Connection *connection, connection_info_struct 
     if (!fs::is_regular_file(filename)) {
         return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     }
-    
+
     ifstream myFile (filename.c_str (), ios::in | ios::binary);
     myFile.seekg (0, ios::end);
     int length = myFile.tellg();
