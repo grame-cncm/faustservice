@@ -5,3 +5,5 @@ faustserver_SOURCES = src/main.cpp src/server.cpp
 faustserver_CPPFLAGS = $(BOOST_CPPFLAGS)
 faustserver_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 faustserver_LIBS = $(BOOST_THREAD_LIBS)
+
+AM_CXXFLAGS = -DPKGDATADIR='"$(pkgdatadir)"'

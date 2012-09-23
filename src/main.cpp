@@ -29,7 +29,6 @@ process_cmdline(int argc, char* argv[])
     ("daemon", "run the server in mode daemon")
     ("directory,d", po::value<string>(), "directory in which files will be written")
     ("help,h", "produce this help message")
-    ("makefile-directory", po::value<string>(), "directory containing the makefiles for the server")
     ("max-clients,m", po::value<int>(), "maximum number of clients allowed to concurrently upload")
     ("port,p", po::value<int>(), "the listening port");
 
@@ -61,11 +60,6 @@ process_cmdline(int argc, char* argv[])
     if (vm.count("directory")) {
         gDirectory = vm["directory"].as<string>();
     }
-
-    if (vm.count("makefile-directory")) {
-        gMakefileDirectory = vm["makefile-directory"].as<string>();
-    }
-
 }
 
 int
@@ -116,6 +110,9 @@ main(int argc, char* argv[])
         close (STDOUT_FILENO);
         close (STDERR_FILENO);
     }
+
+    if (!fs::is_directory(gMakefileDirectory))
+        gMakefileDirectory = PKGDATADIR;
 
     FaustServer server(gPort, gMaxClients, gDirectory, gMakefileDirectory, gLogfile);
 
