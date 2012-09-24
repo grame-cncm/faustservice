@@ -16,7 +16,7 @@ AC_SEARCH_LIBS([MHD_queue_response], [microhttpd], [], [
   AC_MSG_ERROR([Unable to find libmicrohttpd])
 ])
 
-AC_SEARCH_LIBS([SHA], [crypto], [], [
+AC_SEARCH_LIBS([SHA1], [crypto], [], [
   AC_MSG_ERROR([Unable to find libcrypto])
 ])
 
@@ -25,23 +25,6 @@ BOOST_REQUIRE([1.50.0])
 
 # hack...
 LIBS="$LIBS -lboost_filesystem -lboost_system -lboost_program_options"
-
-#AC_SEARCH_LIBS([pthread_create], [pthread], [], [
-#  AC_MSG_ERROR([Unable to find libpthread])
-#])
-#
-#AC_MSG_CHECKING([for library containing CryptoPP::SHA1])
-#AC_LANG_PUSH([C++])
-#SAVED_LDFLAGS=$LDFLAGS
-#LDFLAGS="$LDFLAGS -lcryptopp"
-#AC_LINK_IFELSE(
-#  [AC_LANG_PROGRAM([#include <cryptopp/sha.h>],
-#                   [CryptoPP::SHA1 sha1;])],
-#  [LIBS="$LIBS -lcryptopp"] [HAVE_CRYPTOPP=1],
-#  [AC_MSG_ERROR([libcryptopp is not installed.])])
-#LDFLAGS=$SAVED_LDFLAGS
-#AC_LANG_POP([C++])
-#AC_MSG_RESULT([-lcryptopp])
 
 AC_SEARCH_LIBS([archive_read_support_filter_all], [archive], [], [
   AC_MSG_ERROR([Unable to find libarchive])

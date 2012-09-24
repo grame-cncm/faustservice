@@ -4173,9 +4173,9 @@ else
 fi
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing SHA" >&5
-$as_echo_n "checking for library containing SHA... " >&6; }
-if ${ac_cv_search_SHA+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing SHA1" >&5
+$as_echo_n "checking for library containing SHA1... " >&6; }
+if ${ac_cv_search_SHA1+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_func_search_save_LIBS=$LIBS
@@ -4188,11 +4188,11 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char SHA ();
+char SHA1 ();
 int
 main ()
 {
-return SHA ();
+return SHA1 ();
   ;
   return 0;
 }
@@ -4205,25 +4205,25 @@ for ac_lib in '' crypto; do
     LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
   fi
   if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_SHA=$ac_res
+  ac_cv_search_SHA1=$ac_res
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext
-  if ${ac_cv_search_SHA+:} false; then :
+  if ${ac_cv_search_SHA1+:} false; then :
   break
 fi
 done
-if ${ac_cv_search_SHA+:} false; then :
+if ${ac_cv_search_SHA1+:} false; then :
 
 else
-  ac_cv_search_SHA=no
+  ac_cv_search_SHA1=no
 fi
 rm conftest.$ac_ext
 LIBS=$ac_func_search_save_LIBS
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_SHA" >&5
-$as_echo "$ac_cv_search_SHA" >&6; }
-ac_res=$ac_cv_search_SHA
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_SHA1" >&5
+$as_echo "$ac_cv_search_SHA1" >&6; }
+ac_res=$ac_cv_search_SHA1
 if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
@@ -4678,23 +4678,6 @@ CPPFLAGS=$boost_save_CPPFLAGS
 
 # hack...
 LIBS="$LIBS -lboost_filesystem -lboost_system -lboost_program_options"
-
-#AC_SEARCH_LIBS([pthread_create], [pthread], [], [
-#  AC_MSG_ERROR([Unable to find libpthread])
-#])
-#
-#AC_MSG_CHECKING([for library containing CryptoPP::SHA1])
-#AC_LANG_PUSH([C++])
-#SAVED_LDFLAGS=$LDFLAGS
-#LDFLAGS="$LDFLAGS -lcryptopp"
-#AC_LINK_IFELSE(
-#  [AC_LANG_PROGRAM([#include <cryptopp/sha.h>],
-#                   [CryptoPP::SHA1 sha1;])],
-#  [LIBS="$LIBS -lcryptopp"] [HAVE_CRYPTOPP=1],
-#  [AC_MSG_ERROR([libcryptopp is not installed.])])
-#LDFLAGS=$SAVED_LDFLAGS
-#AC_LANG_POP([C++])
-#AC_MSG_RESULT([-lcryptopp])
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing archive_read_support_filter_all" >&5
 $as_echo_n "checking for library containing archive_read_support_filter_all... " >&6; }
