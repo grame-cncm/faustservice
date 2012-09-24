@@ -16,18 +16,14 @@
 #include <archive.h>
 #include <archive_entry.h>
 
-// POCO
-#include "Poco/Process.h"
-#include "Poco/PipeStream.h"
-#include "Poco/StreamCopier.h"
-
 #include "utilities.hh"
 #include "server.hh"
 
+// to use command line tools
+#include <stdlib.h>
+
 using namespace std;
 namespace fs = boost::filesystem;
-using Poco::Process;
-using Poco::ProcessHandle;
 
 /*
  * Various responses to GET requests
@@ -588,7 +584,6 @@ unsigned int FaustServer::nr_of_uploading_clients = 0;
 int
 FaustServer::faustGet(struct MHD_Connection *connection, connection_info_struct *con_info, const char *raw_url, TArgs &args, string directory)
 {
-
     // The parent_path of the URL must be valid in the file tree
     // we examine.
     fs::path basedir(con_info->directory);
@@ -609,19 +604,18 @@ FaustServer::faustGet(struct MHD_Connection *connection, connection_info_struct 
     // dangerous operation...but have to do it for makefiles
     fs::path old_path(fs::current_path());
     fs::current_path(basedir / url.parent_path());
-
-    string cmd = "make";
-    vector<string> args_to_make;
-    args_to_make.push_back(url.filename().string());
-
-    Poco::Pipe outPipe;
-    ProcessHandle ph = Process::launch(cmd, args_to_make, 0, &outPipe, 0, args);
-    Poco::PipeInputStream istr(outPipe);
-    stringstream ostr;
-    Poco::StreamCopier::copyStream(istr, ostr);
-    //ugh...even with the line below, it looks like the processes
-    //are sticking around. how to really kill them off?
-    Process::kill(ph);
+    for (map<string, string>::iterator it = args.begin (); it != args.end(); it++) {
+        string setter = (it->first+"="+it->second).c_str();
+        char *caution = new char[setter.length()+1];
+        setter.copy(caution, setter.length()+1);
+        if (0 != putenv(caution)) {
+            delete[] caution;
+            return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+        }
+        delete[] caution;        
+    }
+    if (0 != system(("make "+url.filename().string()).c_str()))
+        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 
     string filename = "";
 
