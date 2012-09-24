@@ -22,6 +22,10 @@ AC_SEARCH_LIBS([MHD_queue_response], [microhttpd], [], [
   AC_MSG_ERROR([Unable to find libmicrohttpd])
 ])
 
+AC_SEARCH_LIBS([pthread_create], [pthread], [], [
+  AC_MSG_ERROR([Unable to find libpthread])
+])
+
 AC_MSG_CHECKING([for library containing CryptoPP::SHA1])
 AC_LANG_PUSH([C++])
 SAVED_LDFLAGS=$LDFLAGS
