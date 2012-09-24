@@ -1,5 +1,6 @@
 #include <sstream>
 #include <iostream>
+#include <fstream>
 
 // libmicrohttpd
 #include <microhttpd.h>
@@ -8,9 +9,10 @@
 #include <boost/filesystem.hpp>
 
 // libcryptopp
-#include <cryptopp/sha.h>
-#include <cryptopp/files.h>
-#include <cryptopp/hex.h>
+//#include <cryptopp/sha.h>
+//#include <cryptopp/files.h>
+//#include <cryptopp/hex.h>
+#include <openssl/sha.h>
 
 // libarchive
 #include <archive.h>
@@ -216,13 +218,33 @@ validate_faust(connection_info_struct *con_info)
 string_and_exitstatus
 generate_sha1(connection_info_struct *con_info)
 {
-    CryptoPP::SHA1 sha1;
     fs::path old_full_filename = fs::path(con_info->tmppath) / fs::path(con_info->filename);
     string source = old_full_filename.string();
     string hash = "";
-    try {
-        CryptoPP::FileSource(source.c_str(), true, new CryptoPP::HashFilter(sha1, new CryptoPP::HexEncoder(new CryptoPP::StringSink(hash))));
-    } catch (...) { }
+
+    ifstream myFile (source.c_str (), ios::in | ios::binary);
+    myFile.seekg (0, ios::end);
+    int length = myFile.tellg();
+    myFile.seekg (0, ios::beg);
+
+    char result[length];
+    // read data as a block:
+    myFile.read (result, length);
+    myFile.close();
+    unsigned char obuf[20];
+    string setter(result);
+
+    SHA1((const unsigned char *)(setter.c_str()), setter.length(), obuf);
+    char buffer[20];
+    stringstream ss;
+    
+    for (int i=0; i < 20; i++) {
+       sprintf(buffer, "%02x", obuf[i]);
+       ss << buffer;
+    }
+    
+    hash = ss.str();
+
     string_and_exitstatus res;
     res.exitstatus = hash.length() == 40 ? 0 : 1;
     res.str = hash;
