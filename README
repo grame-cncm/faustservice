@@ -3,3 +3,20 @@
 
 The goal of this project is to develop a web API for the Faust compiler allowing to do remote compilations.
 
+LIBRARIES
+
+In order to compile, faustserver links against the following libraries:
+
+libarchive
+boost
+libcrypto
+libmicrohttpd
+
+Make sure to download the current development trunk of all these libraries.
+
+Then, the standard
+
+mkdir build && cd build
+../configure
+make
+sudo make install
