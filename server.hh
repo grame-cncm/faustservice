@@ -4,6 +4,11 @@
 #include "microhttpd.h"
 #include "utilities.hh"
 
+// Boost libraries
+#include <boost/filesystem.hpp>
+namespace fs = boost::filesystem;
+
+
 using namespace std;
 
 struct connection_info_struct {
@@ -27,14 +32,14 @@ class FaustServer
 {
     int port_;
     int max_clients_;
-    string directory_;
-    string makefile_directory_;
-    string logfile_;
+    fs::path directory_;
+    fs::path makefile_directory_;
+    fs::path logfile_;
 
     struct MHD_Daemon* daemon_;
 
     static unsigned int nr_of_uploading_clients;
-    static int faustGet(struct MHD_Connection *connection, connection_info_struct *con_info, const char *raw_url, TArgs &args, string directory);
+    static int faustGet(struct MHD_Connection *connection, connection_info_struct *con_info, const char *raw_url, TArgs &args, const fs::path&  directory);
     static int get_params(void *cls, enum MHD_ValueKind, const char *key, const char *data);
     static int send_page(struct MHD_Connection *connection, const char *page, int length, int status_code, const char *type);
     static int iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
@@ -49,13 +54,13 @@ class FaustServer
                                     size_t *upload_data_size, void **con_cls);
 
 public:
-    FaustServer(int port, int max_cleints, string directory, string makefile_directory, string logfile);
+    FaustServer(int port, int max_cleints, const fs::path& directory, const fs::path& makefile_directory, const fs::path& logfile);
     virtual ~FaustServer () {
     };
     const int getMaxClients();
-    const string getDirectory();
-    const string getMakefileDirectory();
-    const string getLogfile();
+    fs::path  getDirectory();
+   	fs::path  getMakefileDirectory();
+    fs::path  getLogfile();
     bool start();
     void stop();
 };

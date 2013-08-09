@@ -10,19 +10,21 @@
 #include "server.hh"
 #include "utilities.hh"
 
-int gPort = 8888;
-int gMaxClients = 2;
-string gDirectory = "";
-string gMakefileDirectory = "../makefiles";
-string gLogfile = "faustserver.log";
-bool gDaemon = false;
-
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 
+int gPort = 8888;
+int gMaxClients = 2;
+
+fs::path gCurrentDirectory;			///< root directory were makefiles and sessions and log are located
+fs::path gSessionsDirectory;		///< directory where sessions are stored
+fs::path gMakefilesDirectory;		///< directory containing all the "<os>/Makefile.<architecture>[-32bits|-64bits]" makefiles 
+fs::path gLogfile;					///< faustweb logfile
+
+bool gDaemon = false;
+
 // Processes command line arguments using boost/parse_options
-void
-process_cmdline(int argc, char* argv[])
+void process_cmdline(int argc, char* argv[])
 {
     po::options_description desc("faustserver program options.");
     desc.add_options()
@@ -56,14 +58,42 @@ process_cmdline(int argc, char* argv[])
     if (vm.count("logfile")) {
         gLogfile = vm["logfile"].as<string>();
     }
-
+#if 0
     if (vm.count("directory")) {
         gDirectory = vm["directory"].as<string>();
     }
+#endif
 }
 
 int main(int argc, char* argv[])
 {
+    std::cerr << "faustwed starting" << std::endl;
+    
+    // Set the various paths
+    gCurrentDirectory = fs::absolute(fs::current_path());
+   	gMakefilesDirectory = gCurrentDirectory / "makefiles";
+   	gSessionsDirectory = gCurrentDirectory / "sessions";
+   	
+   	// check for ".../makefiles/" directory
+   	if (is_directory(gMakefilesDirectory)) {
+   		std::cerr << "Makefiles directory available at path " << gMakefilesDirectory << std::endl;
+   	} else {
+   		std::cerr << "ERROR : no makefiles directory available at path " << gMakefilesDirectory << std::endl;
+   		exit(1);   	
+   	}
+   		
+   	// if needed creates ".../sessions/" directory
+   	if (create_directory(gSessionsDirectory)) {
+   		std::cerr << "Create \"sessions\" directory at path " << gSessionsDirectory << std::endl;
+   	} else {
+   		std::cerr << "Reuse \"sessions\" directory at path " << gSessionsDirectory << std::endl;
+   	}
+   		
+   	
+    std::cerr << "faustwed started in directory " << gCurrentDirectory << std::endl;
+    std::cerr << "faustwed makefiles directory " << gMakefilesDirectory << std::endl;
+    std::cerr << "faustwed sessions directory " << gSessionsDirectory << std::endl;
+    
     process_cmdline(argc, argv);
 
     if (gDaemon) {
@@ -87,6 +117,7 @@ int main(int argc, char* argv[])
         // Create a new SID for the child process
         sid = setsid ();
 
+/*
         if (sid < 0) {
             FILE *f = fopen ((fs::path (gDirectory) / fs::path (gLogfile)).string().c_str(), "ab");
             const char *error = "Could not create an SID for the process.";
@@ -94,7 +125,7 @@ int main(int argc, char* argv[])
             fclose (f);
             exit (EXIT_FAILURE);
         }
-
+*/
 
         // We need to keep the cwd where it is
         // which is why all of this is commented out.
@@ -109,15 +140,17 @@ int main(int argc, char* argv[])
         close (STDOUT_FILENO);
         close (STDERR_FILENO);
     }
-
+/*
     if (!fs::is_directory(gMakefileDirectory)) {
-        //gMakefileDirectory = PKGDATADIR;
+        std::cerr << gMakefileDirectory << " is not the expected makefiles directory" << std::endl;
         exit (EXIT_FAILURE);
     }
-
-    FaustServer server(gPort, gMaxClients, gDirectory, gMakefileDirectory, gLogfile);
+*/
+    //gDirectory = fs::initial_path<fs::path>();
+    FaustServer server(gPort, gMaxClients, gSessionsDirectory, gMakefilesDirectory, gLogfile);
 
     if (!server.start()) {
+        std::cerr << "unable to start webserver" << std::endl;
         return 1;
     }
 
