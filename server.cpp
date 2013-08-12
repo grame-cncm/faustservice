@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <fcntl.h>
 
 // libmicrohttpd
 #include <microhttpd.h>
@@ -249,52 +250,18 @@ string_and_exitstatus generate_sha1(connection_info_struct *con_info)
     return res;
 }
 
-/*
- * Creates an arboreal structure in root with the appropriate makefiles.
- */
 
-void OLDcreate_file_tree(fs::path sha1path, fs::path makefile_directory)
-{
-	std::cerr << "ENTER create_file_tree(" << sha1path << ", " << makefile_directory << ")" << std::endl;
-    fs::directory_iterator end_iter;
-    for (fs::directory_iterator os_iter(makefile_directory); os_iter != end_iter; ++os_iter) {
-        string os_dir = os_iter->path().filename().string();
-        std::cerr << "scanning OS " << os_iter->path() << std::endl;
-        // hack for root Makefile
-        if (os_dir == "Makefile.none") {
-            fs::copy_file(os_iter->path(),
-                          sha1path / fs::path("Makefile"));
-        } else if (fs::is_directory(os_iter->path())) {
-            fs::create_directory(sha1path / os_dir);
-            for (fs::directory_iterator dir_iter(os_iter->path()); dir_iter != end_iter; ++dir_iter) {
-                string fname = dir_iter->path().filename().string();
-                std::cerr << "scanning file " << dir_iter->path() << std::endl;
-                if (fname.substr(0, fname.find_first_of(".")) == "Makefile") {
-                    string dirname = fname.substr(fname.find_last_of(".") + 1);
-                    fs::create_directory(sha1path / os_dir / fs::path (dirname));
-                    fs::copy_file(makefile_directory / dir_iter->path(),
-                                  sha1path / os_dir / fs::path(dirname) / fs::path("Makefile"));
-                    for (fs::directory_iterator faust_iter(sha1path); faust_iter != end_iter; ++faust_iter) {
-                        string maybe_link_me = faust_iter->path().filename().string();
-                        if (maybe_link_me.substr(maybe_link_me.find_last_of(".") + 1) == "dsp"
-                                || maybe_link_me.substr(maybe_link_me.find_last_of(".") + 1) == "lib") {
-                            fs::copy_file/*create_symlink*/(faust_iter->path(),
-                                               sha1path / os_dir / fs::path(dirname) / faust_iter->path().filename ());
-                        }
-                    }
-                }
-            }
-        }
-    }
-	std::cerr << "EXIT create_file_tree()" << std::endl;
-}
+
+/*
+ * True if it is a .dsp or a .lib source file 
+ */
 
 bool isFaustFile(const fs::path& f)
 {
 
 	fs::path x = f.extension();
 	bool a = (x==".dsp") || (x==".lib");
-	std::cerr << "isFaustFile(" << f << ") = " << a << std::endl;
+	//std::cerr << "isFaustFile(" << f << ") = " << a << std::endl;
 	return a;
 }
 
@@ -302,6 +269,11 @@ bool isMakefile(const fs::path& f)
 {
 	return f.stem() == "Makefile";
 }
+
+
+/*
+ * Copy all faust source files from src directory to destination directory
+ */
 
 void copyFaustFiles(const fs::path& src, const fs::path& dst)
 {
@@ -317,20 +289,25 @@ void copyFaustFiles(const fs::path& src, const fs::path& dst)
 }
 
 
+
+/*
+ * Creates an arboreal structure in root with the appropriate makefiles.
+ */
+
 void create_file_tree(fs::path sha1path, fs::path makefile_directory)
 {
-	std::cerr << "ENTER create_file_tree(" << sha1path << ", " << makefile_directory << ")" << std::endl;
+	//std::cerr << "ENTER create_file_tree(" << sha1path << ", " << makefile_directory << ")" << std::endl;
     fs::directory_iterator end_iter;
     for (fs::directory_iterator os_iter(makefile_directory); os_iter != end_iter; ++os_iter) {
     	if (fs::is_directory(os_iter->path())) {
-        	std::cerr << "scanning OS directory " << os_iter->path() << std::endl;
+        	//std::cerr << "scanning OS directory " << os_iter->path() << std::endl;
         	string OSname = os_iter->path().filename().string();
         	//create_directory(sha1path/OSname);
             for (fs::directory_iterator makefile_iter(os_iter->path()); makefile_iter != end_iter; ++makefile_iter) {
         		string makefileName = makefile_iter->path().filename().string();
         		if (makefileName.substr(0,9) == "Makefile.") {
         			string archName = makefileName.substr(9);
-                	std::cerr << "scanning makefile " << makefile_iter->path() << ", makefile : " << makefileName << ", architecture : " << archName << std::endl;
+                	//std::cerr << "scanning makefile " << makefile_iter->path() << ", makefile : " << makefileName << ", architecture : " << archName << std::endl;
                 	fs::path dstdir = sha1path/OSname/archName;
                 	create_directories(dstdir);
                 	copy(makefile_iter->path(), dstdir/"Makefile");
@@ -339,7 +316,7 @@ void create_file_tree(fs::path sha1path, fs::path makefile_directory)
             }
         }
     }
-	std::cerr << "EXIT create_file_tree()" << std::endl;
+	//std::cerr << "EXIT create_file_tree()" << std::endl;
 }
 	
 /*
@@ -352,10 +329,10 @@ void create_file_tree(fs::path sha1path, fs::path makefile_directory)
 // TODO: merge with validate function if possible...
 int make_initial_faust_directory(connection_info_struct *con_info, string sha1)
 {
-	std::cerr << "ENTER make_initial_faust_directory(" << con_info << ", " << sha1 << std::endl;
     fs::path sha1path = fs::path(con_info->directory) / fs::path(sha1);
     if (! fs::is_directory(sha1path)) {
-    
+ 		std::cerr << "ENTER make_initial_faust_directory(" << con_info << ", " << sha1 << std::endl;
+   
     	// first time we have this file
     	fs::create_directory(sha1path);
     	string filename(con_info->filename);
@@ -395,8 +372,9 @@ int make_initial_faust_directory(connection_info_struct *con_info, string sha1)
 		}
 
 		create_file_tree(sha1path, fs::path(con_info->makefile_directory));
-		con_info->answerstring = completepage_head + sha1 + completepage_tail;
+		std::cerr << "EXIT make_initial_faust_directory(" << con_info << ", " << sha1 << std::endl;
 	}
+	con_info->answerstring = completepage_head + sha1 + completepage_tail;
 	return 0;	
 }
 
@@ -466,6 +444,15 @@ int FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const 
     struct connection_info_struct *con_info = (connection_info_struct*)coninfo_cls;
     FILE *fp;
 
+	std::cerr 	<< "ENTER iterate_post (" 
+				<< "kind : " << kind 
+				<< ", key : " << key 
+				<< ", filename: " << filename 
+				<< ", content type: " << content_type
+				//<< ", transfer_encoding: " << transfer_encoding
+				<< ", data pointer: " << (void*)data
+				<< ", size: " << size
+				<< ")" << std::endl;
     if (con_info->tmppath.empty()) {
         con_info->filename = filename;
         con_info->tmppath = (fs::temp_directory_path() / fs::unique_path("%%%%-%%%%-%%%%-%%%%")).string();
@@ -478,6 +465,7 @@ int FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const 
     con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
     if (0 != strcmp(key, "file")) {
+    	std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
         return MHD_NO;
     }
 
@@ -486,17 +474,20 @@ int FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const 
             fclose(fp);
             con_info->answerstring = fileexistspage;
             con_info->answercode = MHD_HTTP_FORBIDDEN;
+    		std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
             return MHD_NO;
         }
 
         con_info->fp = fopen(full_path.c_str(), "ab");
         if (!con_info->fp) {
+    		std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
             return MHD_NO;
         }
     }
 
     if (size > 0) {
         if (!fwrite(data, size, sizeof(char), con_info->fp)) {
+    		std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
             return MHD_NO;
         }
     }
@@ -606,6 +597,7 @@ int FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connecti
     }
 
     if (0 == strcmp(method, "POST")) {
+    	std::cerr << "POST processing" << std::endl;
         struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
 
         if (0 != *upload_data_size) {
@@ -650,14 +642,107 @@ unsigned int FaustServer::nr_of_uploading_clients = 0;
  * Any GET parameters are set as environmetnal variables before
  * calling the makefile.
  */
+ 
+// Define here the various targets accepted by faustweb makefiles
+bool isValidTarget(const fs::path& target) 
+{
+	return (target == "binary")
+		|| (target == "src")
+		|| (target == "svg");
+}
+
+fs::path make (const fs::path& dir, const fs::path& target)
+{
+	std::stringstream ss;
+	ss << "make -C " << dir << " " << target;
+	std::cerr << ss.str() << std::endl;
+	if ( 0 == system(ss.str().c_str()) ) {
+       	fs::ifstream  resinfo (dir/"binaryfilename.txt", ios::in);
+       	string	fname; resinfo >> fname;
+       	std::cerr << "makefile was successfull ==> " << fname << std::endl; 
+       	resinfo.close();
+       	return dir/fname;
+	} else {
+       	std::cerr << __LINE__  << "makefile failed !!!" << std::endl; 
+	}
+
+	return fs::path(); // bidon
+}
+
+
+/*
+ * Function that sends a file in response to a GET
+ */
+
+int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& filepath)
+{
+	struct stat sbuf;
+	int 		fd;
+		
+	std::cerr << " ENTER send_file : " << filepath << endl;
+	
+	if ( (-1 == (fd = open (filepath.string().c_str(), O_RDONLY))) || (0 != fstat (fd, &sbuf)) ) {
+		std::cerr << __LINE__  << " error accessing file : " << filepath << endl;
+		return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+	}
+
+    struct MHD_Response* response = MHD_create_response_from_fd (sbuf.st_size, fd);
+    if (!response) { 
+		std::cerr << __LINE__ << " error can't create response : " << filepath << endl;
+    	return MHD_NO; 
+    }
+
+    MHD_add_response_header (response, "Content-Type", "application/zip");
+    MHD_add_response_header (response, "Content-Location", filepath.filename().string().c_str());
+    int ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+    MHD_destroy_response(response);
+
+	std::cerr << " EXIT send_file : " << filepath << endl;
+    return ret;
+}
+
 
 int FaustServer::faustGet(struct MHD_Connection* connection, connection_info_struct* con_info, const char* raw_url, TArgs &args, const fs::path& directory)
 {
+    fs::path url 		= fs::path(raw_url);
+	fs::path fulldir  	= directory / url.parent_path();
+	fs::path target  	= url.filename();
+	fs::path makefile 	= fulldir / "Makefile";
+	
+	if ( fs::is_regular_file(makefile) && isValidTarget(target) ) {
+	
+		fs::path filename = make (fulldir, target);
+		
+    	if (!fs::is_regular_file(filename)) {
+        	return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+    	} else {
+    		return send_file(connection, filename);
+    		fs::ifstream myFile (filename, ios::in | ios::binary);
+   			myFile.seekg (0, ios::end);
+    		int length = myFile.tellg();
+   			myFile.seekg (0, ios::beg);
+    
+    		std::cerr << "Preparing answer of size " << length << std::endl;
+
+    		char result[length];
+    		// read data as a block:
+    		myFile.read (result, length);
+    		myFile.close();
+
+    		int errcode = send_page(connection, result, length, MHD_HTTP_OK, "application/zip");
+    		return errcode;
+    	}
+		
+	} else { 
+		return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+	}
+	
+#if 0
+
     std::cerr << "FaustServer::faustGet(" << raw_url << ", " << directory << ")" << std::endl;
     // The parent_path of the URL must be valid in the file tree
     // we examine.
     fs::path basedir(con_info->directory);
-    fs::path url(raw_url);
     int nelts = pathsize(url);
 
     std::cerr << "FaustServer::faustGet : " << basedir << ", " << url << std::endl;
@@ -666,12 +751,13 @@ int FaustServer::faustGet(struct MHD_Connection* connection, connection_info_str
         return send_page(connection, invalidosorarchitecture.c_str(), invalidosorarchitecture.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     }
 
+	// check we are looking for binary, source or svg
     if (url.filename() != "binary"
             && url.filename() != "source"
             && url.filename() != "svg") {
         return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     }
-
+#if 1
     // dangerous operation...but have to do it for makefiles
     fs::path old_path(fs::current_path());
     fs::current_path(basedir / url.parent_path());
@@ -685,26 +771,23 @@ int FaustServer::faustGet(struct MHD_Connection* connection, connection_info_str
         }
         delete[] caution;        
     }
-    std::cerr << "before calling make with target " << url.string() << std::endl;
-    if (0 != system(("make "+url.filename().string()).c_str()))
-        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
-
-    std::cerr << "after calling make with target " << url.filename().string() << std::endl;
-    std::cerr << "after calling make with parent " << url.parent_path().string() << std::endl;
-    string filename = "";
-#if 0
-    fs::directory_iterator end_iter;
-    for (fs::directory_iterator os_iter(basedir / url.parent_path()); os_iter != end_iter; ++os_iter) {
-        string os_dir = os_iter->path().string();
-        std::cerr << "iteraction : " << os_dir << std::endl;
-        if (os_dir.substr(os_dir.find_last_of(".") + 1) == "dsp") {
-            filename = os_dir;
-            break;
-        }
-    }
-    std::cerr << "the resulting file is " << filename << std::endl;
 #endif
 
+
+    std::cerr << "before calling make with target " << url.string() << std::endl;
+    if (0 != system(("make "+url.filename().string()).c_str())) {
+        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+	}
+    std::cerr << "after calling make with target " << url.filename().string() << std::endl;
+
+	// Read the name of resulting file in file 'binaryfilename.txt'
+    if (!fs::is_regular_file("binaryfilename.txt")) {
+        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+    }
+
+	
+	
+	string filename;
     string mimetype = "text/plain";
     if (url.filename() == "binary") {
         filename = filename.substr(0,filename.find_first_of("."))+".zip";
@@ -739,6 +822,7 @@ int FaustServer::faustGet(struct MHD_Connection* connection, connection_info_str
     fs::current_path(old_path);
     int errcode = send_page(connection, result, length, MHD_HTTP_OK, mimetype.c_str ());
     return errcode;
+#endif
 }
 
 // Get the maximum number of clients allowed to connect at a given time.
