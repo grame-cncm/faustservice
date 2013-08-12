@@ -14,34 +14,20 @@ compSvgfile	:= $(svgdir).zip
 ARCH		:= csound.cpp
 TMP 		:= ./tmp/$(applname)
 
-binary : $(binaryfile)
+binary : $(compBinaryfile)
 	echo $(compBinaryfile) > binaryfilename.txt
 
-source : $(cppfile)
-
-source-pkg : $(cppfile)
-
-highlighted : $(cppfile)
-	highlight -V -t 4 -S cpp -i $(cppfile) -o highlighted
-
-svg : $(svgfile)
-
-mdoc : $(cppfile)
-	faust2mathdoc $(faustfile)
+svg : $(compSvgfile)
+	echo $(compSvgfile) > binaryfilename.txt
 
 clean :
 	rm -rf $(svgdir) $(pkgdir) $(binaryfile) $(compBinaryfile) $(cppfile) $(binaryfile)-svg
-	
-$(cppfile) : $(faustfile)
-	if test -d $(DSPDEPTS);then dep=0;else cp $(DSPDEPTS) .;fi
-	faust -a $(ARCH) $(faustfile) $(OPT) -o $(cppfile) 2> errors.log
-	
-$(svgfile) : $(cppfile)
+		
+$(compSvgfile) : $(faustfile)
 	faust $(faustfile) $(OPT) -svg >/dev/null 2> errors.log
 	zip -r $(compSvgfile) $(svgdir)
 
-$(binaryfile) : $(cppfile)
+$(compBinaryfile) : $(faustfile)
 	faust2csound $(OPT) $(oscOPT) $(faustfile)
 	zip -r $(compBinaryfile) $(binaryfile)
-	rm -r $(binaryfile)
 
