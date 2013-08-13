@@ -11,23 +11,12 @@ binaryfile 	:= $(applname).dylib
 compBinaryfile 	:= $(applname).zip
 compSvgfile	:= $(svgdir).zip
 
-ARCH		:= csound.cpp
-TMP 		:= ./tmp/$(applname)
 
-binary : $(compBinaryfile)
-	echo $(compBinaryfile) > binaryfilename.txt
+binary.zip : $(faustfile)
+	faust2csound $(OPT) $(faustfile)
+	zip -r binary.zip $(binaryfile)
 
-svg : $(compSvgfile)
-	echo $(compSvgfile) > binaryfilename.txt
-
-clean :
-	rm -rf $(svgdir) $(pkgdir) $(binaryfile) $(compBinaryfile) $(cppfile) $(binaryfile)-svg
-		
-$(compSvgfile) : $(faustfile)
+svg.zip : $(faustfile)
 	faust $(faustfile) $(OPT) -svg >/dev/null 2> errors.log
-	zip -r $(compSvgfile) $(svgdir)
-
-$(compBinaryfile) : $(faustfile)
-	faust2csound $(OPT) $(oscOPT) $(faustfile)
-	zip -r $(compBinaryfile) $(binaryfile)
+	zip -r svg.zip $(svgdir)
 

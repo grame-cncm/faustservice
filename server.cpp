@@ -646,9 +646,9 @@ unsigned int FaustServer::nr_of_uploading_clients = 0;
 // Define here the various targets accepted by faustweb makefiles
 bool isValidTarget(const fs::path& target) 
 {
-	return (target == "binary")
-		|| (target == "src")
-		|| (target == "svg");
+	return (target == "binary.zip")
+		|| (target == "src.zip")
+		|| (target == "svg.zip");
 }
 
 fs::path make (const fs::path& dir, const fs::path& target)
@@ -657,16 +657,10 @@ fs::path make (const fs::path& dir, const fs::path& target)
 	ss << "make -C " << dir << " " << target;
 	std::cerr << ss.str() << std::endl;
 	if ( 0 == system(ss.str().c_str()) ) {
-       	fs::ifstream  resinfo (dir/"binaryfilename.txt", ios::in);
-       	string	fname; resinfo >> fname;
-       	std::cerr << "makefile was successfull ==> " << fname << std::endl; 
-       	resinfo.close();
-       	return dir/fname;
+       	return dir/target;
 	} else {
        	std::cerr << __LINE__  << "makefile failed !!!" << std::endl; 
 	}
-
-	return fs::path(); // bidon
 }
 
 
@@ -717,112 +711,11 @@ int FaustServer::faustGet(struct MHD_Connection* connection, connection_info_str
         	return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     	} else {
     		return send_file(connection, filename);
-    		fs::ifstream myFile (filename, ios::in | ios::binary);
-   			myFile.seekg (0, ios::end);
-    		int length = myFile.tellg();
-   			myFile.seekg (0, ios::beg);
-    
-    		std::cerr << "Preparing answer of size " << length << std::endl;
-
-    		char result[length];
-    		// read data as a block:
-    		myFile.read (result, length);
-    		myFile.close();
-
-    		int errcode = send_page(connection, result, length, MHD_HTTP_OK, "application/zip");
-    		return errcode;
     	}
 		
 	} else { 
 		return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 	}
-	
-#if 0
-
-    std::cerr << "FaustServer::faustGet(" << raw_url << ", " << directory << ")" << std::endl;
-    // The parent_path of the URL must be valid in the file tree
-    // we examine.
-    fs::path basedir(con_info->directory);
-    int nelts = pathsize(url);
-
-    std::cerr << "FaustServer::faustGet : " << basedir << ", " << url << std::endl;
-    if (!fs::is_directory(basedir / url.parent_path())
-            || !(nelts == 2 || nelts == 4)) {
-        return send_page(connection, invalidosorarchitecture.c_str(), invalidosorarchitecture.size(), MHD_HTTP_BAD_REQUEST, "text/html");
-    }
-
-	// check we are looking for binary, source or svg
-    if (url.filename() != "binary"
-            && url.filename() != "source"
-            && url.filename() != "svg") {
-        return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
-    }
-#if 1
-    // dangerous operation...but have to do it for makefiles
-    fs::path old_path(fs::current_path());
-    fs::current_path(basedir / url.parent_path());
-    for (map<string, string>::iterator it = args.begin (); it != args.end(); it++) {
-        string setter = (it->first+"="+it->second).c_str();
-        char *caution = new char[setter.length()+1];
-        setter.copy(caution, setter.length()+1);
-        if (0 != putenv(caution)) {
-            delete[] caution;
-            return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
-        }
-        delete[] caution;        
-    }
-#endif
-
-
-    std::cerr << "before calling make with target " << url.string() << std::endl;
-    if (0 != system(("make "+url.filename().string()).c_str())) {
-        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
-	}
-    std::cerr << "after calling make with target " << url.filename().string() << std::endl;
-
-	// Read the name of resulting file in file 'binaryfilename.txt'
-    if (!fs::is_regular_file("binaryfilename.txt")) {
-        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
-    }
-
-	
-	
-	string filename;
-    string mimetype = "text/plain";
-    if (url.filename() == "binary") {
-        filename = filename.substr(0,filename.find_first_of("."))+".zip";
-        mimetype = "application/zip";
-    } else if (url.filename() == "source") {
-        filename = filename.substr(0,filename.find_first_of("."))+".cpp";
-    } else if (url.filename() == "svg") {
-        filename = filename.substr(0,filename.find_first_of("."))+"-svg.zip";
-    }
-    std::cerr << "the resulting file is " << filename << std::endl;
-
-    if (!fs::is_regular_file(filename)) {
-        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
-    }
-
-    std::cerr << "Preparing answer of filename " << filename << std::endl;
-
-    ifstream myFile (filename.c_str (), ios::in | ios::binary);
-    myFile.seekg (0, ios::end);
-    int length = myFile.tellg();
-    myFile.seekg (0, ios::beg);
-    
-    std::cerr << "Preparing answer of size " << length << std::endl;
-
-    char result[length];
-    // read data as a block:
-    myFile.read (result, length);
-    myFile.close();
-
-    std::cerr << "Preparing answer copied here " << (void*)result << std::endl;
-
-    fs::current_path(old_path);
-    int errcode = send_page(connection, result, length, MHD_HTTP_OK, mimetype.c_str ());
-    return errcode;
-#endif
 }
 
 // Get the maximum number of clients allowed to connect at a given time.
