@@ -1,55 +1,15 @@
-#OSC_ALLOWED
-#HTTPD_ALLOWED
-### The behaviour of this Makefile will only be correct if
-### only one .dsp file exists in the folder
+################################################################################
+#							FaustWeb script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
 
 faustfile	?= $(wildcard *.dsp)
-system 		:= $(shell uname -s)
-applname 	:= $(faustfile:.dsp=)
-cppfile 	:= $(faustfile:.dsp=.cpp)
-svgdir 		:= $(faustfile:.dsp=-svg)
-svgfile 	:= $(svgdir)/process.svg
-binaryfile 	:= $(applname).app
-compBinaryfile 	:= $(applname).zip
-compSvgfile	:= $(svgdir).zip
 
-ifeq ($(OSC),1)
-oscOPT := -osc
-endif
+binary.zip : $(faustfile)
+	faust2caqt $(OPT) $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=.app)
 
-ifeq ($(HTTPD),1)
-httpdOPT := -httpd
-endif
+src.cpp : $(faustfile)
+	faust -i -a ca-qt.cpp $(faustfile) -o src.cpp
 
-ARCH		:= ca-qt.cpp
-TMP 		:= ./tmp/$(applname)
-
-binary : $(binaryfile)
-
-source : $(cppfile)
-
-source-pkg : $(cppfile)
-
-highlighted : $(cppfile)
-	highlight -V -t 4 -S cpp -i $(cppfile) -o highlighted
-
-svg : $(svgfile)
-
-mdoc : $(cppfile)
-	faust2mathdoc $(faustfile)
-
-clean :
-	rm -rf $(svgdir) $(pkgdir) $(binaryfile) $(compBinaryfile) $(compSvgfile) $(cppfile) $(binaryfile)-svg
-	
-$(cppfile) : $(faustfile)
-	if test -d $(DSPDEPTS);then dep=0;else cp $(DSPDEPTS) .;fi
-	faust -a $(ARCH) $(faustfile) $(OPT) -o $(cppfile) 2> errors.log
-	
-$(svgfile) : $(cppfile)
-	faust $(faustfile) $(OPT) -svg >/dev/null 2> errors.log
-	zip -r $(compSvgfile) $(svgdir)
-
-$(binaryfile) : $(cppfile)
-	faust2caqt $(OPT) $(oscOPT) $(faustfile)
-	zip -r $(compBinaryfile) $(binaryfile)
-	rm -r $(binaryfile)

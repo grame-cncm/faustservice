@@ -1,20 +1,15 @@
-### The behaviour of this Makefile will only be correct if
-### only one .dsp file exists in the folder
+################################################################################
+#							FaustWeb script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
 
 faustfile	:= $(wildcard *.dsp)
-system 		:= $(shell uname -s)
-applname 	:= $(faustfile:.dsp=)
-cppfile 	:= $(faustfile:.dsp=.cpp)
-svgdir 		:= $(faustfile:.dsp=-svg)
-svgfile 	:= $(svgdir)/process.svg
-binaryfile 	:= $(applname).dylib
-compBinaryfile 	:= $(applname).zip
-compSvgfile	:= $(svgdir).zip
 
 
 binary.zip : $(faustfile)
 	faust2csound $(OPT) $(faustfile)
-	zip -r binary.zip $(binaryfile)
+	zip -r binary.zip $(faustfile:.dsp=.dylib)
 
 src.cpp : $(faustfile)
 	faust -i -a csound.cpp $(faustfile) -o src.cpp
