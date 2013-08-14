@@ -127,6 +127,8 @@ int validate_faust(connection_info_struct *con_info)
     fs::path filename = fs::path(con_info->filename);
     fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
 
+	std::cerr << "validate_faust for file : " << old_full_filename << std::endl;
+	
     // libarchive stuff
     struct archive *my_archive;
     struct archive_entry *my_entry;
@@ -436,73 +438,6 @@ int FaustServer::send_page(struct MHD_Connection *connection, const char *page, 
 }
 
 /*
- * Callback called every time a POST request comes in by the postprocessor.
- * To understand more about how postprocessors work, consult the microhttpd
- * documentation.
- */
-
-int FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
-                          const char *filename, const char *content_type,
-                          const char *transfer_encoding, const char *data, uint64_t off,
-                          size_t size)
-{
-    struct connection_info_struct *con_info = (connection_info_struct*)coninfo_cls;
-    FILE *fp;
-
-	std::cerr 	<< "ENTER iterate_post (" 
-				<< "kind : " << kind 
-				<< ", key : " << key 
-				<< ", filename: " << filename 
-				<< ", content type: " << content_type
-				//<< ", transfer_encoding: " << transfer_encoding
-				<< ", data pointer: " << (void*)data
-				<< ", size: " << size
-				<< ")" << std::endl;
-    if (con_info->tmppath.empty()) {
-        con_info->filename = filename;
-        con_info->tmppath = (fs::temp_directory_path() / fs::unique_path("%%%%-%%%%-%%%%-%%%%")).string();
-        fs::create_directory(con_info->tmppath);
-    }
-
-    string full_path = (fs::path(con_info->tmppath) / fs::path(con_info->filename)).string();
-
-    con_info->answerstring = servererrorpage;
-    con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
-
-    if (0 != strcmp(key, "file")) {
-    	std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
-        return MHD_NO;
-    }
-
-    if (!con_info->fp) {
-        if (NULL != (fp = fopen(full_path.c_str(), "rb"))) {
-            fclose(fp);
-            con_info->answerstring = fileexistspage;
-            con_info->answercode = MHD_HTTP_FORBIDDEN;
-    		std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
-            return MHD_NO;
-        }
-
-        con_info->fp = fopen(full_path.c_str(), "ab");
-        if (!con_info->fp) {
-    		std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
-            return MHD_NO;
-        }
-    }
-
-    if (size > 0) {
-        if (!fwrite(data, size, sizeof(char), con_info->fp)) {
-    		std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
-            return MHD_NO;
-        }
-    }
-
-    con_info->answercode = MHD_HTTP_OK;
-
-    return MHD_YES;
-}
-
-/*
  * Callback called every time a GET or POST request is completed.
  * Note that this is NOT necessarily called once the entirety of
  * POST data is transfered. If the data is transfered in chunks,
@@ -532,104 +467,6 @@ void FaustServer::request_completed(void *cls, struct MHD_Connection *connection
 
     free(con_info);
     *con_cls = NULL;
-}
-
-/*
- * Callback called every time a GET or POST request is received.
- * by the server.
- */
-
-int FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connection,
-                                  const char *url, const char *method,
-                                  const char *version, const char *upload_data,
-                                  size_t *upload_data_size, void **con_cls)
-{
-    std::cerr << "FaustServer::answer_to_connection(" << url << ", " << method  << ", " << version << ")" << std::endl;
-    FaustServer *server = (FaustServer*)cls;
-
-    if (NULL == *con_cls) {
-        struct connection_info_struct *con_info;
-
-        if (nr_of_uploading_clients >= server->getMaxClients()) {
-            return send_page(connection, busypage.c_str (), busypage.size (), MHD_HTTP_SERVICE_UNAVAILABLE, "text/html");
-        }
-
-        con_info = new connection_info_struct();
-        con_info->directory = server->getDirectory().string();
-        con_info->makefile_directory = server->getMakefileDirectory().string();
-
-        if (NULL == con_info) {
-            return MHD_NO;
-        }
-
-        con_info->fp = NULL;
-
-        if (0 == strcmp(method, "POST")) {
-            con_info->postprocessor =
-                MHD_create_post_processor(connection, POSTBUFFERSIZE,
-                                          iterate_post, (void*)con_info);
-
-            if (NULL == con_info->postprocessor) {
-                free(con_info);
-                return MHD_NO;
-            }
-
-            nr_of_uploading_clients++;
-
-            con_info->connectiontype = POST;
-            con_info->answercode = MHD_HTTP_OK;
-            con_info->answerstring = errorpage;
-        } else {
-            con_info->connectiontype = GET;
-        }
-
-        *con_cls = (void*)con_info;
-
-        return MHD_YES;
-    }
-
-    if (0 == strcmp(method, "GET")) {
-        TArgs args;
-        MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
-        if (!args.size() && strcmp(url, "/") == 0) {
-            stringstream ss;
-            ss << askpage_head << nr_of_uploading_clients << askpage_tail;
-            return send_page(connection, ss.str().c_str (), ss.str().size(), MHD_HTTP_OK, "text/html");
-        }
-        struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
-        std::cerr << "server->getDirectory() = " << server->getDirectory() << std::endl;
-        return faustGet(connection, con_info, url, args, server->getDirectory());
-    }
-
-    if (0 == strcmp(method, "POST")) {
-    	std::cerr << "POST processing" << std::endl;
-        struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
-
-        if (0 != *upload_data_size) {
-            MHD_post_process(con_info->postprocessor, upload_data,
-                             *upload_data_size);
-            *upload_data_size = 0;
-
-            return MHD_YES;
-        } else {
-            // need to close the file before request_completed
-            // so that it can be opened by the methods below
-            if (con_info->fp) {
-                fclose(con_info->fp);
-            }
-
-            if (!validate_faust(con_info)) {
-                string_and_exitstatus sha1 = generate_sha1(con_info);
-                if (!sha1.exitstatus) {
-                    (void)make_initial_faust_directory(con_info, sha1.str);
-                }
-            }
-            return send_page(connection, con_info->answerstring.c_str(),
-                             con_info->answerstring.size(), con_info->answercode, "text/html");
-        }
-    }
-
-    return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 }
 
 // Number of clients currently uploading
@@ -730,33 +567,6 @@ int FaustServer::faustGet(struct MHD_Connection* connection, connection_info_str
 	}
 }
 
-// Get the maximum number of clients allowed to connect at a given time.
-
-const int FaustServer::getMaxClients()
-{
-    return max_clients_;
-}
-
-// Get the directory to which the uploaded files are being written.
-
-fs::path FaustServer::getDirectory()
-{
-    return directory_;
-}
-
-// Get the directory that the makefiles should be copied from.
-
-fs::path FaustServer::getMakefileDirectory()
-{
-    return makefile_directory_;
-}
-
-// Get the path to the logfile.
-
-fs::path FaustServer::getLogfile()
-{
-    return logfile_;
-}
 
 // Start the Faust server - shallow wrapper around MHD_start_daemon
 
@@ -781,10 +591,169 @@ void FaustServer::stop()
 }
 
 
-// Constructor for the Faust server
 
-FaustServer::FaustServer (int port, int max_clients, const fs::path&  directory, const fs::path&  makefile_directory, const fs::path&  logfile)
-    : port_(port), max_clients_(max_clients), directory_(directory), makefile_directory_(makefile_directory), logfile_(logfile)
+/*
+ * Callback called every time a GET or POST request is received.
+ * by the server.
+ */
+
+int FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connection,
+                                  const char *url, const char *method,
+                                  const char *version, const char *upload_data,
+                                  size_t *upload_data_size, void **con_cls)
 {
-    std::cerr << "FaustServer::FaustServer(" << port << "," << max_clients << "," << directory << "," << makefile_directory << "," << logfile << ")" << std::endl;
+    std::cerr << "FaustServer::answer_to_connection(" << url << ", " << method  << ", " << version << ")" << std::endl;
+    FaustServer *server = (FaustServer*)cls;
+
+    if (NULL == *con_cls) {
+        struct connection_info_struct *con_info;
+
+        if (nr_of_uploading_clients >= server->getMaxClients()) {
+            return send_page(connection, busypage.c_str (), busypage.size (), MHD_HTTP_SERVICE_UNAVAILABLE, "text/html");
+        }
+
+        con_info = new connection_info_struct();
+        con_info->directory = server->getDirectory().string();
+        con_info->makefile_directory = server->getMakefileDirectory().string();
+
+        if (NULL == con_info) {
+            return MHD_NO;
+        }
+
+        con_info->fp = NULL;
+
+        if (0 == strcmp(method, "POST")) {
+            con_info->postprocessor =
+                MHD_create_post_processor(connection, POSTBUFFERSIZE,
+                                          iterate_post, (void*)con_info);
+
+            if (NULL == con_info->postprocessor) {
+                free(con_info);
+                return MHD_NO;
+            }
+
+            nr_of_uploading_clients++;
+
+            con_info->connectiontype = POST;
+            con_info->answercode = MHD_HTTP_OK;
+            con_info->answerstring = errorpage;
+        } else {
+            con_info->connectiontype = GET;
+        }
+
+        *con_cls = (void*)con_info;
+
+        return MHD_YES;
+    }
+
+    if (0 == strcmp(method, "GET")) {
+        TArgs args;
+        MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
+        if (!args.size() && strcmp(url, "/") == 0) {
+            stringstream ss;
+            ss << askpage_head << nr_of_uploading_clients << askpage_tail;
+            return send_page(connection, ss.str().c_str (), ss.str().size(), MHD_HTTP_OK, "text/html");
+        }
+        struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
+        std::cerr << "server->getDirectory() = " << server->getDirectory() << std::endl;
+        return faustGet(connection, con_info, url, args, server->getDirectory());
+    }
+
+    if (0 == strcmp(method, "POST")) {
+    	std::cerr << "POST processing" << std::endl;
+        struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
+
+        if (0 != *upload_data_size) {
+            MHD_post_process(con_info->postprocessor, upload_data,
+                             *upload_data_size);
+            *upload_data_size = 0;
+
+            return MHD_YES;
+        } else {
+            // need to close the file before request_completed
+            // so that it can be opened by the methods below
+            if (con_info->fp) {
+                fclose(con_info->fp);
+            }
+
+            if (!validate_faust(con_info)) {
+                string_and_exitstatus sha1 = generate_sha1(con_info);
+                if (!sha1.exitstatus) {
+                    (void)make_initial_faust_directory(con_info, sha1.str);
+                }
+            }
+            return send_page(connection, con_info->answerstring.c_str(),
+                             con_info->answerstring.size(), con_info->answercode, "text/html");
+        }
+    }
+
+    return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+}
+
+
+/*
+ * Callback called every time a POST request comes in by the postprocessor.
+ * To understand more about how postprocessors work, consult the microhttpd
+ * documentation.
+ */
+
+int FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
+                          const char *filename, const char *content_type,
+                          const char *transfer_encoding, const char *data, uint64_t off,
+                          size_t size)
+{
+    struct connection_info_struct *con_info = (connection_info_struct*)coninfo_cls;
+    FILE *fp;
+
+	std::cerr 	<< "ENTER iterate_post (" 
+				<< "kind : " << kind 
+				<< ", key : " << key 
+				<< ", filename: " << filename 
+				<< ", content type: " << content_type
+				//<< ", transfer_encoding: " << transfer_encoding
+				<< ", data pointer: " << (void*)data
+				<< ", size: " << size
+				<< ")" << std::endl;
+    if (con_info->tmppath.empty()) {
+        con_info->filename = filename;
+        con_info->tmppath = (fs::temp_directory_path() / fs::unique_path("%%%%-%%%%-%%%%-%%%%")).string();
+        fs::create_directory(con_info->tmppath);
+    }
+
+    string full_path = (fs::path(con_info->tmppath) / fs::path(con_info->filename)).string();
+
+    con_info->answerstring = servererrorpage;
+    con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
+
+    if (0 != strcmp(key, "file")) {
+    	std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+        return MHD_NO;
+    }
+
+    if (!con_info->fp) {
+        if (NULL != (fp = fopen(full_path.c_str(), "rb"))) {
+            fclose(fp);
+            con_info->answerstring = fileexistspage;
+            con_info->answercode = MHD_HTTP_FORBIDDEN;
+    		std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+            return MHD_NO;
+        }
+
+        con_info->fp = fopen(full_path.c_str(), "ab");
+        if (!con_info->fp) {
+    		std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+            return MHD_NO;
+        }
+    }
+
+    if (size > 0) {
+        if (!fwrite(data, size, sizeof(char), con_info->fp)) {
+    		std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+            return MHD_NO;
+        }
+    }
+
+    con_info->answercode = MHD_HTTP_OK;
+
+    return MHD_YES;
 }
