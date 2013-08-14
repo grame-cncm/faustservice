@@ -16,7 +16,5 @@ binary.zip : $(faustfile)
 	faust2csound $(OPT) $(faustfile)
 	zip -r binary.zip $(binaryfile)
 
-svg.zip : $(faustfile)
-	faust $(faustfile) $(OPT) -svg >/dev/null 2> errors.log
-	zip -r svg.zip $(svgdir)
-
+src.cpp : $(faustfile)
+	faust -i -a csound.cpp $(faustfile) -o src.cpp

@@ -10,6 +10,19 @@ pkgfile := $(pkgdir).tgz
 svgdir := $(faustfile)-svg
 svgfile := $(svgdir)/process.svg
 
+
+
+svg.zip : $(faustfile)
+	faust2svg $(faustfile)
+	zip -r svg.zip $(applname)-svg
+
+mdoc.zip : $(faustfile)
+	faust2mathdoc $(faustfile) 
+	zip -r mdoc.zip $(applname)-mdoc
+
+
+
+
 binary : $(cppfile)
 	echo no binary allowed for $(faustfile) > errors.log
 	g++ $(cppfile)

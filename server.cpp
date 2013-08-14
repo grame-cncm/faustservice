@@ -371,7 +371,12 @@ int make_initial_faust_directory(connection_info_struct *con_info, string sha1)
 			return 1;
 		}
 
+		// copy makefile.none to handle non-architecture-specific targets like mdoc.zip, etc
+		fs::copy_file(fs::path(con_info->makefile_directory) / "Makefile.none", sha1path / "Makefile");
+		
+		// create the architecture-specific folders
 		create_file_tree(sha1path, fs::path(con_info->makefile_directory));
+		
 		std::cerr << "EXIT make_initial_faust_directory(" << con_info << ", " << sha1 << std::endl;
 	}
 	con_info->answerstring = completepage_head + sha1 + completepage_tail;
@@ -647,8 +652,9 @@ unsigned int FaustServer::nr_of_uploading_clients = 0;
 bool isValidTarget(const fs::path& target) 
 {
 	return (target == "binary.zip")
-		|| (target == "src.zip")
-		|| (target == "svg.zip");
+		|| (target == "src.cpp")
+		|| (target == "svg.zip")
+		|| (target == "mdoc.zip");
 }
 
 fs::path make (const fs::path& dir, const fs::path& target)
@@ -673,7 +679,7 @@ int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& fi
 	struct stat sbuf;
 	int 		fd;
 		
-	std::cerr << " ENTER send_file : " << filepath << endl;
+	std::cerr << __LINE__ << " ENTER send_file : " << filepath << endl;
 	
 	if ( (-1 == (fd = open (filepath.string().c_str(), O_RDONLY))) || (0 != fstat (fd, &sbuf)) ) {
 		std::cerr << __LINE__  << " error accessing file : " << filepath << endl;
@@ -691,10 +697,16 @@ int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& fi
     int ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
     MHD_destroy_response(response);
 
-	std::cerr << " EXIT send_file : " << filepath << endl;
+	std::cerr << __LINE__ << " EXIT send_file : " << filepath << endl;
     return ret;
 }
 
+
+
+
+/*
+ * Handle a GET command by "making" the appropriate resource and returning it
+ */
 
 int FaustServer::faustGet(struct MHD_Connection* connection, connection_info_struct* con_info, const char* raw_url, TArgs &args, const fs::path& directory)
 {
