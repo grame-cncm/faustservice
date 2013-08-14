@@ -1,5 +1,5 @@
 ################################################################################
-#							FaustWeb script
+#							FaustWeb OSX script
 #  The behaviour of this Makefile will only be correct if
 #  only one .dsp file exists in the folder
 ################################################################################
