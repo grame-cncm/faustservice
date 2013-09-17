@@ -7,7 +7,7 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2caqt $(OPT) $(faustfile)
+	faust2puredata $(OPT) $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=.pd) $(faustfile:.dsp=~.pd_darwin)
 
 src.cpp : $(faustfile)
