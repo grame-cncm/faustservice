@@ -127,7 +127,7 @@ int validate_faust(connection_info_struct *con_info)
     fs::path filename = fs::path(con_info->filename);
     fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
 
-	std::cerr << "validate_faust for file : " << old_full_filename << std::endl;
+	std::cerr << "ENTER validate_faust for file : " << old_full_filename << std::endl;
 	
     // libarchive stuff
     struct archive *my_archive;
@@ -143,6 +143,7 @@ int validate_faust(connection_info_struct *con_info)
     if (!fs::is_regular_file(old_full_filename)) {
         fs::remove_all(tmpdir);
         con_info->answerstring = completebuterrorpage;
+		std::cerr << "EXIT validate_faust with failure : not regular file : " << old_full_filename << std::endl;
         return 1;
     } else if (old_full_filename.string().substr(old_full_filename.string().find_last_of(".") + 1) == "dsp") {
         fs::copy_file(old_full_filename, tmpdir / filename);
@@ -168,11 +169,13 @@ int validate_faust(connection_info_struct *con_info)
         if (archive_status != ARCHIVE_OK) {
             fs::remove_all(tmpdir);
             con_info->answerstring = completebutdecompressionproblem;
+			std::cerr << "EXIT validate_faust with failure : Archive not OK case 1 : " << old_full_filename << std::endl;
             return 1;
         }
     } else {
         fs::remove_all(tmpdir);
         con_info->answerstring = completebutendoftheworld;
+		std::cerr << "EXIT validate_faust with failure : Archive not OK case 2 : " << old_full_filename << std::endl;
         return 1;
     }
 
@@ -180,18 +183,21 @@ int validate_faust(connection_info_struct *con_info)
     if (filename.string() == "") {
         fs::remove_all(tmpdir);
         con_info->answerstring = completebutnoDSPfile;
+		std::cerr << "EXIT validate_faust with failure : empty filename : " << old_full_filename << std::endl;
         return 1;
     }
 
+	std::cerr << "TRY TO COMPILE validate_faust : " << (tmpdir / filename).string() << std::endl;
     string result = "";
     FILE *pipe = popen(("faust -a plot.cpp " + (tmpdir / filename).string() + " 2>&1").c_str(), "r");
     if (!pipe) {
         con_info->answerstring = completebutnopipe;
     } else {
         // Bleed off the pipe
-        char buffer[128];
+        char buffer[256];
         while (!feof(pipe)) {
             if (fgets(buffer, 128, pipe) != NULL) {
+            	std::cerr << "READ PIPE validate_faust : " << buffer<< std::endl;
                 result += buffer;
             }
         }
@@ -201,9 +207,11 @@ int validate_faust(connection_info_struct *con_info)
     fs::remove_all(tmpdir);
 
     if (exitstatus) {
+		std::cerr << "EXIT validate_faust with failure : completebutcorrupt_head  : " << old_full_filename << std::endl;
         con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
     }
 
+	std::cerr << "EXIT validate_faust : " << old_full_filename << std::endl;
     return exitstatus;
 }
 
@@ -381,7 +389,8 @@ int make_initial_faust_directory(connection_info_struct *con_info, string sha1)
 		
 		std::cerr << "EXIT make_initial_faust_directory(" << con_info << ", " << sha1 << std::endl;
 	}
-	con_info->answerstring = completepage_head + sha1 + completepage_tail;
+	con_info->answerstring = sha1;
+	//con_info->answerstring = completepage_head + sha1 + completepage_tail;
 	return 0;	
 }
 
