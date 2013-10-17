@@ -9,7 +9,7 @@ In order to compile faustweb links against the following libraries:
 
 libarchive
 boost
-libcrypto
+libcryptopp
 libmicrohttpd
 
 Make sure to download the current development trunk of all these libraries.
