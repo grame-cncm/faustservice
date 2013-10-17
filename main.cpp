@@ -67,12 +67,18 @@ void process_cmdline(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-    std::cerr << "faustwed starting" << std::endl;
     
-    // Set the various paths
+    // Set the various default paths
     gCurrentDirectory = fs::absolute(fs::current_path());
    	gMakefilesDirectory = gCurrentDirectory / "makefiles";
    	gSessionsDirectory = gCurrentDirectory / "sessions";
+
+    process_cmdline(argc, argv);
+
+    std::cerr 	<< "faustwed starting "
+  				<< " port:" << gPort
+    			<< " directory:" << gCurrentDirectory 
+    			<< std::endl;
    	
    	// check for ".../makefiles/" directory
    	if (is_directory(gMakefilesDirectory)) {
@@ -88,13 +94,7 @@ int main(int argc, char* argv[])
    	} else {
    		std::cerr << "Reuse \"sessions\" directory at path " << gSessionsDirectory << std::endl;
    	}
-   		
-   	
-    std::cerr << "faustwed started in directory " << gCurrentDirectory << std::endl;
-    std::cerr << "faustwed makefiles directory " << gMakefilesDirectory << std::endl;
-    std::cerr << "faustwed sessions directory " << gSessionsDirectory << std::endl;
-    
-    process_cmdline(argc, argv);
+   	 
 
     if (gDaemon) {
         // Create an autonomous process

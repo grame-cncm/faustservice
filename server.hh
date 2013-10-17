@@ -41,16 +41,10 @@ class FaustServer
     fs::path 			makefile_directory_;
     fs::path 			logfile_;
     struct MHD_Daemon* 	daemon_;
+    string				targets;
 
 public:
-    FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory, const fs::path& logfile)
-    			: 	port_(port), 
-    				max_clients_(max_clients), 
-    				directory_(directory), 
-    				makefile_directory_(makefile_directory), 
-    				logfile_(logfile),
-    				daemon_(0)
-	{};
+    FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory, const fs::path& logfile);
 	
     virtual 	~FaustServer () {};
     
@@ -67,7 +61,6 @@ public:
  
     static unsigned int nr_of_uploading_clients;
     
-    static int faustGet		(struct MHD_Connection *connection, connection_info_struct *con_info, const char *raw_url, TArgs &args, const fs::path&  directory);
     static int get_params	(void *cls, enum MHD_ValueKind, const char *key, const char *data);
     static int send_page	(struct MHD_Connection *connection, const char *page, int length, int status_code, const char *type);
 	static int send_file	(struct MHD_Connection *connection, const fs::path& filepath);
@@ -79,9 +72,23 @@ public:
     static void request_completed	(void *cls, struct MHD_Connection *connection,
                                   	void **con_cls, enum MHD_RequestTerminationCode toe);
     static int answer_to_connection	(void *cls, struct MHD_Connection *connection,
-                                    const char *url, const char *method,
-                                    const char *version, const char *upload_data,
-                                    size_t *upload_data_size, void **con_cls);
+                                     const char *url, const char *method,
+                                     const char *version, const char *upload_data,
+                                     size_t *upload_data_size, void **con_cls);
+    
+    int answerConnection	(struct MHD_Connection* connection,
+                             const char* url, const char* method,
+                             const char* version, const char* upload_data,
+                             size_t *upload_data_size, void **con_cls);
+    int answerGET 			(struct MHD_Connection* connection, const char* url );
+    int answerPOST 			(struct MHD_Connection* connection,
+                             const char* url, const char* upload_data,
+                             size_t *upload_data_size, void **con_cls);
+
+
+    int faustGet			(struct MHD_Connection *connection, const char *raw_url);
+
+
 
 };
 

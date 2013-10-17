@@ -511,7 +511,8 @@ fs::path make (const fs::path& dir, const fs::path& target)
 	if ( 0 == system(ss.str().c_str()) ) {
        	return dir/target;
 	} else {
-       	std::cerr << __LINE__  << "makefile failed !!!" << std::endl; 
+       	std::cerr << __LINE__  << " makefile " << dir/target << " failed !!!" << std::endl; 
+       	return "";
 	}
 }
 
@@ -550,32 +551,6 @@ int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& fi
 
 
 
-/*
- * Handle a GET command by "making" the appropriate resource and returning it
- */
-
-int FaustServer::faustGet(struct MHD_Connection* connection, connection_info_struct* con_info, const char* raw_url, TArgs &args, const fs::path& directory)
-{
-    fs::path url 		= fs::path(raw_url);
-	fs::path fulldir  	= directory / url.parent_path();
-	fs::path target  	= url.filename();
-	fs::path makefile 	= fulldir / "Makefile";
-	
-	if ( fs::is_regular_file(makefile) && isValidTarget(target) ) {
-	
-		fs::path filename = make (fulldir, target);
-		
-    	if (!fs::is_regular_file(filename)) {
-        	return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
-    	} else {
-    		return send_file(connection, filename);
-    	}
-		
-	} else { 
-		return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
-	}
-}
-
 
 // Start the Faust server - shallow wrapper around MHD_start_daemon
 
@@ -602,7 +577,7 @@ void FaustServer::stop()
 
 
 /*
- * Callback called every time a GET or POST request is received.
+ * Static Callback called every time a GET or POST request is received.
  * by the server.
  */
 
@@ -613,17 +588,96 @@ int FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connecti
 {
     std::cerr << "FaustServer::answer_to_connection(" << url << ", " << method  << ", " << version << ")" << std::endl;
     FaustServer *server = (FaustServer*)cls;
+    if (server == 0) {
+        std::cerr << "REAL BAD ERROR, NO SERVER !!!" << std::endl;
+        exit(1);
+    }
+    return server->answerConnection(connection, url, method, version, upload_data, upload_data_size, con_cls);
+}
 
+
+
+
+/*
+ * Actual callback method called every time a GET or POST request is received.
+ * by the server.
+ */
+
+int FaustServer::answerGET ( struct MHD_Connection* connection, const char* url )
+{
+//        TArgs args;
+//        MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
+		std::cerr << "answerGET " << url << std::endl;
+        if (/*!args.size() &&*/ strcmp(url, "/") == 0) {
+            stringstream ss;
+            ss << askpage_head << nr_of_uploading_clients << askpage_tail;
+            return send_page(connection, ss.str().c_str (), ss.str().size(), MHD_HTTP_OK, "text/html");
+        } else if (strcmp(url, "/targets") == 0) {
+        	return send_page(connection, targets.c_str (), targets.size(), MHD_HTTP_OK, "application/json");
+        }
+        //struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
+        std::cerr << "this->getDirectory() = " << this->getDirectory() << std::endl;
+        return faustGet(connection, url);
+}
+
+/*
+ * Handle a GET command by "making" the appropriate resource and returning it
+ */
+
+int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url)
+{
+    fs::path url 		= fs::path(raw_url);
+	fs::path fulldir  	= this->getDirectory() / url.parent_path();
+	fs::path target  	= url.filename();
+	fs::path makefile 	= fulldir / "Makefile";
+	
+	if ( fs::is_regular_file(makefile) && isValidTarget(target) ) {
+	
+		fs::path filename = make (fulldir, target);
+		std::cerr << "Makefile vient de terminer" << std::endl;
+		
+    	if (!fs::is_regular_file(filename)) {
+        	return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+    	} else {
+    		return send_file(connection, filename);
+    	}
+		
+	} else { 
+		return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+	}
+}
+
+
+
+int FaustServer::answerConnection (  struct MHD_Connection* connection,
+                                     const char* url, const char* method,
+                                     const char* version, const char* upload_data,
+                                     size_t *upload_data_size, void **con_cls )
+{
+    
+    if (0 == strcmp(method, "GET")) {
+        return answerGET(connection, url);
+    } else if (0 == strcmp(method, "POST")) {
+		return answerPOST(connection, url, upload_data, upload_data_size, con_cls);
+	} else {
+	    return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+	}
+}
+
+int FaustServer::answerPOST (  struct MHD_Connection* connection,
+                                     const char* url, const char* upload_data,
+                                     size_t *upload_data_size, void **con_cls )
+{
     if (NULL == *con_cls) {
-        struct connection_info_struct *con_info;
+        struct connection_info_struct* con_info;
 
-        if (nr_of_uploading_clients >= server->getMaxClients()) {
+        if (nr_of_uploading_clients >= this->getMaxClients()) {
             return send_page(connection, busypage.c_str (), busypage.size (), MHD_HTTP_SERVICE_UNAVAILABLE, "text/html");
         }
 
         con_info = new connection_info_struct();
-        con_info->directory = server->getDirectory().string();
-        con_info->makefile_directory = server->getMakefileDirectory().string();
+        con_info->directory = this->getDirectory().string();
+        con_info->makefile_directory = this->getMakefileDirectory().string();
 
         if (NULL == con_info) {
             return MHD_NO;
@@ -631,7 +685,6 @@ int FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connecti
 
         con_info->fp = NULL;
 
-        if (0 == strcmp(method, "POST")) {
             con_info->postprocessor =
                 MHD_create_post_processor(connection, POSTBUFFERSIZE,
                                           iterate_post, (void*)con_info);
@@ -646,29 +699,13 @@ int FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connecti
             con_info->connectiontype = POST;
             con_info->answercode = MHD_HTTP_OK;
             con_info->answerstring = errorpage;
-        } else {
-            con_info->connectiontype = GET;
-        }
+        
 
         *con_cls = (void*)con_info;
 
         return MHD_YES;
     }
 
-    if (0 == strcmp(method, "GET")) {
-        TArgs args;
-        MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
-        if (!args.size() && strcmp(url, "/") == 0) {
-            stringstream ss;
-            ss << askpage_head << nr_of_uploading_clients << askpage_tail;
-            return send_page(connection, ss.str().c_str (), ss.str().size(), MHD_HTTP_OK, "text/html");
-        }
-        struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
-        std::cerr << "server->getDirectory() = " << server->getDirectory() << std::endl;
-        return faustGet(connection, con_info, url, args, server->getDirectory());
-    }
-
-    if (0 == strcmp(method, "POST")) {
     	std::cerr << "POST processing" << std::endl;
         struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
 
@@ -694,7 +731,7 @@ int FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connecti
             return send_page(connection, con_info->answerstring.c_str(),
                              con_info->answerstring.size(), con_info->answercode, "text/html");
         }
-    }
+
 
     return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 }
@@ -766,3 +803,43 @@ int FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const 
 
     return MHD_YES;
 }
+
+
+
+FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory, const fs::path& logfile)
+			: 	port_(port), 
+				max_clients_(max_clients), 
+				directory_(directory), 
+				makefile_directory_(makefile_directory), 
+				logfile_(logfile),
+				daemon_(0),
+				targets("")
+{
+	// create a string containing the list possible targets by scanning the makefile directory. The list is
+	// JSON formatted :   { "os1" : ["arch11", "arch12", ...],  "os2" : ["arch21", "arch22", ...], ...} 
+	// and stored in field targets
+	std::stringstream ss;
+	char sep1 = '{';
+
+	fs::directory_iterator end_iter;
+    for (fs::directory_iterator os_iter(makefile_directory); os_iter != end_iter; ++os_iter) {
+    	if (fs::is_directory(os_iter->path())) {
+        	string OSname = os_iter->path().filename().string();
+        	ss << sep1 << std::endl << '"' << OSname << '"' << ": ";
+        	char sep2 = '[';
+            for (fs::directory_iterator makefile_iter(os_iter->path()); makefile_iter != end_iter; ++makefile_iter) {
+        		string makefileName = makefile_iter->path().filename().string();
+        		if (makefileName.substr(0,9) == "Makefile.") {
+        			string archName = makefileName.substr(9);
+        			ss << sep2 << '"' << archName << '"';
+        			sep2 = ',';
+                }
+            }
+            ss << ']';
+            sep1 = ',';
+        }
+    }
+    ss << std::endl << "}";
+	targets = ss.str();
+}
+	
