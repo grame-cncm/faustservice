@@ -12,3 +12,7 @@ faustweb: *.cpp *.hh
 	
 clean :
 	rm faustweb
+	
+format :
+	astyle *.cpp *.hh
+	
