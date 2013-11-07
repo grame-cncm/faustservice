@@ -419,7 +419,7 @@ int FaustServer::get_params(void *cls, enum MHD_ValueKind, const char *key, cons
 int FaustServer::send_page(struct MHD_Connection *connection, const char *page, int length,
                            int status_code, const char * type = 0)
 {
-    struct MHD_Response* response = MHD_create_response_from_buffer(length, (void*)page, MHD_RESPMEM_PERSISTENT);
+    struct MHD_Response* response = MHD_create_response_from_buffer(length, (void*)page, MHD_RESPMEM_MUST_COPY);
     
     if (response == 0) {
     
@@ -434,6 +434,25 @@ int FaustServer::send_page(struct MHD_Connection *connection, const char *page, 
 		return ret;
 	}
 }
+
+
+/**
+* Handler used to generate a 404 reply.
+*
+* @param cls a ’const char *’ with the HTML webpage to return
+* @param mime mime type to use
+* @param session session handle
+* @param connection connection to use
+*/
+static int page_not_found (struct MHD_Connection *connection, const char* page, int length, const char* mimetype)
+{
+	struct MHD_Response* response = MHD_create_response_from_buffer (length, (void*)page, MHD_RESPMEM_MUST_COPY);
+	int ret = MHD_queue_response (connection, MHD_HTTP_NOT_FOUND, response);
+	MHD_add_response_header (response, MHD_HTTP_HEADER_CONTENT_ENCODING, mimetype);
+	MHD_destroy_response (response);
+	return ret;
+}
+
 
 /*
  * Callback called every time a GET or POST request is completed.
@@ -604,6 +623,9 @@ int FaustServer::answerGET ( struct MHD_Connection* connection, const char* url 
         return r;
     } else if (strcmp(url, "/targets") == 0) {
         int r = send_page(connection, targets.c_str (), targets.size(), MHD_HTTP_OK, "application/json");
+        return r;
+    } else if (strcmp(url, "/favicon.ico") == 0) {
+        int r = page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
         return r;
     } else {
     	//struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
