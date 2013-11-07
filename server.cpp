@@ -216,48 +216,38 @@ int validate_faust(connection_info_struct *con_info)
 }
 
 /*
- * Generates an SHA-1 key for Faust file or archive and returns 0 for success
- * or 1 for failure along with the key in the string_and_exitstatus structure.
- * If the evaluation fails, the appropriate error message is set. More info
- * on the con_info structure is in server.hh.
+ * Generates an SHA-1 key for Faust file or archive.
  */
 
-string_and_exitstatus generate_sha1(connection_info_struct *con_info)
+string generate_sha1(connection_info_struct *con_info)
 {
-    fs::path old_full_filename = fs::path(con_info->tmppath) / fs::path(con_info->filename);
-    string source = old_full_filename.string();
-    string hash = "";
-
-    ifstream myFile (source.c_str (), ios::in | ios::binary);
+    fs::path filepath = fs::path(con_info->tmppath) / fs::path(con_info->filename);
+    
+    // read file content
+    ifstream myFile (filepath.string().c_str (), ios::in | ios::binary);
     myFile.seekg (0, ios::end);
     int length = myFile.tellg();
     myFile.seekg (0, ios::beg);
 
-    char result[length];
-    // read data as a block:
-    myFile.read (result, length);
+    char content[length];
+    myFile.read (content, length);
     myFile.close();
+    
+    // compute SHA1 key
     unsigned char obuf[20];
-    string setter(result);
-
-    SHA1((const unsigned char *)(setter.c_str()), setter.length(), obuf);
-    char buffer[20];
-    stringstream ss;
-
+    SHA1((const unsigned char*)content, length, obuf);
+    
+    
+	// convert SHA1 key into hexadecimal string
+    string sha1key;
     for (int i=0; i < 20; i++) {
-        sprintf(buffer, "%02x", obuf[i]);
-        ss << buffer;
+    	const char* H = "0123456789ABCDEF";
+    	char c1 = H[ (obuf[i] >> 4) ];
+    	char c2 = H[ (obuf[i] & 15) ];
+        sha1key += c1;
+        sha1key += c2;
     }
-
-    hash = ss.str();
-
-    string_and_exitstatus res;
-    res.exitstatus = hash.length() == 40 ? 0 : 1;
-    res.str = hash;
-    if (res.exitstatus) {
-        con_info->answerstring = completebutnohash;
-    }
-    return res;
+    return sha1key;
 }
 
 
@@ -429,21 +419,20 @@ int FaustServer::get_params(void *cls, enum MHD_ValueKind, const char *key, cons
 int FaustServer::send_page(struct MHD_Connection *connection, const char *page, int length,
                            int status_code, const char * type = 0)
 {
-    int ret;
-    struct MHD_Response *response;
-
-    response =
-        MHD_create_response_from_buffer(length, (void*)page,
-                                        MHD_RESPMEM_PERSISTENT);
-    if (!response) {
+    struct MHD_Response* response = MHD_create_response_from_buffer(length, (void*)page, MHD_RESPMEM_PERSISTENT);
+    
+    if (response == 0) {
+    
         return MHD_NO;
-    }
+        
+    } else {
 
-    MHD_add_response_header (response, "Content-Type", type ? type : "text/plain");
-    ret = MHD_queue_response(connection, status_code, response);
-    MHD_destroy_response(response);
+		MHD_add_response_header (response, "Content-Type", type ? type : "text/plain");
+		int ret = MHD_queue_response(connection, status_code, response);
+		MHD_destroy_response(response);
 
-    return ret;
+		return ret;
+	}
 }
 
 /*
@@ -458,24 +447,24 @@ void FaustServer::request_completed(void *cls, struct MHD_Connection *connection
 {
     std::cerr << "FaustServer::request_completed()" << endl;
 
-    struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
-
-    if (NULL == con_info) {
-        return;
-    }
-
-    if (con_info->connectiontype == POST) {
-        if (NULL != con_info->postprocessor) {
-            MHD_destroy_post_processor(con_info->postprocessor);
-            nr_of_uploading_clients--;
-        }
-        if (con_info->fp) {
-            fclose(con_info->fp);
-        }
-    }
-
-    free(con_info);
+    struct connection_info_struct* con_info = (connection_info_struct*)*con_cls;
     *con_cls = NULL;
+
+    if (con_info != 0) {
+
+		if (con_info->connectiontype == POST) {
+			if (NULL != con_info->postprocessor) {
+				MHD_destroy_post_processor(con_info->postprocessor);
+				nr_of_uploading_clients--;
+			}
+			if (con_info->fp != 0) {
+				fclose(con_info->fp);
+				con_info->fp = 0;
+			}
+		}
+
+		free(con_info);
+	}
 }
 
 // Number of clients currently uploading
@@ -611,13 +600,17 @@ int FaustServer::answerGET ( struct MHD_Connection* connection, const char* url 
     if (/*!args.size() &&*/ strcmp(url, "/") == 0) {
         stringstream ss;
         ss << askpage_head << nr_of_uploading_clients << askpage_tail;
-        return send_page(connection, ss.str().c_str (), ss.str().size(), MHD_HTTP_OK, "text/html");
+        int r = send_page(connection, ss.str().c_str (), ss.str().size(), MHD_HTTP_OK, "text/html");
+        return r;
     } else if (strcmp(url, "/targets") == 0) {
-        return send_page(connection, targets.c_str (), targets.size(), MHD_HTTP_OK, "application/json");
+        int r = send_page(connection, targets.c_str (), targets.size(), MHD_HTTP_OK, "application/json");
+        return r;
+    } else {
+    	//struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
+    	// std::cerr << "this->getDirectory() = " << this->getDirectory() << std::endl;
+    	int r = faustGet(connection, url);
+    	return r;
     }
-    //struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
-    std::cerr << "this->getDirectory() = " << this->getDirectory() << std::endl;
-    return faustGet(connection, url);
 }
 
 /*
@@ -676,12 +669,11 @@ int FaustServer::answerPOST (  struct MHD_Connection* connection,
         }
 
         con_info = new connection_info_struct();
-        con_info->directory = this->getDirectory().string();
-        con_info->makefile_directory = this->getMakefileDirectory().string();
-
         if (NULL == con_info) {
             return MHD_NO;
         }
+        con_info->directory = this->getDirectory().string();
+        con_info->makefile_directory = this->getMakefileDirectory().string();
 
         con_info->fp = NULL;
 
@@ -720,19 +712,18 @@ int FaustServer::answerPOST (  struct MHD_Connection* connection,
         // so that it can be opened by the methods below
         if (con_info->fp) {
             fclose(con_info->fp);
+            con_info->fp = 0;
         }
 
         if (!validate_faust(con_info)) {
-            string_and_exitstatus sha1 = generate_sha1(con_info);
-            if (!sha1.exitstatus) {
-                (void)make_initial_faust_directory(con_info, sha1.str);
-            }
+            string sha1 = generate_sha1(con_info);
+            make_initial_faust_directory(con_info, sha1);
         }
         return send_page(connection, con_info->answerstring.c_str(),
                          con_info->answerstring.size(), con_info->answercode, "text/html");
     }
 
-
+	std::cerr << "NEVER EXECUTED" << std::endl;
     return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 }
 
@@ -776,9 +767,10 @@ int FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const 
         return MHD_NO;
     }
 
-    if (!con_info->fp) {
+    if (con_info->fp == 0) {
         if (NULL != (fp = fopen(full_path.c_str(), "rb"))) {
             fclose(fp);
+            
             con_info->answerstring = fileexistspage;
             con_info->answercode = MHD_HTTP_FORBIDDEN;
             std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
@@ -786,7 +778,7 @@ int FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const 
         }
 
         con_info->fp = fopen(full_path.c_str(), "ab");
-        if (!con_info->fp) {
+        if (con_info->fp == 0) {
             std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
             return MHD_NO;
         }
