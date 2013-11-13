@@ -2,6 +2,7 @@
 # Faustweb requires : boost, libmicrohttpd, libcrypto and libarchive
 # in order to compile it just do make
 #----------------------------------------------------------------------------------------
+dest   := /usr/local/bin
 
 faustweb: *.cpp *.hh
 	g++ -g -O1 -I/opt/local/include *.cpp \
@@ -12,7 +13,14 @@ faustweb: *.cpp *.hh
 	
 clean :
 	rm faustweb
-	
+
 format :
 	astyle *.cpp *.hh
 	
+install:
+	install faustweb $(dest)
+	install bin/remoteOSX $(dest)
+		
+uninstall:
+	rm -f  $(dest)/faustweb
+	rm -f  $(dest)/remoteOSX 
