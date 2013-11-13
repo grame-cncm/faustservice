@@ -15,7 +15,7 @@ echo script=$SCRIPT file=$FILE options=$OPT
 
 # produce binary.zip on remote server
 TMP=`ssh $SERVER "mktemp -d fwtemp.XXXXXX"`
-CMD="$PREFIX/$SCRIPT $OPT $TMP/$FILE"
+CMD="PATH=/usr/local/bin:$PATH cd $TMP; $SCRIPT $OPT $FILE"
 echo command="$CMD"
 
 scp "$FILE" "$SERVER:$TMP/"
