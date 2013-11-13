@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # settings
-PREFIX='/usr/local/bin'
 SERVER='faust@macyann.grame.fr'
 
 # parameters SCRIPT=$1 FILE=$2 OPT=remaining
@@ -11,12 +10,12 @@ shift
 shift
 OPT=$*
 
-echo script=$SCRIPT file=$FILE options=$OPT
+#echo script=$SCRIPT file=$FILE options=$OPT
 
 # produce binary.zip on remote server
 TMP=`ssh $SERVER "mktemp -d fwtemp.XXXXXX"`
-CMD="PATH=/usr/local/bin:$PATH cd $TMP; $SCRIPT $OPT $FILE"
-echo command="$CMD"
+CMD="source /etc/profile; cd $TMP; $SCRIPT $OPT $FILE"
+#echo command="$CMD"
 
 scp "$FILE" "$SERVER:$TMP/"
 ssh "$SERVER" "$CMD"
