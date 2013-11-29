@@ -21,7 +21,6 @@ fs::path gSessionsDirectory;		///< directory where sessions are stored
 fs::path gMakefilesDirectory;		///< directory containing all the "<os>/Makefile.<architecture>[-32bits|-64bits]" makefiles
 fs::path gLogfile;					///< faustweb logfile
 
-bool gDaemon = false;
 
 // Processes command line arguments using boost/parse_options
 void process_cmdline(int argc, char* argv[])
@@ -45,10 +44,6 @@ void process_cmdline(int argc, char* argv[])
 
     if (vm.count("port")) {
         gPort = vm["port"].as<int>();
-    }
-
-    if (vm.count("daemon")) {
-        gDaemon = true;
     }
 
     if (vm.count("max-clients")) {
@@ -95,58 +90,7 @@ int main(int argc, char* argv[])
         std::cerr << "Reuse \"sessions\" directory at path " << gSessionsDirectory << std::endl;
     }
 
-
-    if (gDaemon) {
-        // Create an autonomous process
-        pid_t pid, sid;
-        // Fork off the parent process
-        pid = fork ();
-        if (pid < 0) {
-            exit (EXIT_FAILURE);
-        }
-        // If we got a good PID, then we can exit the parent process.
-        if (pid > 0) {
-            exit (EXIT_SUCCESS);
-        }
-
-        // Change the file mode mask
-        umask (0);
-
-        // Open any logs here
-
-        // Create a new SID for the child process
-        sid = setsid ();
-
-        /*
-                if (sid < 0) {
-                    FILE *f = fopen ((fs::path (gDirectory) / fs::path (gLogfile)).string().c_str(), "ab");
-                    const char *error = "Could not create an SID for the process.";
-                    fwrite (error, strlen(error), sizeof (char), f);
-                    fclose (f);
-                    exit (EXIT_FAILURE);
-                }
-        */
-
-        // We need to keep the cwd where it is
-        // which is why all of this is commented out.
-        //if ( (chdir ("/")) < 0) {
-        // Log the failure
-        //exit (EXIT_FAILURE);
-        //}
-
-
-        // Close out the standard file descriptors
-        close (STDIN_FILENO);
-        close (STDOUT_FILENO);
-        close (STDERR_FILENO);
-    }
-    /*
-        if (!fs::is_directory(gMakefileDirectory)) {
-            std::cerr << gMakefileDirectory << " is not the expected makefiles directory" << std::endl;
-            exit (EXIT_FAILURE);
-        }
-    */
-    //gDirectory = fs::initial_path<fs::path>();
+	// Create, start and stop the http server
     FaustServer server(gPort, gMaxClients, gSessionsDirectory, gMakefilesDirectory, gLogfile);
 
     if (!server.start()) {
