@@ -645,21 +645,25 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
     fs::path fulldir  	= this->getDirectory() / url.parent_path();
     fs::path target  	= url.filename();
     fs::path makefile 	= fulldir / "Makefile";
-
-    if ( fs::is_regular_file(makefile) && isValidTarget(target) ) {
-
-        fs::path filename = make (fulldir, target);
-        std::cerr << "Makefile vient de terminer" << std::endl;
-
-        if (!fs::is_regular_file(filename)) {
-            return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
-        } else {
-            return send_file(connection, filename);
-        }
-
-    } else {
+    
+    // Analyze possible cases of errors
+    if (! isValidTarget(target)) {
+    	std::cerr << "Error : not a valid target " << target << " in raw_url " << raw_url << std::endl;
         return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
-    }
+	} else if ( ! fs::is_regular_file(makefile) ) {
+		std::cerr << "Error : No makefile found " << " in raw_url " << raw_url << std::endl;
+		return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+	}
+
+	// we can call make
+    fs::path filename = make (fulldir, target);
+    
+	if (!fs::is_regular_file(filename)) {
+		std::cerr << "Error : Make Failed " << " in raw_url " << raw_url << std::endl;
+		return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+	} else {
+		return send_file(connection, filename);
+	}
 }
 
 
