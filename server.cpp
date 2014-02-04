@@ -1,3 +1,5 @@
+#include <vector>
+#include <algorithm>
 #include <sstream>
 #include <iostream>
 #include <fstream>
@@ -844,14 +846,20 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
         if (fs::is_directory(os_iter->path())) {
             string OSname = os_iter->path().filename().string();
             ss << sep1 << std::endl << '"' << OSname << '"' << ": ";
-            char sep2 = '[';
+            
+            // collect a vector of target names
+            vector<string> = V;
             for (fs::directory_iterator makefile_iter(os_iter->path()); makefile_iter != end_iter; ++makefile_iter) {
                 string makefileName = makefile_iter->path().filename().string();
                 if (makefileName.substr(0,9) == "Makefile.") {
-                    string archName = makefileName.substr(9);
-                    ss << sep2 << '"' << archName << '"';
-                    sep2 = ',';
+                    V.push_back(makefileName.substr(9));
                 }
+            }
+            
+            std::sort(V.begin(), V.end())
+            char sep2 = '[';
+            for (int i=0; i<V.size(); i++) {
+                ss << sep2 << '"' << V[i] << '"'; sep2 = ',';
             }
             ss << ']';
             sep1 = ',';
