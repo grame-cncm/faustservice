@@ -8,7 +8,7 @@ faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
 	faust2supercollider $(OPT) -arch32 $(faustfile)
-	zip -r binary.zip $(faustfile:.dsp=)
+	zip -r binary.zip $(faustfile:.dsp=.so) $(faustfile:.dsp=.sc)
 
 src.cpp : $(faustfile)
 	faust -i -a supercollider.cpp $(faustfile) -o src.cpp

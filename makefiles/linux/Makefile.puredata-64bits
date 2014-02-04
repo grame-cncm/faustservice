@@ -8,7 +8,7 @@ faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
 	faust2puredata $(OPT) -arch64 $(faustfile)
-	zip -r binary.zip $(faustfile:.dsp=)
+	zip -r binary.zip $(faustfile:.dsp=~.pd_linux) $(faustfile:.dsp=.pd)
 
 src.cpp : $(faustfile)
 	faust -i -a puredata.cpp $(faustfile) -o src.cpp
