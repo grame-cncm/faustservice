@@ -100,14 +100,19 @@ int main(int argc, char* argv[])
         std::cerr << "webserver started succesfully" << std::endl;
     }
 
-    std::cerr << "waiting for a character to end" << std::endl;
-    getchar();
+    std::cerr << "type ctrl-c to quit" << std::endl;
     
-    std::cerr << "character typed, we are going to stop the webserver" << std::endl;
-
-    server.stop();
-    
-    std::cerr << "webserver stopped, we exit !" << std::endl;
+    while (true) {
+        // we never stop the server
+    }
+//    std::cerr << "waiting for a character to end" << std::endl;
+//    getchar();
+//    
+//    std::cerr << "character typed, we are going to stop the webserver" << std::endl;
+//
+//    server.stop();
+//    
+//    std::cerr << "webserver stopped, we exit !" << std::endl;
 
     return 0;
 }
