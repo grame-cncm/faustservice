@@ -96,11 +96,18 @@ int main(int argc, char* argv[])
     if (!server.start()) {
         std::cerr << "unable to start webserver" << std::endl;
         return 1;
+    } else {
+        std::cerr << "webserver started succesfully" << std::endl;
     }
 
+    std::cerr << "waiting for a character to end" << std::endl;
     getchar();
+    
+    std::cerr << "character typed, we are going to stop the webserver" << std::endl;
 
     server.stop();
+    
+    std::cerr << "webserver stopped, we exit !" << std::endl;
 
     return 0;
 }
