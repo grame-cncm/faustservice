@@ -848,7 +848,7 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
             ss << sep1 << std::endl << '"' << OSname << '"' << ": ";
             
             // collect a vector of target names
-            vector<string> = V;
+            vector<string> V;
             for (fs::directory_iterator makefile_iter(os_iter->path()); makefile_iter != end_iter; ++makefile_iter) {
                 string makefileName = makefile_iter->path().filename().string();
                 if (makefileName.substr(0,9) == "Makefile.") {
