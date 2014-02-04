@@ -197,7 +197,7 @@ int validate_faust(connection_info_struct *con_info)
         char buffer[256];
         while (!feof(pipe)) {
             if (fgets(buffer, 128, pipe) != NULL) {
-                std::cerr << "READ PIPE validate_faust : " << buffer<< std::endl;
+                //std::cerr << "READ PIPE validate_faust : " << buffer<< std::endl;
                 result += buffer;
             }
         }
