@@ -569,8 +569,15 @@ int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& fi
 
 // Start the Faust server - shallow wrapper around MHD_start_daemon
 
+static void panicCallback (void *cls, const char *file, unsigned int line, const char *reason)
+{
+	cerr << "PANIC " << line << ':' << file << ' ' << reason << endl;
+}
+
 bool FaustServer::start()
 {
+	MHD_set_panic_func(&panicCallback, NULL);
+	
     daemon_ = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, port_, NULL, NULL,
                                &answer_to_connection, this,
                                MHD_OPTION_NOTIFY_COMPLETED, request_completed,
