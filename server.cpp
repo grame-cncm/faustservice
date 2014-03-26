@@ -552,6 +552,11 @@ int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& fi
     MHD_add_response_header (response, "Content-Type", "application/zip");
     MHD_add_response_header (response, "Content-Location", filepath.filename().string().c_str());
     int ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+    if (ret == MHD_YES) {
+    	std::cerr << __LINE__ << " MHD_queue_response() return MHD_YES " << endl;
+    } else {
+    	std::cerr << __LINE__ << " MHD_queue_response() return NOT MHD_YES but " << ret << endl;
+    }
     MHD_destroy_response(response);
 
     std::cerr << __LINE__ << " EXIT send_file : " << filepath << endl;
@@ -839,13 +844,14 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
     // JSON formatted :   { "os1" : ["arch11", "arch12", ...],  "os2" : ["arch21", "arch22", ...], ...}
     // and stored in field targets
     std::stringstream ss;
-    char sep1 = '{';
+    
+    ss << '{';
+    char sep1 = ' ';
 
     fs::directory_iterator end_iter;
     for (fs::directory_iterator os_iter(makefile_directory); os_iter != end_iter; ++os_iter) {
         if (fs::is_directory(os_iter->path())) {
             string OSname = os_iter->path().filename().string();
-            ss << sep1 << std::endl << '"' << OSname << '"' << ": ";
             
             // collect a vector of target names
             vector<string> V;
@@ -855,14 +861,15 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
                     V.push_back(makefileName.substr(9));
                 }
             }
-            
-            std::sort(V.begin(), V.end());
-            char sep2 = '[';
-            for (int i=0; i<V.size(); i++) {
-                ss << sep2 << '"' << V[i] << '"'; sep2 = ',';
+ 
+ 			// If it is a folder with makefiles inside, print it
+            if (V.size() > 0) {
+            	std::sort(V.begin(), V.end());
+            	ss << sep1 << std::endl << '"' << OSname << '"' << ": [";
+            	for (int i=0; i<V.size(); i++) { if(i>0) ss << ','; ss << '"' << V[i] << '"'; }
+            	ss << ']';
+            	sep1 = ',';
             }
-            ss << ']';
-            sep1 = ',';
         }
     }
     ss << std::endl << "}";
