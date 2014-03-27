@@ -1,0 +1,14 @@
+################################################################################
+# 
+#			FaustWeb Makefile for OWL pedal
+# 
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2owl $(faustfile) > README
+	zip -r binary.zip README $(faustfile:.dsp=Patch.hpp) 
+
+src.cpp : $(faustfile)
+	faust -i -a owl.cpp $(faustfile) -o src.cpp
