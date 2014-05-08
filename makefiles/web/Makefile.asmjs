@@ -1,0 +1,14 @@
+################################################################################
+# 
+#			FaustWeb Makefile for OWL pedal
+# 
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2webaudioasm $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=.html) 
+
+src.cpp : $(faustfile)
+	faust -i -a webaudio/webaudio-asm.cpp $(faustfile) -o src.cpp
