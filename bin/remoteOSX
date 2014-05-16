@@ -22,4 +22,5 @@ ssh "$SERVER" "$CMD"
 ssh "$SERVER" "rm $TMP/$FILE"
 ssh "$SERVER" "cd $TMP; zip -r binary.zip *"
 scp "$SERVER:$TMP/binary.zip" .
+ssh "$SERVER" "rm -rf $TMP"
 
