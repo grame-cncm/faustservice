@@ -1,0 +1,14 @@
+################################################################################
+# 
+#			FaustWeb Makefile for WebAudio+asm.js polyphonic applications
+# 
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2webaudioasm -poly $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=.html) 
+
+src.cpp : $(faustfile)
+	faust -i -a webaudio/webaudio-asm-poly.cpp $(faustfile) -o src.cpp

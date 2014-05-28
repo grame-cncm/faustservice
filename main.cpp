@@ -70,7 +70,7 @@ int main(int argc, char* argv[])
 
     process_cmdline(argc, argv);
 
-    std::cerr 	<< "faustwed starting "
+    std::cerr 	<< "faustweb starting "
                 << " port:" << gPort
                 << " directory:" << gCurrentDirectory
                 << std::endl;
