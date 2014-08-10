@@ -1,5 +1,5 @@
 ################################################################################
-#							FaustWeb OSX script
+#							FaustWeb Linux script
 #  The behaviour of this Makefile will only be correct if
 #  only one .dsp file exists in the folder
 ################################################################################
@@ -12,3 +12,4 @@ binary.zip : $(faustfile)
 	
 src.cpp : $(faustfile)
 	faust -i -a max-msp.cpp $(faustfile) -o src.cpp
+
