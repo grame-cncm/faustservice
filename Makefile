@@ -3,6 +3,7 @@
 # in order to compile it just do make
 #----------------------------------------------------------------------------------------
 dest   := /usr/local/bin
+pdsdk  := /usr/include/pd
 
 faustweb: *.cpp *.hh
 	g++ -g -O1 -I/opt/local/include *.cpp \
@@ -20,6 +21,8 @@ format :
 install:
 	install faustweb $(dest)
 	install bin/remoteOSX $(dest)
+	install -d $(pdsdk)/pdfaustextra/
+	install pdfaustextra/*.pd -t 	$(pdsdk)/pdfaustextra/
 		
 uninstall:
 	rm -f  $(dest)/faustweb
