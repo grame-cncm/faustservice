@@ -6,7 +6,8 @@ dest   := /usr/local/bin
 
 faustweb: *.cpp *.hh
 	g++ -g -O1 -I/opt/local/include *.cpp \
-	-L/opt/local/lib/ \
+	-I/usr/local/Cellar/libarchive/3.1.2/include/ \
+	-L/usr/local/Cellar/libarchive/3.1.2/lib/ \
 	-lmicrohttpd -lboost_filesystem -lboost_system -lboost_program_options \
 	-larchive -lcrypto -lm \
 	-o faustweb
