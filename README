@@ -7,9 +7,9 @@ LIBRARIES
 
 In order to compile faustweb links against the following libraries:
 
-libarchive
-boost
-libcryptopp
+libarchive 	(sudo apt-get install libarchive-dev)
+boost 		(sudo apt-get install libboost-filesystem-dev  libboost-program-options-dev)
+libcryptopp (sudo apt-get install libcrypto++-dev)
 libmicrohttpd
 
 Make sure to download the current development trunk of all these libraries.
