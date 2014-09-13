@@ -23,7 +23,7 @@ install:
 	install faustweb $(dest)
 	install bin/remoteOSX $(dest)
 	install -d $(pdsdk)/pdfaustextra/
-	install pdfaustextra/*.pd -t 	$(pdsdk)/pdfaustextra/
+	install pdfaustextra/*.pd $(pdsdk)/pdfaustextra/
 		
 uninstall:
 	rm -f  $(dest)/faustweb
