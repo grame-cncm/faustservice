@@ -1,0 +1,19 @@
+#!/bin/bash
+rm -rf sandbox
+rm -f LOG
+for f in *.dsp; do
+	echo "test file $f"
+	for m in ../makefiles/osxlocal/Makefile.*; do
+		echo -n "compile $f with $m : "
+		rm -rf sandbox
+		mkdir sandbox
+		cp $f sandbox/
+		cp $m sandbox/Makefile
+		cd sandbox
+		((make binary.zip  >> ../LOG 2>&1) && echo "passed" ) || echo "failed" 
+		cd ..
+		mv sandbox build-$(basename $m)
+	done
+done
+		
+		
