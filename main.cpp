@@ -9,6 +9,7 @@
 
 #include "server.hh"
 #include "utilities.hh"
+#include <unistd.h>
 
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
@@ -104,6 +105,7 @@ int main(int argc, char* argv[])
     
     while (true) {
         // we never stop the server
+		sleep(30);
     }
 //    std::cerr << "waiting for a character to end" << std::endl;
 //    getchar();
