@@ -1,0 +1,16 @@
+################################################################################
+#							FaustWeb OSX script 
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2puredata $(OPT) -poly $(faustfile)
+	cp $(wildcard 	/usr/lib/pd/extra/faust*.pd  /usr/local/lib/pd/extra/faust*.pd /opt/lib/pd/extra/faust*.pd) .
+	zip -r binary.zip *.pd $(faustfile:.dsp=~.pd_darwin)
+
+src.cpp : $(faustfile)
+	faust -i -a puredata.cpp $(faustfile) -o src.cpp
+
