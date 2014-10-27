@@ -8,7 +8,8 @@ faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
 	faust2puredata $(OPT) -poly -arch32 $(faustfile)
-	zip -r binary.zip $(faustfile:.dsp=~.pd_linux) $(wildcard /usr/include/pd/pdfaustextra/*.pd) $(faustfile:.dsp=.pd)
+	cp $(wildcard 	/usr/lib/pd/extra/faust*.pd  /usr/local/lib/pd/extra/faust*.pd /opt/lib/pd/extra/faust*.pd) .
+	zip -r binary.zip $(faustfile:.dsp=~.pd_linux) *.pd
 
 src.cpp : $(faustfile)
 	faust -i -a puredata.cpp $(faustfile) -o src.cpp
