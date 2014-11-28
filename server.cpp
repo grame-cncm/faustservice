@@ -513,6 +513,7 @@ unsigned int FaustServer::nr_of_uploading_clients = 0;
 bool isValidTarget(const fs::path& target)
 {
     return (target == "binary.zip")
+           || (target == "binary.apk")
            || (target == "src.cpp")
            || (target == "svg.zip")
            || (target == "mdoc.zip");
