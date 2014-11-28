@@ -231,7 +231,11 @@ string generate_sha1(connection_info_struct *con_info)
     int length = myFile.tellg();
     myFile.seekg (0, ios::beg);
 
-    char content[length];
+    //char content[length];
+	char* content = (char*)malloc(length);
+	if (content == 0) {
+		return "malloc-error";
+	}
     myFile.read (content, length);
     myFile.close();
     
@@ -249,6 +253,7 @@ string generate_sha1(connection_info_struct *con_info)
         sha1key += c1;
         sha1key += c2;
     }
+	free(content);
     return sha1key;
 }
 
