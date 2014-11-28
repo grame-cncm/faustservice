@@ -10,5 +10,8 @@ binary.zip : $(faustfile)
 	faust2android $(OPT) $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=.apk)
 
+binary.apk : binary.zip
+	cp $(faustfile:.dsp=.apk) binary.apk
+
 src.cpp : $(faustfile)
 	faust -i -a android.cpp $(faustfile) -o src.cpp
