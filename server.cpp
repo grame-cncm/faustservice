@@ -31,6 +31,8 @@ using namespace std;
  * Various responses to GET requests
  */
 
+#define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
+
 string askpage_head = "<html><body>\n\
                        Upload a Faust file, please.<br>\n\
                        There are ";
@@ -265,7 +267,6 @@ string generate_sha1(connection_info_struct *con_info)
 
 bool isFaustFile(const fs::path& f)
 {
-
     fs::path x = f.extension();
     bool a = (x==".dsp") || (x==".lib");
     //std::cerr << "isFaustFile(" << f << ") = " << a << std::endl;
@@ -435,6 +436,7 @@ int FaustServer::send_page(struct MHD_Connection *connection, const char *page, 
     } else {
 
 		MHD_add_response_header (response, "Content-Type", type ? type : "text/plain");
+		MHD_add_response_header (response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, "*");
 		int ret = MHD_queue_response(connection, status_code, response);
 		MHD_destroy_response(response);
 
@@ -748,11 +750,10 @@ int FaustServer::answerPOST (  struct MHD_Connection* connection,
     struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
 
     if (0 != *upload_data_size) {
-        MHD_post_process(con_info->postprocessor, upload_data,
-                         *upload_data_size);
+        int result = MHD_post_process(con_info->postprocessor, upload_data, *upload_data_size);
         *upload_data_size = 0;
 
-        return MHD_YES;
+        return result;
     } else {
         // need to close the file before request_completed
         // so that it can be opened by the methods below
