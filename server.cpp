@@ -512,13 +512,31 @@ unsigned int FaustServer::nr_of_uploading_clients = 0;
  */
 
 // Define here the various targets accepted by faustweb makefiles
-bool isValidTarget(const fs::path& target)
+bool isValidTarget(const fs::path& target, const char* mimetype)
 {
-    return (target == "binary.zip")
-           || (target == "binary.apk")
-           || (target == "src.cpp")
-           || (target == "svg.zip")
-           || (target == "mdoc.zip");
+    if (target == "binary.zip") {
+		mimetype = "application/zip";
+		return true;
+
+	} else if (target == "binary.apk") {
+		mimetype = "application/vnd.android.package-archive";
+		return true;
+
+	} else if (target == "src.cpp") {
+		mimetype = "text/x-c";
+		return true;
+
+	} else if (target == "svg.zip") {
+		mimetype = "application/zip";
+		return true;
+
+	} else if (target == "mdoc.zip") {
+		mimetype = "application/zip";
+		return true;
+
+	} else {
+		return false;
+	}
 }
 
 fs::path make (const fs::path& dir, const fs::path& target)
@@ -539,7 +557,7 @@ fs::path make (const fs::path& dir, const fs::path& target)
  * Function that sends a file in response to a GET
  */
 
-int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& filepath)
+int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& filepath, const char* mimetype)
 {
     struct stat sbuf;
     int 		fd;
@@ -557,7 +575,7 @@ int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& fi
         return MHD_NO;
     }
 
-    MHD_add_response_header (response, "Content-Type", "application/zip");
+    MHD_add_response_header (response, "Content-Type", mimetype);
     MHD_add_response_header (response, "Content-Location", filepath.filename().string().c_str());
     int ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
     if (ret == MHD_YES) {
@@ -663,13 +681,14 @@ int FaustServer::answerGET ( struct MHD_Connection* connection, const char* url 
 
 int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url)
 {
-    fs::path url 		= fs::path(raw_url);
-    fs::path fulldir  	= this->getDirectory() / url.parent_path();
-    fs::path target  	= url.filename();
-    fs::path makefile 	= fulldir / "Makefile";
+    fs::path 		url 		= fs::path(raw_url);
+    fs::path 		fulldir  	= this->getDirectory() / url.parent_path();
+    fs::path 		target  	= url.filename();
+    fs::path 		makefile 	= fulldir / "Makefile";
+	const char*		mimetype;
     
     // Analyze possible cases of errors
-    if (! isValidTarget(target)) {
+    if (! isValidTarget(target, mimetype)) {
     	std::cerr << "Error : not a valid target " << target << " in raw_url " << raw_url << std::endl;
         return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 	} else if ( ! fs::is_regular_file(makefile) ) {
@@ -684,7 +703,7 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
 		std::cerr << "Error : Make Failed " << " in raw_url " << raw_url << std::endl;
 		return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 	} else {
-		return send_file(connection, filename);
+		return send_file(connection, filename, mimetype);
 	}
 }
 
