@@ -1,0 +1,14 @@
+################################################################################
+# 
+#			FaustWeb Makefile for WebAudio+asm.js applications
+# 
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2webaudioasm -links $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=.html) $(faustfile) $(faustfile:.dsp=-svg)
+
+src.cpp : $(faustfile)
+	faust -i -a webaudio/webaudio-asm.cpp $(faustfile) -o src.cpp
