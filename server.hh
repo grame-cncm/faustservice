@@ -42,10 +42,9 @@ class FaustServer
     fs::path 			logfile_;
     struct MHD_Daemon* 	daemon_;
     string				targets;
-	bool				fAllowsAnyOrigin;
 
 public:
-    FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory, const fs::path& logfile, bool anyOrigin=false);
+    FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory, const fs::path& logfile);
 
     virtual 	~FaustServer () {};
 

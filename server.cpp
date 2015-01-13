@@ -31,6 +31,8 @@ using namespace std;
  * Various responses to GET requests
  */
 
+extern bool			gAnyOrigin;		// when true adds Access-Control-Allow-Origin to http answers
+
 #define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
 
 string askpage_head = "<html><body>\n\
@@ -436,7 +438,7 @@ int FaustServer::send_page(struct MHD_Connection *connection, const char *page, 
     } else {
 
 		MHD_add_response_header (response, "Content-Type", type ? type : "text/plain");
-		if (fAllowsAnyOrigin) MHD_add_response_header (response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+		if (gAnyOrigin) MHD_add_response_header (response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, "*");
 		int ret = MHD_queue_response(connection, status_code, response);
 		MHD_destroy_response(response);
 
@@ -864,15 +866,14 @@ int FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const 
 
 
 
-FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory, const fs::path& logfile, bool anyOrigin)
+FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory, const fs::path& logfile)
     : 	port_(port),
         max_clients_(max_clients),
         directory_(directory),
         makefile_directory_(makefile_directory),
         logfile_(logfile),
         daemon_(0),
-        targets(""),
-		fAllowsAnyOrigin(anyOrigin);
+        targets("")
 {
     // create a string containing the list possible targets by scanning the makefile directory. The list is
     // JSON formatted :   { "os1" : ["arch11", "arch12", ...],  "os2" : ["arch21", "arch22", ...], ...}

@@ -22,6 +22,7 @@ fs::path gSessionsDirectory;		///< directory where sessions are stored
 fs::path gMakefilesDirectory;		///< directory containing all the "<os>/Makefile.<architecture>[-32bits|-64bits]" makefiles
 fs::path gLogfile;					///< faustweb logfile
 
+bool gAnyOrigin = false; 
 
 // Processes command line arguments using boost/parse_options
 void process_cmdline(int argc, char* argv[])
@@ -31,6 +32,7 @@ void process_cmdline(int argc, char* argv[])
     ("daemon", "run the server in mode daemon")
     ("directory,d", po::value<string>(), "directory in which files will be written")
     ("help,h", "produce this help message")
+    ("any-origin,a", "Adds any origin when answering requests")
     ("max-clients,m", po::value<int>(), "maximum number of clients allowed to concurrently upload")
     ("port,p", po::value<int>(), "the listening port");
 
@@ -53,6 +55,10 @@ void process_cmdline(int argc, char* argv[])
 
     if (vm.count("logfile")) {
         gLogfile = vm["logfile"].as<string>();
+    }
+
+    if (vm.count("allow-any-origin")) {
+        gAnyOrigin = true;
     }
 #if 0
     if (vm.count("directory")) {
