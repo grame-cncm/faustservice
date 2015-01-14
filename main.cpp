@@ -67,7 +67,7 @@ void process_cmdline(int argc, char* argv[])
 #endif
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char* argv[], char* env[])
 {
 
     // Set the various default paths
@@ -81,6 +81,14 @@ int main(int argc, char* argv[])
                 << " port:" << gPort
                 << " directory:" << gCurrentDirectory
                 << std::endl;
+
+    // print running environment
+    std::cerr << "\n\nBEGIN ENVIRONMENT" << std::endl;
+    for (int i=0; env[i]!=0; i++) {
+        std::cerr << env[i] << std::endl;
+    }
+    std::cerr << "END ENVIRONMENT\n" << std::endl;
+
 
     // check for ".../makefiles/" directory
     if (is_directory(gMakefilesDirectory)) {
