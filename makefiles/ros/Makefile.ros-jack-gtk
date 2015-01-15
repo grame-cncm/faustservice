@@ -1,0 +1,13 @@
+################################################################################
+#							FaustWeb script
+#  Used to create ROS audio modules based on jack and gtk
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2rosgtk $(OPT) $(faustfile)
+	mv $(faustfile:.dsp=_gtk.zip)  binary.zip
+
+src.cpp : $(faustfile)
+	faust -i -a jack-ros-gtk.cpp $(faustfile) -o src.cpp

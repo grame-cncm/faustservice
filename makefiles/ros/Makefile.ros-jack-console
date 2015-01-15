@@ -1,0 +1,13 @@
+################################################################################
+#							FaustWeb script
+#  Used to create ROS audio modules based on jack, without GUI
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2ros $(OPT) $(faustfile)
+	mv $(faustfile:.dsp=.zip)  binary.zip
+
+src.cpp : $(faustfile)
+	faust -i -a jack-ros.cpp $(faustfile) -o src.cpp
