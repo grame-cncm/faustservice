@@ -688,6 +688,13 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
     fs::path 		target  	= url.filename();
     fs::path 		makefile 	= fulldir / "Makefile";
 	const char*		mimetype;
+	bool			precompile 	= false;
+
+	// Check if we are doing only a pre-compilation (without actually downloading the compiled file)
+	if (target == "precompile") {
+		precompile = true;
+		target = "binary.zip";
+	}
     
     // Analyze possible cases of errors
     if (! isValidTarget(target, mimetype)) {
@@ -705,7 +712,11 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
 		std::cerr << "Error : Make Failed " << " in raw_url " << raw_url << std::endl;
 		return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 	} else {
-		return send_file(connection, filename, mimetype);
+		if (! precompile) {
+			return send_file(connection, filename, mimetype);
+		} else {
+			return send_page(connection, "DONE", 4, MHD_HTTP_OK, "text/html");
+		}
 	}
 }
 
