@@ -1,5 +1,5 @@
 ################################################################################
-#							FaustWeb OSX script
+#							FaustWeb Linux script
 #  The behaviour of this Makefile will only be correct if
 #  only one .dsp file exists in the folder
 ################################################################################
@@ -7,8 +7,9 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	remoteOSX faust2msp $(faustfile) $(OPT)
-
+	faust2w32max6 $(faustfile) $(OPT)
+	zip -r binary.zip $(faustfile:.dsp=~.mxe)
+	
 src.cpp : $(faustfile)
 	faust -i -a max-msp/max-msp.cpp $(faustfile) -o src.cpp
 
