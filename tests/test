@@ -1,9 +1,12 @@
 #!/bin/bash
+
+#USAGE : test <architecture>
+
 rm -rf sandbox
 rm -f LOG
 for f in *.dsp; do
-	echo "test file $f"
-	for m in ../makefiles/osxlocal/Makefile.*; do
+	echo "test file $f with $1 architecture"
+	for m in "../makefiles/$1/Makefile".*; do
 		echo -n "compile $f with $m : "
 		rm -rf sandbox
 		mkdir sandbox
@@ -15,5 +18,4 @@ for f in *.dsp; do
 		mv sandbox build-$(basename $m)
 	done
 done
-		
-		
+
