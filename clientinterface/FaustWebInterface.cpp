@@ -26,7 +26,6 @@ char*	basename(const char* fullpath){
 
 #endif
 
-// #include <jack/net.h>
 #include <curl/curl.h>
 
 using namespace std;
@@ -145,23 +144,6 @@ bool fw_export_file(const std::string& url, const std::string& filename, const s
 bool fw_get_shakey_from_string(const std::string& url, const std::string& name, const std::string& code, std::string& key, std::string& error){
 
     CURL *curl = curl_easy_init();
-    struct curl_httppost* formpost = NULL;
-    struct curl_httppost* lastptr = NULL;
-
-//    ADD EXPANSION
-    
-//    if ((expanded_dsp = expandDSPFromString(name_app, dsp_content, argc, argv, sha_key, error_msg)) == "") {
-//        return 0;
-    
-    struct curl_forms forms[2]; 
-    
-//    forms[0].option=CURLFORM_FILE; 
-//    forms[0].value=strdup(file.c_str()); 
-//    forms[1].option=CURLFORM_CONTENTTYPE;
-//    forms[1].value=strdup("text/plain");
-//    forms[1].option=CURLFORM_END;
-    
-//    curl_formadd(&formpost, &lastptr, CURLFORM_COPYNAME, "file", CURLFORM_ARRAY, forms, CURLFORM_END); 
     
     string boundary = "87142694621188";
     
