@@ -24,16 +24,16 @@ bool fw_get_available_targets(const std::string& url, std::vector<std::string>& 
 /* Access to FaustWeb service - Upload your Faust application given a sourceFile, an operating system and an architecture
  *
  * @param url - FaustWeb server URL
- * @param file - Faust source file
+ * @param filename - Faust source file
  * @param os - Wanted Operating System
  * @param architecture - Wanted architecture
- * @param output_type - There are 2 types of files : "binary.zip", "binary.apk" and "src.cpp"
+ * @param output_type - There are 3 types of files : "binary.zip", "binary.apk" and "src.cpp"
  * @param output_file - Location of file to create
  * @param error - In case the export fails, the error is filled
  *
  * @return true if no error was encountered
  */
-bool fw_export_file(const std::string& url, const std::string& name, const std::string& code, const std::string& os, const std::string& architecture, const std::string& output_type, const std::string& output_file, std::string& error);
+bool fw_export_file(const std::string& url, const std::string& filename, const std::string& os, const std::string& architecture, const std::string& output_type, const std::string& output_file, std::string& error);
 
 /* Access to FaustWeb service - Upload your Faust application given a program name, a program, an operating system and an architecture
  *
