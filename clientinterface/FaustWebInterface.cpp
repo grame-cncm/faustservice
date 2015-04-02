@@ -10,7 +10,8 @@
 #else
 #include <windows.h>
 
-char*	basename(const char* fullpath){
+static char* basename(const char* fullpath)
+{
 	char drive[_MAX_DRIVE];
 	char dir[_MAX_DIR];
 	char fname[_MAX_FNAME];
@@ -30,7 +31,7 @@ char*	basename(const char* fullpath){
 
 using namespace std;
 
-string path_to_content(const string& path)
+static string path_to_content(const string& path)
 {
     ifstream file(path.c_str(), ifstream::binary);
     
@@ -153,15 +154,13 @@ bool fw_get_shakey_from_string(const std::string& url, const std::string& name, 
     data += ".dsp\";\r\nContent-Type: text/plain\r\n\r\n";
     data += code;
     data += "\r\n--" + boundary + "--\r\n";
-
+   
     string h1 = "Content-Type: multipart/form-data; boundary=" + boundary;
-    string h2 = "Content-Length:" + data.length();
-    
+    stringstream h2; h2 << "Content-Length:" << data.length();
 
     struct curl_slist *headers=NULL;
     headers = curl_slist_append(headers, h1.c_str());
-    headers = curl_slist_append(headers, h2.c_str());
-    
+    headers = curl_slist_append(headers, h2.str().c_str());
     
     bool isInitSuccessfull = false;
     
@@ -198,7 +197,6 @@ bool fw_get_shakey_from_string(const std::string& url, const std::string& name, 
         }
         
         curl_easy_cleanup(curl);
-        curl_formfree(formpost);
     }
     else
         error = "Connection Impossible To Start";
