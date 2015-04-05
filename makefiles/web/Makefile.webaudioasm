@@ -11,4 +11,4 @@ binary.zip : $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=.html) 
 
 src.cpp : $(faustfile)
-	faust -i -a webaudio/webaudio-asm.cpp $(faustfile) -o src.cpp
+	faust -lang ajs -i -a webaudio/webaudio-asm-standalone-wrapper.js $(faustfile) -o src.js
