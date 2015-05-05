@@ -11,13 +11,12 @@ using namespace std;
  * 
  *
  * @param url - FaustWeb server URL 
- * @param platforms - If the research is sucessfull, the vector is filled with available platforms
- * @param targets - Associates a platform with a vector of available architectures
+  * @param targets - Associates a platform with a vector of available architectures
  * @param error - In case the research fails, the error is filled
  *
  * @return true if no error was encountered
  */
-bool fw_get_available_targets(const std::string& url, std::vector<std::string>& platforms, std::map<std::string, std::vector<std::string> >& targets, string& error);
+bool fw_get_available_targets(const std::string& url, std::map<std::string, std::vector<std::string> >& targets, string& error);
 
 //---------------------EXPORT IN 1 FUNCTION CALL
 

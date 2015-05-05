@@ -65,7 +65,7 @@ static size_t store_File(void *ptr, size_t size, size_t nmemb, FILE *stream)
 }
 
 // Access to FaustWeb service - Sends a request to faustweb compilation service to know platforms and architecture supported by this
-bool fw_get_available_targets(const string& url, vector<string>& platforms, map<string, vector<string> >& targets, string& error){
+bool fw_get_available_targets(const string& url, map<string, vector<string> >& targets, string& error){
     
     string finalURL = url + "/targets";
     
@@ -94,6 +94,7 @@ bool fw_get_available_targets(const string& url, vector<string>& platforms, map<
                 
                 string response(oss.str());
                 const char* json = response.c_str();
+                vector<string> platforms;
                      
                 if (parseOperatingSystemsList(json, platforms, targets)) {
                     isInitSuccessfull = true;
