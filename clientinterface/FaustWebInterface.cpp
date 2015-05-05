@@ -4,6 +4,9 @@
 #include <sstream>
 #include <iostream>
 #include <fstream> 
+#include <curl/curl.h>
+
+using namespace std;
 
 #ifndef _WIN32
 #include <libgen.h>
@@ -19,17 +22,13 @@ static char* basename(const char* fullpath)
 
 	_splitpath(fullpath, drive, dir, fname, ext);
 
-	std::string fullname = fullpath;
+	string fullname = fullpath;
 	size_t pos = fullname.rfind(fname);
 
 	return (char*)&fullpath[pos];
 }
 
 #endif
-
-#include <curl/curl.h>
-
-using namespace std;
 
 static string path_to_content(const string& path)
 {
@@ -54,8 +53,8 @@ static string path_to_content(const string& path)
 // Standard Callback to store a server response in strinstream
 static size_t store_Response(void* buf, size_t size, size_t nmemb, void* userp)
 {
-    std::ostream* os = static_cast<std::ostream*>(userp);
-    std::streamsize len = size * nmemb;
+    ostream* os = static_cast<ostream*>(userp);
+    streamsize len = size * nmemb;
     return (os->write(static_cast<char*>(buf), len)) ? len : 0;
 }
 
@@ -66,7 +65,7 @@ static size_t store_File(void *ptr, size_t size, size_t nmemb, FILE *stream)
 }
 
 // Access to FaustWeb service - Sends a request to faustweb compilation service to know platforms and architecture supported by this
-bool fw_get_available_targets(const std::string& url, std::vector<std::string>& platforms, std::map<std::string, std::vector<std::string> >& targets, string& error){
+bool fw_get_available_targets(const string& url, vector<string>& platforms, map<string, vector<string> >& targets, string& error){
     
     string finalURL = url + "/targets";
     
@@ -76,20 +75,20 @@ bool fw_get_available_targets(const std::string& url, std::vector<std::string>& 
     
     if (curl) {
         
-        std::ostringstream oss;
+        ostringstream oss;
         
         curl_easy_setopt(curl, CURLOPT_URL, finalURL.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &store_Response);
         curl_easy_setopt(curl, CURLOPT_FILE, &oss);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 60); 
-        curl_easy_setopt(curl,CURLOPT_TIMEOUT, 600);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 600);
         
         CURLcode res = curl_easy_perform(curl);
         
         if (res == CURLE_OK) {
             
             long respcode; //response code of the http transaction
-            curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE, &respcode);
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &respcode);
             
             if(respcode == 200){
                 
@@ -115,12 +114,12 @@ bool fw_get_available_targets(const std::string& url, std::vector<std::string>& 
 
 
 // Access to FaustWeb service - Upload your faust application given a sourceFile, an operating system and an architecture
-bool fw_export_string(const std::string& url, const std::string& name, 
-                    const std::string& code, const std::string& os, 
-                    const std::string& architecture, 
-                    const std::string& output_type, 
-                    const std::string& output_file, 
-                    std::string& error) {
+bool fw_export_string(const string& url, const string& name, 
+                    const string& code, const string& os, 
+                    const string& architecture, 
+                    const string& output_type, 
+                    const string& output_file, 
+                    string& error) {
 
     string key("");
     
@@ -132,13 +131,13 @@ bool fw_export_string(const std::string& url, const std::string& name,
 }
 
 // Access to FaustWeb service - Upload your faust application given a sourceFile, an operating system and an architecture
-bool fw_export_file(const std::string& url, 
-                    const std::string& filename, 
-                    const std::string& os, 
-                    const std::string& architecture, 
-                    const std::string& output_type, 
-                    const std::string& output_file, 
-                    std::string& error) {
+bool fw_export_file(const string& url, 
+                    const string& filename, 
+                    const string& os, 
+                    const string& architecture, 
+                    const string& output_type, 
+                    const string& output_file, 
+                    string& error) {
 
 	string base = basename((char*)filename.c_str());
     size_t pos = base.find(".dsp");
@@ -152,7 +151,7 @@ bool fw_export_file(const std::string& url,
 }
 
 // Access to FaustWeb service - Post your faust file and get a corresponding SHA-Key
-bool fw_get_shakey_from_string(const std::string& url, const std::string& name, const std::string& code, std::string& key, std::string& error){
+bool fw_get_shakey_from_string(const string& url, const string& name, const string& code, string& key, string& error){
 
     CURL *curl = curl_easy_init();
     
@@ -176,7 +175,7 @@ bool fw_get_shakey_from_string(const std::string& url, const std::string& name, 
     
     if (curl) {
         
-        std::ostringstream oss;
+        ostringstream oss;
         
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
@@ -212,7 +211,7 @@ bool fw_get_shakey_from_string(const std::string& url, const std::string& name, 
     return isInitSuccessfull;
 }
 
-bool fw_get_shakey_from_file(const std::string& url, const std::string& filename, std::string& key, std::string& error) {
+bool fw_get_shakey_from_file(const string& url, const string& filename, string& key, string& error) {
 		
 	string base = basename((char*)filename.c_str());
     size_t pos = base.find(".dsp");
@@ -226,13 +225,13 @@ bool fw_get_shakey_from_file(const std::string& url, const std::string& filename
 }
 
 // Access to FaustWeb service - Upload your faust application given the SHA-Key, an operating system and an architecture
-bool fw_get_file_from_shakey(const std::string& url, 
-                        const std::string& key, 
-                        const std::string& os, 
-                        const std::string& architecture, 
-                        const std::string& output_type, 
-                        const std::string& output_file, 
-                        std::string& error) {
+bool fw_get_file_from_shakey(const string& url, 
+                            const string& key, 
+                            const string& os, 
+                            const string& architecture, 
+                            const string& output_type, 
+                            const string& output_file, 
+                            string& error) {
     
     bool isInitSuccessfull = false;
     string finalURL = url + "/" + key + "/" + os + "/" + architecture + "/" + output_type;
@@ -248,14 +247,14 @@ bool fw_get_file_from_shakey(const std::string& url,
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &store_File);
             curl_easy_setopt(curl, CURLOPT_FILE, file);
             curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT , 60); 
-            curl_easy_setopt(curl,CURLOPT_TIMEOUT, 600);
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, 600);
             
             CURLcode res = curl_easy_perform(curl);
             
             if (res == CURLE_OK) {
                 
                 long respcode; //response code of the http transaction
-                curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE, &respcode);
+                curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &respcode);
                 
                 if (respcode == 200) {
                     isInitSuccessfull = true;
@@ -268,7 +267,7 @@ bool fw_get_file_from_shakey(const std::string& url,
             
             curl_easy_cleanup(curl);
         } else {
-            error = "Connection Impossible To Start";
+            error = "Connection impossible to start";
         }
         
         fclose(file);

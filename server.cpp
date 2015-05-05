@@ -88,7 +88,7 @@ string completebutcorrupt_head =
     "<html><body><p>The upload is completed but the file you uploaded is not a valid Faust file. \
   Make sure that it is either a file with an extension .dsp or an archive (tar.gz, tar.bz, tar \
   or zip) containing one .dsp file and potentially .lib files included by the .dsp file. \
-  Furthermore, the code in these files must be valid faust code.</p> \
+  Furthermore, the code in these files must be valid Faust code.</p> \
   <p>Below is the STDOUT and STDERR for the Faust code you tried to compile. \
   If the two are empty, then your file structure is wrong. Otherwise, they will tell you \
   why Faust failed.</p>"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ;
@@ -261,8 +261,6 @@ string generate_sha1(connection_info_struct *con_info)
     return sha1key;
 }
 
-
-
 /*
  * True if it is a .dsp or a .lib source file
  */
@@ -280,7 +278,6 @@ bool isMakefile(const fs::path& f)
     return f.stem() == "Makefile";
 }
 
-
 /*
  * Copy all faust source files from src directory to destination directory
  */
@@ -297,8 +294,6 @@ void copyFaustFiles(const fs::path& src, const fs::path& dst)
         }
     }
 }
-
-
 
 /*
  * Creates an arboreal structure in root with the appropriate makefiles.
@@ -446,7 +441,6 @@ int FaustServer::send_page(struct MHD_Connection *connection, const char *page, 
 	}
 }
 
-
 /**
 * Handler used to generate a 404 reply.
 *
@@ -463,7 +457,6 @@ static int page_not_found (struct MHD_Connection *connection, const char* page, 
 	MHD_destroy_response (response);
 	return ret;
 }
-
 
 /*
  * Callback called every time a GET or POST request is completed.
@@ -541,7 +534,7 @@ bool isValidTarget(const fs::path& target, const char* mimetype)
 	}
 }
 
-fs::path make (const fs::path& dir, const fs::path& target)
+fs::path make(const fs::path& dir, const fs::path& target)
 {
     std::stringstream ss;
     ss << "make -C " << dir << " " << target;
@@ -553,7 +546,6 @@ fs::path make (const fs::path& dir, const fs::path& target)
         return "";
     }
 }
-
 
 /*
  * Function that sends a file in response to a GET
@@ -591,13 +583,9 @@ int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& fi
     return ret;
 }
 
-
-
-
-
 // Start the Faust server - shallow wrapper around MHD_start_daemon
 
-static void panicCallback (void *cls, const char *file, unsigned int line, const char *reason)
+static void panicCallback(void *cls, const char *file, unsigned int line, const char *reason)
 {
 	cerr << "PANIC " << line << ':' << file << ' ' << reason << endl;
 }
@@ -624,8 +612,6 @@ void FaustServer::stop()
     daemon_ = 0;
 }
 
-
-
 /*
  * Static Callback called every time a GET or POST request is received.
  * by the server.
@@ -644,9 +630,6 @@ int FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connecti
     }
     return server->answerConnection(connection, url, method, version, upload_data, upload_data_size, con_cls);
 }
-
-
-
 
 /*
  * Actual callback method called every time a GET or POST request is received.
@@ -720,12 +703,10 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
 	}
 }
 
-
-
-int FaustServer::answerConnection (  struct MHD_Connection* connection,
-                                     const char* url, const char* method,
-                                     const char* version, const char* upload_data,
-                                     size_t *upload_data_size, void **con_cls )
+int FaustServer::answerConnection(struct MHD_Connection* connection,
+                                 const char* url, const char* method,
+                                 const char* version, const char* upload_data,
+                                 size_t *upload_data_size, void **con_cls)
 {
 
     if (0 == strcmp(method, "GET")) {
@@ -737,9 +718,9 @@ int FaustServer::answerConnection (  struct MHD_Connection* connection,
     }
 }
 
-int FaustServer::answerPOST (  struct MHD_Connection* connection,
-                               const char* url, const char* upload_data,
-                               size_t *upload_data_size, void **con_cls )
+int FaustServer::answerPOST(struct MHD_Connection* connection,
+                           const char* url, const char* upload_data,
+                           size_t *upload_data_size, void **con_cls)
 {
     if (NULL == *con_cls) {
         struct connection_info_struct* con_info;
@@ -805,7 +786,6 @@ int FaustServer::answerPOST (  struct MHD_Connection* connection,
 	std::cerr << "NEVER EXECUTED" << std::endl;
     return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 }
-
 
 /*
  * Callback called every time a POST request comes in by the postprocessor.
@@ -874,8 +854,6 @@ int FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const 
 
     return MHD_YES;
 }
-
-
 
 FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory, const fs::path& logfile)
     : 	port_(port),

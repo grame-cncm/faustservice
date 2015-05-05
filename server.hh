@@ -10,9 +10,7 @@
 
 namespace fs = boost::filesystem;
 
-
 using namespace std;
-
 
 struct connection_info_struct {
     int connectiontype;                         // GET or POST
@@ -26,12 +24,10 @@ struct connection_info_struct {
     string makefile_directory;                  // the path from which makefiles should be copied
 };
 
-
 struct string_and_exitstatus {
     string str;
     int exitstatus;
 };
-
 
 class FaustServer
 {
@@ -64,7 +60,6 @@ public:
         return logfile_;                    ///< Path to the logfile.
     }
 
-
 private:
 
     static unsigned int nr_of_uploading_clients;
@@ -95,8 +90,6 @@ private:
 
 
     int faustGet			(struct MHD_Connection *connection, const char *raw_url);
-
-
 
 };
 
