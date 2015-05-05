@@ -7,7 +7,7 @@
 
 using namespace std;
 
-/* Access to FaustWeb service - Requests the supported platforms and architecture of a faustweb service
+/* Access to FaustWeb service - Requests the supported platforms and architecture of a FaustWeb service
  * 
  *
  * @param url - FaustWeb server URL 
@@ -49,7 +49,6 @@ bool fw_export_file(const std::string& url, const std::string& filename, const s
  * @return true if no error was encountered
  */
 bool fw_export_string(const std::string& url, const std::string& name, const std::string& pgm, const std::string& os, const std::string& architecture, const std::string& output_type, const std::string& output_file, std::string& error);
-
 
 //---------------------EXPORT DIVIDED IN 2 FUNCTION CALLS
 

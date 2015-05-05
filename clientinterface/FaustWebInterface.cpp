@@ -81,7 +81,7 @@ bool fw_get_available_targets(const string& url, vector<string>& platforms, map<
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &store_Response);
         curl_easy_setopt(curl, CURLOPT_FILE, &oss);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 60); 
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 600);
+        curl_easy_setopt(curl,CURLOPT_TIMEOUT, 600);
         
         CURLcode res = curl_easy_perform(curl);
         
@@ -90,7 +90,7 @@ bool fw_get_available_targets(const string& url, vector<string>& platforms, map<
             long respcode; //response code of the http transaction
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &respcode);
             
-            if(respcode == 200){
+            if (respcode == 200) {
                 
                 string response(oss.str());
                 const char* json = response.c_str();
@@ -111,7 +111,6 @@ bool fw_get_available_targets(const string& url, vector<string>& platforms, map<
     
     return isInitSuccessfull;
 }
-
 
 // Access to FaustWeb service - Upload your faust application given a sourceFile, an operating system and an architecture
 bool fw_export_string(const string& url, const string& name, 

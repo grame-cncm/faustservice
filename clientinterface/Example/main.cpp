@@ -15,9 +15,9 @@ int main(int argc, char **argv) {
     bool res = fw_get_available_targets(url, platforms, targets, err);
     
     for (int i = 0; i < platforms.size(); i++) {
- 		cout<<platforms[i]<<endl;
+ 		cout << "Platform : " << platforms[i] << endl;
      	for(int j = 0; j < targets[platforms[i]].size(); j++)
-     		cout<<targets[platforms[i]][j]<<endl;
+     		cout << "Target : " << targets[platforms[i]][j] << endl;
     }
 
 	string key;

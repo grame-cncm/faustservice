@@ -3,7 +3,6 @@
 #include <ctype.h>
 #include "JsonParser.h"
 
-
 // ---------------------------------------------------------------------
 // Parse full json record describing available operating systems and
 // associated architectures :
@@ -28,7 +27,6 @@ bool parseOperatingSystemsList (const char*& p, vector<string>& platforms, map<s
     return parseChar(p, '}');
 }
 
-
 // ---------------------------------------------------------------------
 // Parse operating system record :
 //  "os" : ["arch1, "arch2",...]
@@ -41,7 +39,6 @@ bool parseOperatingSystem (const char*& p, string& os, vector<string>& al)
             && parseArchitecturesList(p,al)
             && parseChar(p,']');
 }
-
 
 // ---------------------------------------------------------------------
 // Parse an architecture list
@@ -63,11 +60,9 @@ bool parseArchitecturesList (const char*& p, vector<string>& v)
     return true;
 }
 
-
 // ---------------------------------------------------------------------
 //                          Elementary parsers
 // ---------------------------------------------------------------------
-
 
 // Advance pointer p to the first non blank character
 void skipBlank(const char*& p)
@@ -111,7 +106,6 @@ bool parseChar(const char*& p, char x)
 bool parseString(const char*& p, string& s)
 {
     string str;
-
     skipBlank(p);
 
     const char* saved = p;
