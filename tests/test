@@ -3,6 +3,7 @@
 #USAGE : test <architecture>
 
 rm -rf sandbox
+rm -rf build-*
 rm -f LOG
 for f in *.dsp; do
 	echo "test file $f with $1 architecture"
@@ -13,9 +14,8 @@ for f in *.dsp; do
 		cp $f sandbox/
 		cp $m sandbox/Makefile
 		cd sandbox
-		((make binary.zip  >> ../LOG 2>&1) && echo "passed" ) || echo "failed" 
+		((make binary.zip  >> ../LOG 2>&1) && echo "passed" ) || echo "failed"
 		cd ..
 		mv sandbox build-$(basename $m)
 	done
 done
-
