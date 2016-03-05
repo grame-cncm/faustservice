@@ -3,6 +3,7 @@
 #USAGE : test <architecture>
 
 rm -rf sandbox
+rm -rf build-Makefile.*
 rm -f LOG
 for f in *.dsp; do
 	echo "test file $f with $1 architecture"
