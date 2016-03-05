@@ -7,9 +7,9 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2lv2 $(OPT) -nvoices 8 -arch32 $(faustfile)
-	zip -r binary.zip $(faustfile:.dsp=.lv2)
+	faust2faustvst $(OPT) -nvoices 8 -arch32 $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=.so)
 
 src.cpp : $(faustfile)
-	faust -uim -i -a lv2.cpp $(faustfile) -o src.cpp
+	faust -uim -i -a faustvst.cpp $(faustfile) -o src.cpp
 
