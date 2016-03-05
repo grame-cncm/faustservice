@@ -7,9 +7,9 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2lv2synth $(OPT) -arch32 $(faustfile)
+	faust2lv2 $(OPT) -nvoices 8 -arch32 $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=.lv2)
 
 src.cpp : $(faustfile)
-	faust -i -a lv2synth.cpp $(faustfile) -o src.cpp
+	faust -uim -i -a lv2.cpp $(faustfile) -o src.cpp
 
