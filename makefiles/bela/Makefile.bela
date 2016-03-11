@@ -1,0 +1,14 @@
+################################################################################
+#
+#			FaustWeb Makefile for the Bela board
+#
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2bela $(faustfile)
+	zip -r binary.zip BeagleRT
+
+src.cpp : $(faustfile)
+	faust -i -a bela.cpp $(faustfile) -o src.cpp
