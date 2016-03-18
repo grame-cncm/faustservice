@@ -11,5 +11,5 @@ binary.zip : $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=.dll)
 	
 src.cpp : $(faustfile)
-	faust -i -a vst.cpp $(faustfile) -o src.cpp
+	faust -i -a faustvst.cpp $(faustfile) -o src.cpp
 
