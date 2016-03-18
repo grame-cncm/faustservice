@@ -7,8 +7,8 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	remoteOSX faust2vst $(faustfile) $(OPT) -vsti
+	remoteOSX faust2fausvst $(faustfile) $(OPT)
 
 src.cpp : $(faustfile)
-	faust -i -a vsti-poly.cpp $(faustfile) -o src.cpp
+	faust -i -a faustvst.cpp $(faustfile) -o src.cpp
 
