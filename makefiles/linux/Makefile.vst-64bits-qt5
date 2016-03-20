@@ -7,7 +7,7 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2faustvst $(OPT) -arch32 -nvoices 8 $(faustfile)
+	faust2faustvst $(OPT) -gui -qt5 $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=.so)
 
 src.cpp : $(faustfile)
