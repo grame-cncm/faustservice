@@ -1,0 +1,15 @@
+################################################################################
+#							FaustWeb LINUX script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2lv2 $(OPT) -gui -qt5 $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=.lv2)
+
+src.cpp : $(faustfile)
+	faust -uim -i -a lv2.cpp $(faustfile) -o src.cpp
+
