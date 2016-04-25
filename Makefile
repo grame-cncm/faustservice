@@ -5,11 +5,15 @@
 dest   := /usr/local/bin
 pdsdk  := /usr/include/pd
 
+ifeq ($(shell uname -s), Darwin)
+EXT = -mt
+else
+EXT = ""
+endif
+
 faustweb: *.cpp *.hh
-	g++ -g -O1 -I/opt/local/include *.cpp \
-	-I/usr/local/Cellar/libarchive/3.1.2/include/ \
-	-L/usr/local/Cellar/libarchive/3.1.2/lib/ \
-	-lmicrohttpd -lboost_filesystem -lboost_system -lboost_program_options \
+	g++ $(CXXFLAGS) $(LDFLAGS) *.cpp \
+	-lmicrohttpd -lboost_filesystem$(EXT) -lboost_system$(EXT) -lboost_program_options$(EXT) \
 	-larchive -lcrypto -lm \
 	-o faustweb
 	
