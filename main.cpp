@@ -22,7 +22,7 @@ fs::path gSessionsDirectory;		///< directory where sessions are stored
 fs::path gMakefilesDirectory;		///< directory containing all the "<os>/Makefile.<architecture>[-32bits|-64bits]" makefiles
 fs::path gLogfile;					///< faustweb logfile
 
-bool gAnyOrigin = false; 
+bool gAnyOrigin = true; 
 
 // Processes command line arguments using boost/parse_options
 void process_cmdline(int argc, char* argv[])
