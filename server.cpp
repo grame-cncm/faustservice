@@ -507,7 +507,7 @@ unsigned int FaustServer::nr_of_uploading_clients = 0;
  */
 
 // Define here the various targets accepted by faustweb makefiles
-bool isValidTarget(const fs::path& target, const char* mimetype)
+bool isValidTarget(const fs::path& target, const char*& mimetype)
 {
     if (target == "binary.zip") {
 		mimetype = "application/zip";
