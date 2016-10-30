@@ -890,7 +890,7 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
             if (V.size() > 0) {
             	std::sort(V.begin(), V.end());
             	ss << sep1 << std::endl << '"' << OSname << '"' << ": [";
-            	for (int i=0; i<V.size(); i++) { if(i>0) ss << ','; ss << '"' << V[i] << '"'; }
+            	for (unsigned int i=0; i<V.size(); i++) { if(i>0) ss << ','; ss << '"' << V[i] << '"'; }
             	ss << ']';
             	sep1 = ',';
             }

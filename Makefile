@@ -13,7 +13,7 @@ LDFLAGS = -L/opt/local/lib
 CXXFLAGS = -Wall -Wno-unused-local-typedef -O3 -I/opt/local/include
 else
 EXT = ""
-CXXFLAGS = -Wall -Wno-unused-local-typedef -O3
+CXXFLAGS = -Wall -O3
 endif
 
 faustweb: *.cpp *.hh
@@ -31,7 +31,7 @@ format :
 install:
 	install upstart-faustweb.conf /etc/init/faustweb.conf
 	install apache2-faustweb.conf /etc/apache2/sites-available/002-faustweb.conf
-    install faustweb $(dest)
+	install faustweb $(dest)
 	install bin/remoteOSX $(dest)
 	install -d $(pdsdk)/pdfaustextra/
 	install pdfaustextra/*.pd $(pdsdk)/pdfaustextra/
