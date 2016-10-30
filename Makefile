@@ -7,12 +7,15 @@ pdsdk  := /usr/include/pd
 
 ifeq ($(shell uname -s), Darwin)
 EXT = -mt
+LDFLAGS = -L/opt/local/lib
+CXXFLAGS = -Wall -Wno-unused-local-typedef -O3 -I/opt/local/include
 else
 EXT = ""
+CXXFLAGS = -Wall -Wno-unused-local-typedef -O3
 endif
 
 faustweb: *.cpp *.hh
-	g++ $(CXXFLAGS) $(LDFLAGS) *.cpp \
+	g++ $(CXXFLAGS) *.cpp $(LDFLAGS) \
 	-lmicrohttpd -lboost_filesystem$(EXT) -lboost_system$(EXT) -lboost_program_options$(EXT) \
 	-larchive -lcrypto -lm \
 	-o faustweb
