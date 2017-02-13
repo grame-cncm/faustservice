@@ -1,0 +1,14 @@
+################################################################################
+#
+#			FaustWeb Makefile for the Bela board
+#
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2juce -plugin -midi $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=)
+
+src.cpp : $(faustfile)
+	faust -i -a juce.cpp $(faustfile) -o src.cpp
