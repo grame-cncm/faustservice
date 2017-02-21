@@ -1,0 +1,17 @@
+################################################################################
+#							FaustWeb OSX script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2smartkeyb -android $(OPT) $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=.apk)
+
+binary.apk : binary.zip
+	cp $(faustfile:.dsp=.apk) binary.apk
+
+src.cpp : $(faustfile)
+	faust -i -a android.cpp $(faustfile) -o src.cpp
