@@ -32,7 +32,7 @@ struct string_and_exitstatus {
 class FaustServer
 {
     int 				port_;
-    int 				max_clients_;
+    unsigned int 		max_clients_;
     fs::path 			directory_;
     fs::path 			makefile_directory_;
     fs::path 			logfile_;
@@ -47,7 +47,7 @@ public:
     bool 		start();
     void 		stop();
 
-    const int 	getMaxClients() 		{
+    const unsigned int 	getMaxClients() 		{
         return max_clients_;                ///< Max number of clients allowed to connect at a given time.
     }
     fs::path  	getDirectory()			{

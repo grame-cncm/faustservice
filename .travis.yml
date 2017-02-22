@@ -1,0 +1,14 @@
+os: linux
+dist: xenial
+language: cpp
+compiler: gcc
+
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y libarchive-dev libboost-filesystem-dev  libboost-program-options-dev libcrypto++-dev libmicrohttpd-dev
+
+branches:
+  only:
+  - dev
+
+script: make
