@@ -26,28 +26,28 @@ Make sure to download the current development trunk of all these libraries. Then
 
 **sudo make install**
 
-#### To use FaustWeb #### 
+#### To use FaustWeb ####
 
 **./faustweb**  starts FaustWeb on port 8888
 
-#### From a browser at URL http://localhost:8888/ #### 
+#### From a browser at URL http://localhost:8888/ ####
 
 Select a file kisana.dsp and send it. The sent file can be a either a .dsp or an .zip archive containing a .dsp .lib files. Next use the returned <key> for example cf55531c580cc7d3485a5161259f0571d3e6bdef
 
-#### General API  #### 
+#### General API ####
 
 http://localhost:8888/<key>/src.cpp	returns the 'src.cpp' file containing the cpp source code 
 http://localhost:8888/<key>/svg.zip	returns a 'svg.zip' archive containing a svg folder with all .svg files
 http://localhost:8888/<key>/mdoc.zip	returns a ’mdoc.zip' archive  containing a kisana-mdoc folder with automatic documentation
 
-#### API for each architecture #### 
+#### API for each architecture ####
 
 http://localhost:8888/<key>/<plateforme>/<architecture>/binary.zip	returns the 'binary.zip' archive containing  one or several binairies
 http://localhost:8888/<key>/<plateforme>/<architecture>/src.cpp	returns the architecture wrapped cpp source code 
 
-#### List of available architectures for each platform #### 
+#### List of available architectures for each platform ####
 
-for osx :
+For osx :
 	osx/coreaudio-qt	
 	osx/jack-qt				
 	osx/supercollider	
