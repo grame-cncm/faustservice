@@ -4,7 +4,7 @@
 
 The goal of this project is to develop a Web API for the Faust compiler allowing to do remote compilations.
 
-#### Required libraries #### 
+#### Required libraries ####
 
 In order to compile FaustWeb links against the following libraries:
 
@@ -19,8 +19,11 @@ In order to compile FaustWeb links against the following libraries:
 Make sure to download the current development trunk of all these libraries. Then, the standard:
 
 **mkdir build && cd build**
+
 **../configure**
+
 **make**
+
 **sudo make install**
 
 #### To use FaustWeb #### 
