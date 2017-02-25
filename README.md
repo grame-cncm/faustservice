@@ -9,8 +9,11 @@ The goal of this project is to develop a Web API for the Faust compiler allowing
 In order to compile FaustWeb links against the following libraries:
 
 **libarchive** 	(sudo apt-get install libarchive-dev)
+
 **boost** 		(sudo apt-get install libboost-filesystem-dev  libboost-program-options-dev)
+
 **libcrypto** (sudo apt-get install libcrypto++-dev)
+
 **libmicrohttpd**
 
 Make sure to download the current development trunk of all these libraries. Then, the standard:
@@ -20,11 +23,11 @@ Make sure to download the current development trunk of all these libraries. Then
 **make**
 **sudo make install**
 
-#### To use FaustWeb  #### 
+#### To use FaustWeb #### 
 
 **./faustweb**  starts FaustWeb on port 8888
 
-#### From a browser at URL http://localhost:8888/  #### 
+#### From a browser at URL http://localhost:8888/ #### 
 
 Select a file kisana.dsp and send it. The sent file can be a either a .dsp or an .zip archive containing a .dsp .lib files. Next use the returned <key> for example cf55531c580cc7d3485a5161259f0571d3e6bdef
 
