@@ -39,13 +39,11 @@ string askpage_head = "<html><body>\n\
                        Upload a Faust file, please.<br>\n\
                        There are ";
 
-
 string askpage_tail = " clients uploading at the moment.<br>\n\
                        <form action=\"/filepost\" method=\"post\" enctype=\"multipart/form-data\">\n\
                        <input name=\"file\" type=\"file\">\n\
                        <input type=\"submit\" value=\" Send \"></form>\n\
                        </body></html>";
-
 
 string cannotcompile =
     "<html><body>Could not execute the provided DSP program for the given architecture file.</body></html>";

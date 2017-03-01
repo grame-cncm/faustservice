@@ -23,8 +23,8 @@
  ************************************************************************
  ************************************************************************/
 
-#ifndef FAUSTWEBINTERFACE_H
-#define FAUSTWEBINTERFACE_H
+#ifndef FAUSTWEB_CLIENT_H
+#define FAUSTWEB_CLIENT_H
 
 #include <string>
 #include <vector>

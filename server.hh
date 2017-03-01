@@ -88,7 +88,6 @@ private:
                              const char* url, const char* upload_data,
                              size_t *upload_data_size, void **con_cls);
 
-
     int faustGet			(struct MHD_Connection *connection, const char *raw_url);
 
 };
