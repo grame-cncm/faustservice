@@ -28,7 +28,7 @@
 
 using namespace std;
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     string err;
     map<string, vector<string> > targets;
@@ -41,7 +41,7 @@ int main(int argc, char **argv)
  		cout << "Platform : " << (*it).first << endl;
         vector<string> target = (*it).second;
         for (int j = 0; j < target.size(); j++) {
-     		cout << "Target : " << target[j] << endl;
+     		cout << "\tTarget : " << target[j] << endl;
         }
     }
 

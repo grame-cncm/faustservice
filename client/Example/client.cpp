@@ -1,0 +1,111 @@
+/************************************************************************
+ FAUST Architecture File
+ Copyright (C) 2017 GRAME, Centre National de Creation Musicale
+ ---------------------------------------------------------------------
+ This Architecture section is free software; you can redistribute it
+ and/or modify it under the terms of the GNU General Public License
+ as published by the Free Software Foundation; either version 3 of
+ the License, or (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program; If not, see <http://www.gnu.org/licenses/>.
+ 
+ EXCEPTION : As a special exception, you may create a larger work
+ that contains this FAUST architecture section and distribute
+ that work under terms of your choice, so long as this FAUST
+ architecture section is not modified.
+ 
+ ************************************************************************
+ ************************************************************************/
+
+#include <iostream>
+#include "../FaustWebClient.h"
+
+using namespace std;
+
+inline long lopt(char* argv[], const char* name, long def)
+{
+    int	i;
+    for (i = 0; argv[i]; i++) if (!strcmp(argv[i], name)) return atoi(argv[i+1]);
+    return def;
+}
+
+inline bool isopt(char* argv[], const char* name)
+{
+    int	i;
+    for (i = 0; argv[i]; i++) if (!strcmp(argv[i], name)) return true;
+    return false;
+}
+
+inline const char* lopts(char* argv[], const char* name, const char* def)
+{
+    int	i;
+    for (i = 0; argv[i]; i++) if (!strcmp(argv[i], name)) return argv[i+1];
+    return def;
+}
+
+int main(int argc, char** argv)
+{
+    string err;
+    map<string, vector<string> > targets;
+    map<string, vector<string> >::iterator it;
+    
+    string url = lopts(argv, "-url", "http://faustservice.grame.fr");
+    string platform = lopts(argv, "-platform", "osx");
+    string target = lopts(argv, "-target", "coreaudio-qt");
+    bool is_service = isopt(argv, "-service");
+    bool is_help1 = isopt(argv, "-help");
+    bool is_help2 = isopt(argv, "-h");
+    
+    if (is_help1 || is_help2) {
+        cout << "faustwebclient [-service] [-url <...>] [-platform <...>] [-target <...>] <file.dsp>\n";
+        cout << "Use '-service' to print all available platform/targets on the service URL (default 'http://faustservice.grame.fr')\n";
+        cout << "Use '-url' to specify service URL (default 'http://faustservice.grame.fr')\n";
+        cout << "Use '-platform' to specify compilation platform\n";
+        cout << "Use '-target' to specify compilation target for the choose platform\n";
+        return 0;
+    }
+  
+    if (is_service) {
+        cout << "==========================" << endl;
+        cout << "Available platform/targets" << endl;
+        cout << "==========================" << endl;
+        bool res = fw_get_available_targets(url, targets, err);
+        for (it = targets.begin(); it != targets.end(); it++) {
+            cout << "Platform : " << (*it).first << endl;
+            vector<string> target = (*it).second;
+            for (int j = 0; j < target.size(); j++) {
+                cout << "\tTarget : " << target[j] << endl;
+            }
+        }
+        return 0;
+    }
+
+    string key;
+    string file = argv[argc - 1];
+    
+    cout << "===========================================" << endl;
+    cout << "Service url : " << url << endl;
+    cout << "Platform : " << platform << endl;
+    cout << "Target : " << target << endl;
+    cout << "File : " << file << endl;
+    cout << "===========================================" << endl;
+
+    if (fw_get_shakey_from_file(url, file, key, err)) {
+    	cout << "SHAKey is " << key << endl;
+        if (fw_get_file_from_shakey(url, key, platform, target, "binary.zip", file + ".zip", err)) {
+            cout << "File correctly written " << endl;
+        } else {
+            cout << err << endl;
+        }
+    } else {
+        cout << "Bad request" << endl;
+    }
+
+    return 0;
+}

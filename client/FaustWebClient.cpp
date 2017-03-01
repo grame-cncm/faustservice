@@ -104,7 +104,7 @@ bool fw_get_available_targets(const string& url, map<string, vector<string> >& t
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &store_Response);
         curl_easy_setopt(curl, CURLOPT_FILE, &oss);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 60); 
-        curl_easy_setopt(curl,CURLOPT_TIMEOUT, 600);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 600);
         
         CURLcode res = curl_easy_perform(curl);
         
@@ -176,7 +176,7 @@ bool fw_export_file(const string& url,
 // Access to FaustWeb service - Post your faust file and get a corresponding SHA-Key
 bool fw_get_shakey_from_string(const string& url, const string& name, const string& code, string& key, string& error)
 {
-    CURL *curl = curl_easy_init();
+    CURL* curl = curl_easy_init();
     string boundary = "87142694621188";
     
     string data = "--" + boundary + "\r\n";
@@ -203,8 +203,8 @@ bool fw_get_shakey_from_string(const string& url, const string& name, const stri
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &store_Response);
         curl_easy_setopt(curl, CURLOPT_FILE, &oss);
-        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT , 60); 
-        curl_easy_setopt(curl,CURLOPT_TIMEOUT, 600);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 60);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 600);
         curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
             
@@ -261,7 +261,7 @@ bool fw_get_file_from_shakey(const string& url,
     
     if (file) {
         
-        CURL *curl = curl_easy_init();
+        CURL* curl = curl_easy_init();
         
         if (curl) {
             
