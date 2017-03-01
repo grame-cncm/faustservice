@@ -7,6 +7,10 @@ The goal of this project is to create a client that communicates with a FaustWeb
 
 - `libcurl` : http://curl.haxx.se/libcurl/
 
+## Compilation
+
+- `make && sudo make install` : to compile and install the `faustwebclient` binary
+
 ## Options
 
 The following options are available: 
@@ -15,3 +19,5 @@ The following options are available:
 - `-url <...>`          : to specify service URL (default 'http://faustservice.grame.fr')
 - `-platform <...>`     : to specify compilation platform
 - `-target <...>`       : to specify compilation target for the chosen platform
+
+
