@@ -13,6 +13,8 @@ The goal of this project is to create a client that communicates with a FaustWeb
 
 ## Options
 
+The compiled binary is : faustwebclient [-service] [-url <...>] [-platform <...>] [-target <...>] <file.dsp>
+
 The following options are available: 
 
 - `-service`            : to print all available platform/targets on the service URL (default 'http://faustservice.grame.fr')
@@ -21,3 +23,6 @@ The following options are available:
 - `-target <...>`       : to specify compilation target for the chosen platform
 
 
+## Example
+
+- `faustwebclient -platform osx -target max-msp test.dsp`
