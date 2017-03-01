@@ -24,7 +24,7 @@
  ************************************************************************/
 
 #include <iostream>
-#include "../FaustWebClient.h"
+#include "FaustWebClient.h"
 
 using namespace std;
 
