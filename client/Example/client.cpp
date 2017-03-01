@@ -67,7 +67,7 @@ int main(int argc, char** argv)
         cout << "Use '-service' to print all available platform/targets on the service URL (default 'http://faustservice.grame.fr')\n";
         cout << "Use '-url' to specify service URL (default 'http://faustservice.grame.fr')\n";
         cout << "Use '-platform' to specify compilation platform\n";
-        cout << "Use '-target' to specify compilation target for the choose platform\n";
+        cout << "Use '-target' to specify compilation target for the chosen platform\n";
         return 0;
     }
   
