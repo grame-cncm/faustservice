@@ -1,5 +1,30 @@
-#ifndef _SERVER_
-#define _SERVER_
+/************************************************************************
+ FAUST Architecture File
+ Copyright (C) 2017 GRAME, Centre National de Creation Musicale
+ ---------------------------------------------------------------------
+ This Architecture section is free software; you can redistribute it
+ and/or modify it under the terms of the GNU General Public License
+ as published by the Free Software Foundation; either version 3 of
+ the License, or (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program; If not, see <http://www.gnu.org/licenses/>.
+ 
+ EXCEPTION : As a special exception, you may create a larger work
+ that contains this FAUST architecture section and distribute
+ that work under terms of your choice, so long as this FAUST
+ architecture section is not modified.
+ 
+ ************************************************************************
+ ************************************************************************/
+
+#ifndef _FAUST_SERVER_
+#define _FAUST_SERVER_
 
 #include "microhttpd.h"
 #include "utilities.hh"
@@ -47,16 +72,20 @@ public:
     bool 		start();
     void 		stop();
 
-    const unsigned int 	getMaxClients() 		{
+    const unsigned int getMaxClients()
+    {
         return max_clients_;                ///< Max number of clients allowed to connect at a given time.
     }
-    fs::path  	getDirectory()			{
+    fs::path getDirectory()
+    {
         return directory_;                  ///< Directory to which the uploaded files are being written.
     }
-    fs::path  	getMakefileDirectory()	{
+    fs::path getMakefileDirectory()
+    {
         return makefile_directory_;         ///< Directory that the makefiles should be copied from.
     }
-    fs::path  	getLogfile()			{
+    fs::path getLogfile()
+    {
         return logfile_;                    ///< Path to the logfile.
     }
 
@@ -64,31 +93,31 @@ private:
 
     static unsigned int nr_of_uploading_clients;
 
-    static int get_params	(void *cls, enum MHD_ValueKind, const char *key, const char *data);
-    static int send_page	(struct MHD_Connection *connection, const char *page, int length, int status_code, const char *type);
-    static int send_file	(struct MHD_Connection *connection, const fs::path& filepath, const char* mimetype);
-    static int iterate_post	(void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
+    static int get_params(void *cls, enum MHD_ValueKind, const char *key, const char *data);
+    static int send_page(struct MHD_Connection *connection, const char *page, int length, int status_code, const char *type);
+    static int send_file(struct MHD_Connection *connection, const fs::path& filepath, const char* mimetype);
+    static int iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
                              const char *filename, const char *content_type,
                              const char *transfer_encoding, const char *data, uint64_t off,
                              size_t size);
 
-    static void request_completed	(void *cls, struct MHD_Connection *connection,
+    static void request_completed(void *cls, struct MHD_Connection *connection,
                                      void **con_cls, enum MHD_RequestTerminationCode toe);
     static int answer_to_connection	(void *cls, struct MHD_Connection *connection,
                                      const char *url, const char *method,
                                      const char *version, const char *upload_data,
                                      size_t *upload_data_size, void **con_cls);
 
-    int answerConnection	(struct MHD_Connection* connection,
+    int answerConnection(struct MHD_Connection* connection,
                              const char* url, const char* method,
                              const char* version, const char* upload_data,
                              size_t *upload_data_size, void **con_cls);
-    int answerGET 			(struct MHD_Connection* connection, const char* url );
-    int answerPOST 			(struct MHD_Connection* connection,
-                             const char* url, const char* upload_data,
-                             size_t *upload_data_size, void **con_cls);
+    int answerGET(struct MHD_Connection* connection, const char* url );
+    int answerPOST(struct MHD_Connection* connection,
+                const char* url, const char* upload_data,
+                size_t *upload_data_size, void **con_cls);
 
-    int faustGet			(struct MHD_Connection *connection, const char *raw_url);
+    int faustGet(struct MHD_Connection *connection, const char *raw_url);
 
 };
 

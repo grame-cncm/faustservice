@@ -1,3 +1,28 @@
+/************************************************************************
+ FAUST Architecture File
+ Copyright (C) 2017 GRAME, Centre National de Creation Musicale
+ ---------------------------------------------------------------------
+ This Architecture section is free software; you can redistribute it
+ and/or modify it under the terms of the GNU General Public License
+ as published by the Free Software Foundation; either version 3 of
+ the License, or (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program; If not, see <http://www.gnu.org/licenses/>.
+ 
+ EXCEPTION : As a special exception, you may create a larger work
+ that contains this FAUST architecture section and distribute
+ that work under terms of your choice, so long as this FAUST
+ architecture section is not modified.
+ 
+ ************************************************************************
+ ************************************************************************/
+
 #include <vector>
 #include <algorithm>
 #include <sstream>
@@ -10,9 +35,6 @@
 #include <microhttpd.h>
 
 // libcryptopp
-//#include <cryptopp/sha.h>
-//#include <cryptopp/files.h>
-//#include <cryptopp/hex.h>
 #include <openssl/sha.h>
 
 // libarchive
@@ -505,7 +527,7 @@ unsigned int FaustServer::nr_of_uploading_clients = 0;
  */
 
 // Define here the various targets accepted by faustweb makefiles
-bool isValidTarget(const fs::path& target, const char*& mimetype)
+static bool isValidTarget(const fs::path& target, const char*& mimetype)
 {
     if (target == "binary.zip") {
 		mimetype = "application/zip";
@@ -532,7 +554,7 @@ bool isValidTarget(const fs::path& target, const char*& mimetype)
 	}
 }
 
-fs::path make(const fs::path& dir, const fs::path& target)
+static fs::path make(const fs::path& dir, const fs::path& target)
 {
     std::stringstream ss;
     ss << "make -C " << dir << " " << target;
@@ -634,7 +656,7 @@ int FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connecti
  * by the server.
  */
 
-int FaustServer::answerGET ( struct MHD_Connection* connection, const char* url )
+int FaustServer::answerGET(struct MHD_Connection* connection, const char* url)
 {
 //        TArgs args;
 //        MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
@@ -751,7 +773,6 @@ int FaustServer::answerPOST(struct MHD_Connection* connection,
         con_info->answercode = MHD_HTTP_OK;
         con_info->answerstring = errorpage;
 
-
         *con_cls = (void*)con_info;
 
         return MHD_YES;
@@ -854,13 +875,13 @@ int FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const 
 }
 
 FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory, const fs::path& logfile)
-    : 	port_(port),
-        max_clients_(max_clients),
-        directory_(directory),
-        makefile_directory_(makefile_directory),
-        logfile_(logfile),
-        daemon_(0),
-        targets("")
+                        : port_(port),
+                        max_clients_(max_clients),
+                        directory_(directory),
+                        makefile_directory_(makefile_directory),
+                        logfile_(logfile),
+                        daemon_(0),
+                        targets("")
 {
     // create a string containing the list possible targets by scanning the makefile directory. The list is
     // JSON formatted :   { "os1" : ["arch11", "arch12", ...],  "os2" : ["arch21", "arch22", ...], ...}
