@@ -13,7 +13,9 @@ The goal of this project is to create a client that communicates with a FaustWeb
 
 ## Options
 
-The compiled binary is : faustwebclient [-service] [-url <...>] [-platform <...>] [-target <...>] file.dsp
+faustwebclient is used with the following command:  
+
+`faustwebclient [-service] [-url <...>] [-platform <...>] [-target <...>] file.dsp`
 
 The following options are available: 
 
