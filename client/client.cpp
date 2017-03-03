@@ -31,25 +31,31 @@
 
 using namespace std;
 
-inline long lopt(char* argv[], const char* name, long def)
+static inline long lopt(char* argv[], const char* name, long def)
 {
-    int	i;
+    int i;
     for (i = 0; argv[i]; i++) if (!strcmp(argv[i], name)) return atoi(argv[i+1]);
     return def;
 }
 
-inline bool isopt(char* argv[], const char* name)
+static inline bool isopt(char* argv[], const char* name)
 {
-    int	i;
+    int i;
     for (i = 0; argv[i]; i++) if (!strcmp(argv[i], name)) return true;
     return false;
 }
 
-inline const char* lopts(char* argv[], const char* name, const char* def)
+static inline const char* lopts(char* argv[], const char* name, const char* def)
 {
-    int	i;
+    int i;
     for (i = 0; argv[i]; i++) if (!strcmp(argv[i], name)) return argv[i+1];
     return def;
+}
+
+static inline string getExtension(const string& str)
+{
+    size_t pos = str.rfind('.');
+    return (pos != string::npos) ? str.substr(pos) : "";
 }
 
 int main(int argc, char** argv)
@@ -61,16 +67,25 @@ int main(int argc, char** argv)
     string url = lopts(argv, "-url", "http://faustservice.grame.fr");
     string platform = lopts(argv, "-platform", "osx");
     string target = lopts(argv, "-target", "coreaudio-qt");
+    string type = lopts(argv, "-type", "binary.zip");
     bool is_service = isopt(argv, "-service");
     bool is_help1 = isopt(argv, "-help");
     bool is_help2 = isopt(argv, "-h");
     
+    if (type != "binary.zip"
+        && type != "binary.apk"
+        && type != "src.cpp") {
+        cout << "-type parameter is incorrect: use binary.zip, binary.apk or src.cpp\n";
+        return 0;
+    }
+    
     if (is_help1 || is_help2) {
-        cout << "faustwebclient [-service] [-url <...>] [-platform <...>] [-target <...>] <file.dsp>\n";
+        cout << "faustwebclient [-service] [-url <...>] [-platform <...>] [-target <...>] [-type <binary.zip, binary.apk, src.cpp>] <file.dsp>\n";
         cout << "Use '-service' to print all available platform/targets on the service URL (default 'http://faustservice.grame.fr')\n";
         cout << "Use '-url' to specify service URL (default 'http://faustservice.grame.fr')\n";
         cout << "Use '-platform' to specify compilation platform\n";
         cout << "Use '-target' to specify compilation target for the chosen platform\n";
+        cout << "Use '-type' to specify type of result file: binary.zip, binary.apk or src.cpp (default 'binary.zip')\n";
         return 0;
     }
   
@@ -96,12 +111,13 @@ int main(int argc, char** argv)
     cout << "Service url : " << url << endl;
     cout << "Platform : " << platform << endl;
     cout << "Target : " << target << endl;
+    cout << "Result type : " << type << endl;
     cout << "File : " << file << endl;
     cout << "===========================================" << endl;
 
     if (fw_get_shakey_from_file(url, file, key, err)) {
     	cout << "SHAKey is " << key << endl;
-        if (fw_get_file_from_shakey(url, key, platform, target, "binary.zip", file + ".zip", err)) {
+        if (fw_get_file_from_shakey(url, key, platform, target, type, file + getExtension(type), err)) {
             cout << "File correctly written " << endl;
         } else {
             cout << err << endl;

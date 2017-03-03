@@ -53,7 +53,7 @@ using namespace std;
  * Various responses to GET requests
  */
 
-extern bool			gAnyOrigin;		// when true adds Access-Control-Allow-Origin to http answers
+extern bool	gAnyOrigin;		// when true adds Access-Control-Allow-Origin to http answers
 
 #define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
 
@@ -700,16 +700,16 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
 	}
     
     // Analyze possible cases of errors
-    if (! isValidTarget(target, mimetype)) {
+    if (!isValidTarget(target, mimetype)) {
     	std::cerr << "Error : not a valid target " << target << " in raw_url " << raw_url << std::endl;
         return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
-	} else if ( ! fs::is_regular_file(makefile) ) {
+	} else if (!fs::is_regular_file(makefile)) {
 		std::cerr << "Error : No makefile found " << " in raw_url " << raw_url << std::endl;
 		return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 	}
 
 	// we can call make
-    fs::path filename = make (fulldir, target);
+    fs::path filename = make(fulldir, target);
     
 	if (!fs::is_regular_file(filename)) {
 		std::cerr << "Error : Make Failed " << " in raw_url " << raw_url << std::endl;
