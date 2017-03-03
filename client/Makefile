@@ -1,6 +1,6 @@
 all: client.cpp main.cpp FaustWebClient.h FaustWebClient.cpp
-	g++ -I/usr/local/include -L/usr/local/lib -lcurl main.cpp FaustWebClient.cpp JsonParser.cpp -o faustwebtest
-	g++ -I/usr/local/include -L/usr/local/lib -lcurl client.cpp FaustWebClient.cpp JsonParser.cpp -o faustwebclient
+	g++ -I/usr/local/include -L/usr/local/lib main.cpp FaustWebClient.cpp JsonParser.cpp -lcurl -o faustwebtest
+	g++ -I/usr/local/include -L/usr/local/lib client.cpp FaustWebClient.cpp JsonParser.cpp -lcurl -o faustwebclient
 
 install:
 
