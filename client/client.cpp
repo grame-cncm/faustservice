@@ -60,10 +60,6 @@ static inline string getExtension(const string& str)
 
 int main(int argc, char** argv)
 {
-    string err;
-    map<string, vector<string> > targets;
-    map<string, vector<string> >::iterator it;
-    
     string url = lopts(argv, "-url", "http://faustservice.grame.fr");
     string platform = lopts(argv, "-platform", "osx");
     string target = lopts(argv, "-target", "coreaudio-qt");
@@ -89,10 +85,14 @@ int main(int argc, char** argv)
         return 0;
     }
   
+    string err;
+    
     if (is_service) {
         cout << "==========================" << endl;
         cout << "Available platform/targets" << endl;
         cout << "==========================" << endl;
+        map<string, vector<string> > targets;
+        map<string, vector<string> >::iterator it;
         bool res = fw_get_available_targets(url, targets, err);
         for (it = targets.begin(); it != targets.end(); it++) {
             cout << "Platform : " << (*it).first << endl;
@@ -104,7 +104,6 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    string key;
     string file = argv[argc - 1];
     
     cout << "===========================================" << endl;
@@ -115,6 +114,7 @@ int main(int argc, char** argv)
     cout << "File : " << file << endl;
     cout << "===========================================" << endl;
 
+    string key;
     if (fw_get_shakey_from_file(url, file, key, err)) {
     	cout << "SHAKey is " << key << endl;
         if (fw_get_file_from_shakey(url, key, platform, target, type, file + getExtension(type), err)) {

@@ -40,16 +40,15 @@ namespace po = boost::program_options;
 
 int gPort = 8888;
 int gMaxClients = 2;
+bool gAnyOrigin = true;
 
 fs::path gCurrentDirectory;			///< root directory were makefiles and sessions and log are located
 fs::path gSessionsDirectory;		///< directory where sessions are stored
 fs::path gMakefilesDirectory;		///< directory containing all the "<os>/Makefile.<architecture>[-32bits|-64bits]" makefiles
 fs::path gLogfile;					///< faustweb logfile
 
-bool gAnyOrigin = true; 
-
 // Processes command line arguments using boost/parse_options
-void process_cmdline(int argc, char* argv[])
+static void process_cmdline(int argc, char* argv[])
 {
     po::options_description desc("faustserver program options.");
     desc.add_options()
@@ -93,28 +92,31 @@ void process_cmdline(int argc, char* argv[])
 
 int main(int argc, char* argv[], char* env[])
 {
-
     // Set the various default paths
     gCurrentDirectory = fs::absolute(fs::current_path());
     gMakefilesDirectory = gCurrentDirectory / "makefiles";
     gSessionsDirectory = gCurrentDirectory / "sessions";
 
-    process_cmdline(argc, argv);
+    try {
+        process_cmdline(argc, argv);
+    } catch (...) {
+        cerr << "Unknown parameter" << endl;
+        exit(1);
+    }
 
-    std::cerr 	<< "faustweb starting "
-                << " port:" << gPort
-                << " directory:" << gCurrentDirectory
-                << std::endl;
+    std::cerr << "faustweb starting "
+            << " port:" << gPort
+            << " directory:" << gCurrentDirectory
+            << std::endl;
 
-    // print running environment
+    // Print running environment
     std::cerr << "\n\nBEGIN ENVIRONMENT" << std::endl;
-    for (int i=0; env[i]!=0; i++) {
+    for (int i = 0; env[i] != 0; i++) {
         std::cerr << env[i] << std::endl;
     }
     std::cerr << "END ENVIRONMENT\n" << std::endl;
 
-
-    // check for ".../makefiles/" directory
+    // Check for ".../makefiles/" directory
     if (is_directory(gMakefilesDirectory)) {
         std::cerr << "Makefiles directory available at path " << gMakefilesDirectory << std::endl;
     } else {
@@ -122,7 +124,7 @@ int main(int argc, char* argv[], char* env[])
         exit(1);
     }
 
-    // if needed creates ".../sessions/" directory
+    // If needed creates ".../sessions/" directory
     if (create_directory(gSessionsDirectory)) {
         std::cerr << "Create \"sessions\" directory at path " << gSessionsDirectory << std::endl;
     } else {
@@ -142,8 +144,8 @@ int main(int argc, char* argv[], char* env[])
     std::cerr << "type ctrl-c to quit" << std::endl;
     
     while (true) {
-        // we never stop the server
-		sleep(30);
+        // We never stop the server
+        sleep(30);
     }
     return 0;
 }

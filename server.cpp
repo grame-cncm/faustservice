@@ -53,100 +53,100 @@ using namespace std;
  * Various responses to GET requests
  */
 
-extern bool	gAnyOrigin;		// when true adds Access-Control-Allow-Origin to http answers
+extern bool gAnyOrigin;		// when true adds Access-Control-Allow-Origin to http answers
 
 #define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
 
-string askpage_head = "<html><body>\n\
+static string askpage_head = "<html><body>\n\
                        Upload a Faust file, please.<br>\n\
                        There are ";
 
-string askpage_tail = " clients uploading at the moment.<br>\n\
+static string askpage_tail = " clients uploading at the moment.<br>\n\
                        <form action=\"/filepost\" method=\"post\" enctype=\"multipart/form-data\">\n\
                        <input name=\"file\" type=\"file\">\n\
                        <input type=\"submit\" value=\" Send \"></form>\n\
                        </body></html>";
 
-string cannotcompile =
+static string cannotcompile =
     "<html><body>Could not execute the provided DSP program for the given architecture file.</body></html>";
 
-string nosha1present =
+static string nosha1present =
     "<html><body>The given SHA1 key is not present in the directory.</body></html>";
 
-string invalidosorarchitecture =
+static string invalidosorarchitecture =
     "<html><body>You have entered either an invalid operating system, an invalid architecture, or an invalid makefile command.\
     Requests should be of the form:<br/>os/architecture/command<br/>For example:<br/>osx/csound/binary</body></html>";
 
-string invalidinstruction =
+static string invalidinstruction =
     "<html><body>The server only can generate binary, source, or svg for a given architecture.</body></html>";
 
-string busypage =
+static string busypage =
     "<html><body>This server is busy, please try again later.</body></html>";
 
-string completebuterrorpage =
+static string completebuterrorpage =
     "<html><body>The upload has been completed but your Faust file is corrupt. It has not been registered.</body></html>";
 
-string completebutmorethanoneDSPfile =
+static string completebutmorethanoneDSPfile =
     "<html><body>The upload has been completed but there is more than one DSP file in your archive. Only one is allowed..</body></html>";
 
-string completebutnoDSPfile =
+static string completebutnoDSPfile =
     "<html><body>The upload has been completed but there is no DSP file in your archive. You must have one and only one.</body></html>";
 
-string completebutdecompressionproblem =
+static string completebutdecompressionproblem =
     "<html><body>The upload has been completed but the server could not decompress the archive.</body></html>";
 
-string completebutendoftheworld =
+static string completebutendoftheworld =
     "<html><body>An internal server error of epic proportions has occurred. This likely portends the end of the world.</body></html>";
 
-string completebutnopipe =
+static string completebutnopipe =
     "<html><body>Could not create a PIPE to faust on the server.</body></html>";
 
-string completebutnohash =
+static string completebutnohash =
     "<html><body>The upload is completed but we could not generate a hash for your file.</body></html>";
 
-string completebutcorrupt_head =
+static string completebutcorrupt_head =
     "<html><body><p>The upload is completed but the file you uploaded is not a valid Faust file. \
   Make sure that it is either a file with an extension .dsp or an archive (tar.gz, tar.bz, tar \
   or zip) containing one .dsp file and potentially .lib files included by the .dsp file. \
   Furthermore, the code in these files must be valid Faust code.</p> \
   <p>Below is the STDOUT and STDERR for the Faust code you tried to compile. \
   If the two are empty, then your file structure is wrong. Otherwise, they will tell you \
-  why Faust failed.</p>"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ;
+  why Faust failed.</p>";
 
-string completebutcorrupt_tail =
+static string completebutcorrupt_tail =
     "</body></html>";
 
-string completebutalreadythere_head =
+static string completebutalreadythere_head =
     "<html><body>The upload is completed but it looks like you have already uploaded this file.<br />Here is its SHA1 key: ";
 
-string completebutalreadythere_tail =
+static string completebutalreadythere_tail =
     "<br />Use this key for all subsequent GET commands.</body></html>";
 
-string completepage_head =
+static string completepage_head =
     "<html><body>The upload is completed.<br />Here is its SHA1 key: ";
 
-string completepage_tail =
+static string completepage_tail =
     "<br />Use this key for all subsequent GET commands.</body></html>";
 
-string errorpage =
+static string errorpage =
     "<html><body>This doesn't seem to be right.</body></html>";
 
-string servererrorpage =
+static string servererrorpage =
     "<html><body>An internal server error has occured.</body></html>";
 
-string fileexistspage =
+static string fileexistspage =
     "<html><body>This file already exists.</body></html>";
 
-string debugstub =
+static string debugstub =
     "<html><body>Rien ne s'est cass&eacute; la figure. F&eacute;licitations !</body></html>";
 
 /*
  * Validates that a Faust file or archive is sane and returns 0 for success
- * or 1 for failure.  If the evaluation fails, the appropriate error message
- * is set.  More info on the con_info structure is in server.hh.
+ * or 1 for failure. If the evaluation fails, the appropriate error message
+ * is set. More info on the con_info structure is in server.hh.
  */
 
-int validate_faust(connection_info_struct *con_info)
+static int validate_faust(connection_info_struct *con_info)
 {
     fs::path tmpdir = fs::temp_directory_path() / fs::unique_path("%%%%-%%%%-%%%%-%%%%");
     fs::create_directory(tmpdir);
@@ -156,8 +156,8 @@ int validate_faust(connection_info_struct *con_info)
     std::cerr << "ENTER validate_faust for file : " << old_full_filename << std::endl;
 
     // libarchive stuff
-    struct archive *my_archive;
-    struct archive_entry *my_entry;
+    struct archive* my_archive;
+    struct archive_entry* my_entry;
 
     my_archive = archive_read_new();
     archive_read_support_filter_all(my_archive);
@@ -245,32 +245,31 @@ int validate_faust(connection_info_struct *con_info)
  * Generates an SHA-1 key for Faust file or archive.
  */
 
-string generate_sha1(connection_info_struct *con_info)
+static string generate_sha1(connection_info_struct *con_info)
 {
     fs::path filepath = fs::path(con_info->tmppath) / fs::path(con_info->filename);
     
     // read file content
     ifstream myFile (filepath.string().c_str (), ios::in | ios::binary);
-    myFile.seekg (0, ios::end);
+    myFile.seekg(0, ios::end);
     int length = myFile.tellg();
-    myFile.seekg (0, ios::beg);
+    myFile.seekg(0, ios::beg);
 
     //char content[length];
 	char* content = (char*)malloc(length);
 	if (content == 0) {
 		return "malloc-error";
 	}
-    myFile.read (content, length);
+    myFile.read(content, length);
     myFile.close();
     
     // compute SHA1 key
     unsigned char obuf[20];
     SHA1((const unsigned char*)content, length, obuf);
     
-    
 	// convert SHA1 key into hexadecimal string
     string sha1key;
-    for (int i=0; i < 20; i++) {
+    for (int i = 0; i < 20; i++) {
     	const char* H = "0123456789ABCDEF";
     	char c1 = H[ (obuf[i] >> 4) ];
     	char c2 = H[ (obuf[i] & 15) ];
@@ -285,7 +284,7 @@ string generate_sha1(connection_info_struct *con_info)
  * True if it is a .dsp or a .lib source file
  */
 
-bool isFaustFile(const fs::path& f)
+static bool isFaustFile(const fs::path& f)
 {
     fs::path x = f.extension();
     bool a = (x==".dsp") || (x==".lib");
@@ -293,16 +292,18 @@ bool isFaustFile(const fs::path& f)
     return a;
 }
 
-bool isMakefile(const fs::path& f)
+/* TO REMOVE ?
+static bool isMakefile(const fs::path& f)
 {
     return f.stem() == "Makefile";
 }
+*/
 
 /*
  * Copy all faust source files from src directory to destination directory
  */
 
-void copyFaustFiles(const fs::path& src, const fs::path& dst)
+static void copyFaustFiles(const fs::path& src, const fs::path& dst)
 {
     assert(is_directory(src));
     assert(is_directory(dst));
@@ -319,7 +320,7 @@ void copyFaustFiles(const fs::path& src, const fs::path& dst)
  * Creates an arboreal structure in root with the appropriate makefiles.
  */
 
-void create_file_tree(fs::path sha1path, fs::path makefile_directory)
+static void create_file_tree(fs::path sha1path, fs::path makefile_directory)
 {
     //std::cerr << "ENTER create_file_tree(" << sha1path << ", " << makefile_directory << ")" << std::endl;
     fs::directory_iterator end_iter;
@@ -352,7 +353,7 @@ void create_file_tree(fs::path sha1path, fs::path makefile_directory)
  */
 
 // TODO: merge with validate function if possible...
-int make_initial_faust_directory(connection_info_struct *con_info, string sha1)
+static int make_initial_faust_directory(connection_info_struct *con_info, string sha1)
 {
     fs::path sha1path = fs::path(con_info->directory) / fs::path(sha1);
     if (! fs::is_directory(sha1path)) {
@@ -364,8 +365,8 @@ int make_initial_faust_directory(connection_info_struct *con_info, string sha1)
         fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
 
         // libarchive stuff
-        struct archive *my_archive;
-        struct archive_entry *my_entry;
+        struct archive* my_archive;
+        struct archive_entry* my_entry;
 
         my_archive = archive_read_new();
         archive_read_support_filter_all(my_archive);
@@ -402,7 +403,7 @@ int make_initial_faust_directory(connection_info_struct *con_info, string sha1)
         // create the architecture-specific folders
         create_file_tree(sha1path, fs::path(con_info->makefile_directory));
 
-        std::cerr << "EXIT make_initial_faust_directory(" << con_info << ", " << sha1 << std::endl;
+        std::cerr << "EXIT make_initial_faust_directory" << con_info << ", " << sha1 << std::endl;
     }
     con_info->answerstring = sha1;
     //con_info->answerstring = completepage_head + sha1 + completepage_tail;
@@ -415,7 +416,8 @@ int make_initial_faust_directory(connection_info_struct *con_info, string sha1)
  * should investigate further...
  */
 
-int pathsize(fs::path path, int n = 0)
+/* TO REMOVE ?
+static int pathsize(fs::path path, int n = 0)
 {
     if (path.string()=="/" || path.string()=="." || path.string()=="") {
         return n;
@@ -423,13 +425,14 @@ int pathsize(fs::path path, int n = 0)
 
     return pathsize(path.parent_path(), n+1);
 }
+*/
 
 /*
- * Callback that puts GET parameters in a TArgs.  The TArgs typedef is defined
+ * Callback that puts GET parameters in a TArgs. The TArgs typedef is defined
  * in utilities.hh.
  */
 
-int FaustServer::get_params(void *cls, enum MHD_ValueKind, const char *key, const char *data)
+int FaustServer::get_params(void* cls, enum MHD_ValueKind, const char* key, const char* data)
 {
     TArgs* args = (TArgs*)cls;
     args->insert(pair<string, string> (string(key), string(data)));
@@ -441,8 +444,8 @@ int FaustServer::get_params(void *cls, enum MHD_ValueKind, const char *key, cons
  * is effectuated.
  */
 
-int FaustServer::send_page(struct MHD_Connection *connection, const char *page, int length,
-                           int status_code, const char * type = 0)
+int FaustServer::send_page(struct MHD_Connection* connection, const char* page, int length,
+                           int status_code, const char*  type = 0)
 {
     struct MHD_Response* response = MHD_create_response_from_buffer(length, (void*)page, MHD_RESPMEM_MUST_COPY);
     
@@ -464,17 +467,18 @@ int FaustServer::send_page(struct MHD_Connection *connection, const char *page, 
 /**
 * Handler used to generate a 404 reply.
 *
-* @param cls a ’const char *’ with the HTML webpage to return
+* @param cls a ’const char* ’ with the HTML webpage to return
 * @param mime mime type to use
 * @param session session handle
 * @param connection connection to use
 */
-static int page_not_found (struct MHD_Connection *connection, const char* page, int length, const char* mimetype)
+
+static int page_not_found (struct MHD_Connection* connection, const char* page, int length, const char* mimetype)
 {
-	struct MHD_Response* response = MHD_create_response_from_buffer (length, (void*)page, MHD_RESPMEM_MUST_COPY);
-	int ret = MHD_queue_response (connection, MHD_HTTP_NOT_FOUND, response);
-	MHD_add_response_header (response, MHD_HTTP_HEADER_CONTENT_ENCODING, mimetype);
-	MHD_destroy_response (response);
+	struct MHD_Response* response = MHD_create_response_from_buffer(length, (void*)page, MHD_RESPMEM_MUST_COPY);
+	int ret = MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, response);
+	MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_ENCODING, mimetype);
+	MHD_destroy_response(response);
 	return ret;
 }
 
@@ -485,8 +489,8 @@ static int page_not_found (struct MHD_Connection *connection, const char* page, 
  * this is called after every chunk.
  */
 
-void FaustServer::request_completed(void *cls, struct MHD_Connection *connection,
-                                    void **con_cls, enum MHD_RequestTerminationCode toe)
+void FaustServer::request_completed(void* cls, struct MHD_Connection* connection,
+                                    void** con_cls, enum MHD_RequestTerminationCode toe)
 {
     std::cerr << "FaustServer::request_completed()" << endl;
 
@@ -501,12 +505,12 @@ void FaustServer::request_completed(void *cls, struct MHD_Connection *connection
 				nr_of_uploading_clients--;
 			}
 			if (con_info->fp != 0) {
-				fclose(con_info->fp);
-				con_info->fp = 0;
+                fclose(con_info->fp);
+                con_info->fp = 0;
 			}
 		}
 
-		free(con_info);
+		delete con_info;
 	}
 }
 
@@ -571,14 +575,14 @@ static fs::path make(const fs::path& dir, const fs::path& target)
  * Function that sends a file in response to a GET
  */
 
-int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& filepath, const char* mimetype)
+int FaustServer::send_file(struct MHD_Connection* connection, const fs::path& filepath, const char* mimetype)
 {
     struct stat sbuf;
-    int 		fd;
+    int fd;
 
     std::cerr << __LINE__ << " ENTER send_file : " << filepath << endl;
 
-    if ( (-1 == (fd = open (filepath.string().c_str(), O_RDONLY))) || (0 != fstat (fd, &sbuf)) ) {
+    if ((-1 == (fd = open(filepath.string().c_str(), O_RDONLY))) || (0 != fstat (fd, &sbuf))) {
         std::cerr << __LINE__  << " error accessing file : " << filepath << endl;
         return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     }
@@ -589,8 +593,8 @@ int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& fi
         return MHD_NO;
     }
 
-    MHD_add_response_header (response, "Content-Type", mimetype);
-    MHD_add_response_header (response, "Content-Location", filepath.filename().string().c_str());
+    MHD_add_response_header(response, "Content-Type", mimetype);
+    MHD_add_response_header(response, "Content-Location", filepath.filename().string().c_str());
     int ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
     if (ret == MHD_YES) {
     	std::cerr << __LINE__ << " MHD_queue_response() return MHD_YES " << endl;
@@ -605,7 +609,7 @@ int FaustServer::send_file(struct MHD_Connection *connection, const fs::path& fi
 
 // Start the Faust server - shallow wrapper around MHD_start_daemon
 
-static void panicCallback(void *cls, const char *file, unsigned int line, const char *reason)
+static void panicCallback(void* cls, const char* file, unsigned int line, const char* reason)
 {
 	cerr << "PANIC " << line << ':' << file << ' ' << reason << endl;
 }
@@ -613,9 +617,10 @@ static void panicCallback(void *cls, const char *file, unsigned int line, const 
 bool FaustServer::start()
 {
 	MHD_set_panic_func(&panicCallback, NULL);
-	
+  	
     daemon_ = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, port_, NULL, NULL,
                                &answer_to_connection, this,
+                               MHD_OPTION_THREAD_POOL_SIZE, max_clients_,      // Experimental multi-threaded support...
                                MHD_OPTION_NOTIFY_COMPLETED, request_completed,
                                NULL, MHD_OPTION_END);
     return daemon_ != NULL;
@@ -637,13 +642,13 @@ void FaustServer::stop()
  * by the server.
  */
 
-int FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connection,
-                                      const char *url, const char *method,
-                                      const char *version, const char *upload_data,
-                                      size_t *upload_data_size, void **con_cls)
+int FaustServer::answer_to_connection(void* cls, struct MHD_Connection* connection,
+                                      const char* url, const char* method,
+                                      const char* version, const char* upload_data,
+                                      size_t* upload_data_size, void** con_cls)
 {
     std::cerr << "FaustServer::answer_to_connection(" << url << ", " << method  << ", " << version << ")" << std::endl;
-    FaustServer *server = (FaustServer*)cls;
+    FaustServer* server = (FaustServer*)cls;
     if (server == 0) {
         std::cerr << "REAL BAD ERROR, NO SERVER !!!" << std::endl;
         exit(1);
@@ -658,8 +663,8 @@ int FaustServer::answer_to_connection(void *cls, struct MHD_Connection *connecti
 
 int FaustServer::answerGET(struct MHD_Connection* connection, const char* url)
 {
-//        TArgs args;
-//        MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
+    // TArgs args;
+    // MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
     std::cerr << "answerGET " << url << std::endl;
     if (/*!args.size() &&*/ strcmp(url, "/") == 0) {
         stringstream ss;
@@ -715,7 +720,7 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
 		std::cerr << "Error : Make Failed " << " in raw_url " << raw_url << std::endl;
 		return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 	} else {
-		if (! precompile) {
+		if (!precompile) {
 			return send_file(connection, filename, mimetype);
 		} else {
 			return send_page(connection, "DONE", 4, MHD_HTTP_OK, "text/html");
@@ -726,7 +731,7 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
 int FaustServer::answerConnection(struct MHD_Connection* connection,
                                  const char* url, const char* method,
                                  const char* version, const char* upload_data,
-                                 size_t *upload_data_size, void **con_cls)
+                                 size_t* upload_data_size, void** con_cls)
 {
 
     if (0 == strcmp(method, "GET")) {
@@ -740,7 +745,7 @@ int FaustServer::answerConnection(struct MHD_Connection* connection,
 
 int FaustServer::answerPOST(struct MHD_Connection* connection,
                            const char* url, const char* upload_data,
-                           size_t *upload_data_size, void **con_cls)
+                           size_t* upload_data_size, void** con_cls)
 {
     if (NULL == *con_cls) {
         struct connection_info_struct* con_info;
@@ -758,12 +763,10 @@ int FaustServer::answerPOST(struct MHD_Connection* connection,
 
         con_info->fp = NULL;
 
-        con_info->postprocessor =
-            MHD_create_post_processor(connection, POSTBUFFERSIZE,
-                                      iterate_post, (void*)con_info);
+        con_info->postprocessor = MHD_create_post_processor(connection, POSTBUFFERSIZE, iterate_post, (void*)con_info);
 
         if (NULL == con_info->postprocessor) {
-            free(con_info);
+            delete con_info;
             return MHD_NO;
         }
 
@@ -784,7 +787,6 @@ int FaustServer::answerPOST(struct MHD_Connection* connection,
     if (0 != *upload_data_size) {
         int result = MHD_post_process(con_info->postprocessor, upload_data, *upload_data_size);
         *upload_data_size = 0;
-
         return result;
     } else {
         // need to close the file before request_completed
@@ -812,13 +814,13 @@ int FaustServer::answerPOST(struct MHD_Connection* connection,
  * documentation.
  */
 
-int FaustServer::iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
-                              const char *filename, const char *content_type,
-                              const char *transfer_encoding, const char *data, uint64_t off,
+int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const char* key,
+                              const char* filename, const char* content_type,
+                              const char* transfer_encoding, const char* data, uint64_t off,
                               size_t size)
 {
-    struct connection_info_struct *con_info = (connection_info_struct*)coninfo_cls;
-    FILE *fp;
+    struct connection_info_struct* con_info = (connection_info_struct*)coninfo_cls;
+    FILE* fp;
 
     std::cerr 	<< "ENTER iterate_post ("
                 << "kind : " << kind
@@ -909,7 +911,7 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
             if (V.size() > 0) {
             	std::sort(V.begin(), V.end());
             	ss << sep1 << std::endl << '"' << OSname << '"' << ": [";
-            	for (unsigned int i=0; i<V.size(); i++) { if(i>0) ss << ','; ss << '"' << V[i] << '"'; }
+            	for (unsigned int i = 0; i < V.size(); i++) { if (i > 0) ss << ','; ss << '"' << V[i] << '"'; }
             	ss << ']';
             	sep1 = ',';
             }
