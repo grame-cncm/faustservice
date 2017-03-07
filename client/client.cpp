@@ -114,6 +114,8 @@ int main(int argc, char** argv)
     cout << "File : " << file << endl;
     cout << "===========================================" << endl;
 
+    /*
+    // Two steps access: first get the SHAKey, then get the file
     string key;
     if (fw_get_shakey_from_file(url, file, key, err)) {
     	cout << "SHAKey is " << key << endl;
@@ -124,6 +126,15 @@ int main(int argc, char** argv)
         }
     } else {
         cout << "Bad request" << endl;
+    }
+    */
+    
+    // One step access
+    string key;
+    if (fw_export_file(url, file, platform, target, type, file + getExtension(type), err)) {
+        cout << "File correctly written " << endl;
+    } else {
+        cout << err << endl;
     }
 
     return 0;

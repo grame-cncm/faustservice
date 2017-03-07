@@ -562,6 +562,18 @@ static fs::path make(const fs::path& dir, const fs::path& target)
 {
     std::stringstream ss;
     ss << "make -C " << dir << " " << target;
+   
+    FILE* fp = popen(ss.str().c_str(), "r");
+    if (fp) {
+        getc(fp);
+        pclose(fp);
+        return dir/target;
+    } else  {
+        std::cerr << __LINE__  << " makefile " << dir/target << " failed !!!" << std::endl;
+        return "";
+    }
+
+    /*
     std::cerr << ss.str() << std::endl;
     if ( 0 == system(ss.str().c_str()) ) {
         return dir/target;
@@ -569,6 +581,7 @@ static fs::path make(const fs::path& dir, const fs::path& target)
         std::cerr << __LINE__  << " makefile " << dir/target << " failed !!!" << std::endl;
         return "";
     }
+    */
 }
 
 /*
@@ -751,7 +764,7 @@ int FaustServer::answerPOST(struct MHD_Connection* connection,
         struct connection_info_struct* con_info;
 
         if (nr_of_uploading_clients >= this->getMaxClients()) {
-            return send_page(connection, busypage.c_str (), busypage.size (), MHD_HTTP_SERVICE_UNAVAILABLE, "text/html");
+            return send_page(connection, busypage.c_str(), busypage.size(), MHD_HTTP_SERVICE_UNAVAILABLE, "text/html");
         }
 
         con_info = new connection_info_struct();
@@ -762,7 +775,6 @@ int FaustServer::answerPOST(struct MHD_Connection* connection,
         con_info->makefile_directory = this->getMakefileDirectory().string();
 
         con_info->fp = NULL;
-
         con_info->postprocessor = MHD_create_post_processor(connection, POSTBUFFERSIZE, iterate_post, (void*)con_info);
 
         if (NULL == con_info->postprocessor) {

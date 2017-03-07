@@ -28,7 +28,7 @@
 
 #include <sstream>
 #include <iostream>
-#include <fstream> 
+#include <fstream>
 #include <curl/curl.h>
 
 using namespace std;
@@ -84,7 +84,7 @@ static size_t store_Response(void* buf, size_t size, size_t nmemb, void* userp)
 }
 
 // Standard Callback to store a server response in file
-static size_t store_File(void *ptr, size_t size, size_t nmemb, FILE *stream)
+static size_t store_File(void* ptr, size_t size, size_t nmemb, FILE* stream)
 {
     return fwrite(ptr, size, nmemb, stream);
 }
@@ -144,7 +144,7 @@ bool fw_export_string(const string& url, const string& name,
                     const string& output_file, 
                     string& error)
 {
-    string key("");
+    string key;
     
     if (fw_get_shakey_from_string(url, name, code, key, error)) {
         return fw_get_file_from_shakey(url, key, os, architecture, output_type, output_file, error);
@@ -189,7 +189,7 @@ bool fw_get_shakey_from_string(const string& url, const string& name, const stri
     string h1 = "Content-Type: multipart/form-data; boundary=" + boundary;
     stringstream h2; h2 << "Content-Length:" << data.length();
 
-    struct curl_slist *headers=NULL;
+    struct curl_slist* headers = NULL;
     headers = curl_slist_append(headers, h1.c_str());
     headers = curl_slist_append(headers, h2.str().c_str());
     

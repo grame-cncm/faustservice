@@ -32,9 +32,8 @@
 
 /* Access to FaustWeb service - Requests the supported platforms and architecture of a FaustWeb service
  * 
- *
- * @param url - FaustWeb server URL 
-  * @param targets - Associates a platform with a vector of available architectures
+ * @param url - FaustWeb server URL
+ * @param targets - Associates a platform with a vector of available architectures
  * @param error - In case the research fails, the error is filled
  *
  * @return true if no error was encountered
@@ -43,7 +42,7 @@ bool fw_get_available_targets(const std::string& url, std::map<std::string, std:
 
 //---------------------EXPORT IN 1 FUNCTION CALL
 
-/* Access to FaustWeb service - Upload your Faust application given a sourcefile, an operating system and an architecture
+/* Access to FaustWeb service - Get the Faust application given a sourcefile, an operating system and an architecture
  *
  * @param url - FaustWeb server URL
  * @param filename - Faust source file
@@ -57,7 +56,7 @@ bool fw_get_available_targets(const std::string& url, std::map<std::string, std:
  */
 bool fw_export_file(const std::string& url, const std::string& filename, const std::string& os, const std::string& architecture, const std::string& output_type, const std::string& output_file, std::string& error);
 
-/* Access to FaustWeb service - Upload your Faust application given a program name, a program, an operating system and an architecture
+/* Access to FaustWeb service - Get the Faust application given a program name, a program, an operating system and an architecture
  *
  * @param url - FaustWeb server URL
  * @param name - Name of the program you compile
@@ -74,7 +73,7 @@ bool fw_export_string(const std::string& url, const std::string& name, const std
 
 //---------------------EXPORT DIVIDED IN 2 FUNCTION CALLS
 
-/* Access to FaustWeb service - Post your Faust file and get the corresponding SHA-Key
+/* Access to FaustWeb service - Post the Faust DSP as a file and get the corresponding SHA-Key
  *
  * @param url - FaustWeb server URL
  * @param file - Faust source file
@@ -85,7 +84,7 @@ bool fw_export_string(const std::string& url, const std::string& name, const std
  */
 bool fw_get_shakey_from_file(const std::string& url, const std::string& file, std::string& key, std::string& error);
 
-/* Access to FaustWeb service - Post your Faust program and get the corresponding SHA-Key
+/* Access to FaustWeb service - Post the Faust DSP as a string and get the corresponding SHA-Key
  *
  * @param url - FaustWeb server URL
  * @param name - Name of the program you compile
@@ -97,7 +96,7 @@ bool fw_get_shakey_from_file(const std::string& url, const std::string& file, st
  */
 bool fw_get_shakey_from_string(const std::string& url, const std::string& name, const std::string& pgm, std::string& key, std::string& error);
 
-/* Access to FaustWeb service - Upload your Faust application given the SHA-Key, an operating system and an architecture
+/* Access to FaustWeb service - Get your Faust application given the SHA-Key, an operating system and an architecture
  *
  *  Multiple requests can be sent with the same SHA-Key
  *
