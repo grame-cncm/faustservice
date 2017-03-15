@@ -23,8 +23,8 @@
  ************************************************************************
  ************************************************************************/
 
-#ifndef _UTILITIES_
-#define _UTILITIES_
+#ifndef SIMPLEPARSER_H
+#define SIMPLEPARSER_H
 
 #include <map>
 #include <vector>
@@ -32,11 +32,16 @@
 
 using namespace std;
 
-#define POSTBUFFERSIZE 512
+bool parseOperatingSystemsList(const char*& p, vector<string>& platforms, map<string, vector<string> >& M);
 
-#define GET 0
-#define POST 1
+// ------------------------- implementation ------------------------------
+bool parseOperatingSystem(const char*& p, string& os, vector<string>& al);
+bool parseArchitecturesList(const char*& p, vector<string>& v);
 
-typedef map<string, string> TArgs;
+void skipBlank(const char*& p);
+bool parseError(const char*& p, const char* errmsg );
+bool tryChar(const char*& p, char x);
+bool parseChar(const char*& p, char x);
+bool parseString(const char*& p, string& s);
 
-#endif
+#endif // SIMPLEPARSER_H

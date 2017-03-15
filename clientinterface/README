@@ -1,7 +1,0 @@
-
-======================== FAUST WEB INTERFACE ======================
-
-The goal of this project is to create an interface that communicates with a FaustWeb compilation service, to export Faust programs as binary applications or plugins.
-
-
-DEPENDENCY : libcurl --> http://curl.haxx.se/libcurl/

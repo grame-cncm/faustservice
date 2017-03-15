@@ -1,8 +1,32 @@
+/************************************************************************
+ FAUST Architecture File
+ Copyright (C) 2017 GRAME, Centre National de Creation Musicale
+ ---------------------------------------------------------------------
+ This Architecture section is free software; you can redistribute it
+ and/or modify it under the terms of the GNU General Public License
+ as published by the Free Software Foundation; either version 3 of
+ the License, or (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program; If not, see <http://www.gnu.org/licenses/>.
+ 
+ EXCEPTION : As a special exception, you may create a larger work
+ that contains this FAUST architecture section and distribute
+ that work under terms of your choice, so long as this FAUST
+ architecture section is not modified.
+ 
+ ************************************************************************
+ ************************************************************************/
+
 #include <sys/stat.h>
 #include <iostream>
 
 #include <boost/filesystem.hpp>
-
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
@@ -16,16 +40,15 @@ namespace po = boost::program_options;
 
 int gPort = 8888;
 int gMaxClients = 2;
+bool gAnyOrigin = true;
 
 fs::path gCurrentDirectory;			///< root directory were makefiles and sessions and log are located
 fs::path gSessionsDirectory;		///< directory where sessions are stored
 fs::path gMakefilesDirectory;		///< directory containing all the "<os>/Makefile.<architecture>[-32bits|-64bits]" makefiles
 fs::path gLogfile;					///< faustweb logfile
 
-bool gAnyOrigin = true; 
-
 // Processes command line arguments using boost/parse_options
-void process_cmdline(int argc, char* argv[])
+static void process_cmdline(int argc, char* argv[])
 {
     po::options_description desc("faustserver program options.");
     desc.add_options()
@@ -69,28 +92,31 @@ void process_cmdline(int argc, char* argv[])
 
 int main(int argc, char* argv[], char* env[])
 {
-
     // Set the various default paths
     gCurrentDirectory = fs::absolute(fs::current_path());
     gMakefilesDirectory = gCurrentDirectory / "makefiles";
     gSessionsDirectory = gCurrentDirectory / "sessions";
 
-    process_cmdline(argc, argv);
+    try {
+        process_cmdline(argc, argv);
+    } catch (...) {
+        cerr << "Unknown parameter" << endl;
+        exit(1);
+    }
 
-    std::cerr 	<< "faustweb starting "
-                << " port:" << gPort
-                << " directory:" << gCurrentDirectory
-                << std::endl;
+    std::cerr << "faustweb starting "
+            << " port:" << gPort
+            << " directory:" << gCurrentDirectory
+            << std::endl;
 
-    // print running environment
+    // Print running environment
     std::cerr << "\n\nBEGIN ENVIRONMENT" << std::endl;
-    for (int i=0; env[i]!=0; i++) {
+    for (int i = 0; env[i] != 0; i++) {
         std::cerr << env[i] << std::endl;
     }
     std::cerr << "END ENVIRONMENT\n" << std::endl;
 
-
-    // check for ".../makefiles/" directory
+    // Check for ".../makefiles/" directory
     if (is_directory(gMakefilesDirectory)) {
         std::cerr << "Makefiles directory available at path " << gMakefilesDirectory << std::endl;
     } else {
@@ -98,7 +124,7 @@ int main(int argc, char* argv[], char* env[])
         exit(1);
     }
 
-    // if needed creates ".../sessions/" directory
+    // If needed creates ".../sessions/" directory
     if (create_directory(gSessionsDirectory)) {
         std::cerr << "Create \"sessions\" directory at path " << gSessionsDirectory << std::endl;
     } else {
@@ -118,17 +144,8 @@ int main(int argc, char* argv[], char* env[])
     std::cerr << "type ctrl-c to quit" << std::endl;
     
     while (true) {
-        // we never stop the server
-		sleep(30);
+        // We never stop the server
+        sleep(30);
     }
-//    std::cerr << "waiting for a character to end" << std::endl;
-//    getchar();
-//    
-//    std::cerr << "character typed, we are going to stop the webserver" << std::endl;
-//
-//    server.stop();
-//    
-//    std::cerr << "webserver stopped, we exit !" << std::endl;
-
     return 0;
 }
