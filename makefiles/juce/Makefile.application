@@ -11,4 +11,4 @@ binary.zip : $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=)
 
 src.cpp : $(faustfile)
-	faust -i -a juce.cpp $(faustfile) -o src.cpp
+	faust -i -a juce-standalone.cpp $(faustfile) -o src.cpp

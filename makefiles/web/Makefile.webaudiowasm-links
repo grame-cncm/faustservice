@@ -8,7 +8,7 @@ faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
 	faust2webaudiowasm -links -svg $(faustfile)
-	zip -r binary.zip $(faustfile:.dsp=.html) $(faustfile:.dsp=-svg) $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=.html) $(faustfile:.dsp=-svg) $(faustfile:.dsp=.wasm) $(faustfile) 
 
 src.cpp : $(faustfile)
 	faust -lang wasm -i -a webaudio/webaudio-wasm-standalone-wrapper.js $(faustfile) -o src.wasm

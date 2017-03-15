@@ -1,9 +1,34 @@
-#include "FaustWebInterface.h"
+/************************************************************************
+ FAUST Architecture File
+ Copyright (C) 2017 GRAME, Centre National de Creation Musicale
+ ---------------------------------------------------------------------
+ This Architecture section is free software; you can redistribute it
+ and/or modify it under the terms of the GNU General Public License
+ as published by the Free Software Foundation; either version 3 of
+ the License, or (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program; If not, see <http://www.gnu.org/licenses/>.
+ 
+ EXCEPTION : As a special exception, you may create a larger work
+ that contains this FAUST architecture section and distribute
+ that work under terms of your choice, so long as this FAUST
+ architecture section is not modified.
+ 
+ ************************************************************************
+ ************************************************************************/
+
+#include "FaustWebClient.h"
 #include "JsonParser.h"
 
 #include <sstream>
 #include <iostream>
-#include <fstream> 
+#include <fstream>
 #include <curl/curl.h>
 
 using namespace std;
@@ -59,18 +84,16 @@ static size_t store_Response(void* buf, size_t size, size_t nmemb, void* userp)
 }
 
 // Standard Callback to store a server response in file
-static size_t store_File(void *ptr, size_t size, size_t nmemb, FILE *stream)
+static size_t store_File(void* ptr, size_t size, size_t nmemb, FILE* stream)
 {
     return fwrite(ptr, size, nmemb, stream);
 }
 
 // Access to FaustWeb service - Sends a request to faustweb compilation service to know platforms and architecture supported by this
-bool fw_get_available_targets(const string& url, map<string, vector<string> >& targets, string& error){
-    
+bool fw_get_available_targets(const string& url, map<string, vector<string> >& targets, string& error)
+{
     string finalURL = url + "/targets";
-    
-    CURL *curl = curl_easy_init();
-    
+    CURL* curl = curl_easy_init();
     bool isInitSuccessfull = false;
     
     if (curl) {
@@ -81,7 +104,7 @@ bool fw_get_available_targets(const string& url, map<string, vector<string> >& t
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &store_Response);
         curl_easy_setopt(curl, CURLOPT_FILE, &oss);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 60); 
-        curl_easy_setopt(curl,CURLOPT_TIMEOUT, 600);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 600);
         
         CURLcode res = curl_easy_perform(curl);
         
@@ -119,9 +142,9 @@ bool fw_export_string(const string& url, const string& name,
                     const string& architecture, 
                     const string& output_type, 
                     const string& output_file, 
-                    string& error) {
-
-    string key("");
+                    string& error)
+{
+    string key;
     
     if (fw_get_shakey_from_string(url, name, code, key, error)) {
         return fw_get_file_from_shakey(url, key, os, architecture, output_type, output_file, error);
@@ -137,8 +160,8 @@ bool fw_export_file(const string& url,
                     const string& architecture, 
                     const string& output_type, 
                     const string& output_file, 
-                    string& error) {
-
+                    string& error)
+{
 	string base = basename((char*)filename.c_str());
     size_t pos = base.find(".dsp");
            
@@ -151,10 +174,9 @@ bool fw_export_file(const string& url,
 }
 
 // Access to FaustWeb service - Post your faust file and get a corresponding SHA-Key
-bool fw_get_shakey_from_string(const string& url, const string& name, const string& code, string& key, string& error){
-
-    CURL *curl = curl_easy_init();
-    
+bool fw_get_shakey_from_string(const string& url, const string& name, const string& code, string& key, string& error)
+{
+    CURL* curl = curl_easy_init();
     string boundary = "87142694621188";
     
     string data = "--" + boundary + "\r\n";
@@ -167,7 +189,7 @@ bool fw_get_shakey_from_string(const string& url, const string& name, const stri
     string h1 = "Content-Type: multipart/form-data; boundary=" + boundary;
     stringstream h2; h2 << "Content-Length:" << data.length();
 
-    struct curl_slist *headers=NULL;
+    struct curl_slist* headers = NULL;
     headers = curl_slist_append(headers, h1.c_str());
     headers = curl_slist_append(headers, h2.str().c_str());
     
@@ -181,8 +203,8 @@ bool fw_get_shakey_from_string(const string& url, const string& name, const stri
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &store_Response);
         curl_easy_setopt(curl, CURLOPT_FILE, &oss);
-        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT , 60); 
-        curl_easy_setopt(curl,CURLOPT_TIMEOUT, 600);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 60);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 600);
         curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
             
@@ -211,8 +233,8 @@ bool fw_get_shakey_from_string(const string& url, const string& name, const stri
     return isInitSuccessfull;
 }
 
-bool fw_get_shakey_from_file(const string& url, const string& filename, string& key, string& error) {
-		
+bool fw_get_shakey_from_file(const string& url, const string& filename, string& key, string& error)
+{
 	string base = basename((char*)filename.c_str());
     size_t pos = base.find(".dsp");
 
@@ -231,15 +253,15 @@ bool fw_get_file_from_shakey(const string& url,
                             const string& architecture, 
                             const string& output_type, 
                             const string& output_file, 
-                            string& error) {
-    
+                            string& error)
+{
     bool isInitSuccessfull = false;
     string finalURL = url + "/" + key + "/" + os + "/" + architecture + "/" + output_type;
     FILE* file = fopen(output_file.c_str(), "w");
     
     if (file) {
         
-        CURL *curl = curl_easy_init();
+        CURL* curl = curl_easy_init();
         
         if (curl) {
             
