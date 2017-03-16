@@ -563,6 +563,7 @@ static fs::path make(const fs::path& dir, const fs::path& target)
     std::stringstream ss;
     ss << "make -C " << dir << " " << target;
    
+    /*
     FILE* fp = popen(ss.str().c_str(), "r");
     if (fp) {
         getc(fp);
@@ -572,8 +573,8 @@ static fs::path make(const fs::path& dir, const fs::path& target)
         std::cerr << __LINE__  << " makefile " << dir/target << " failed !!!" << std::endl;
         return "";
     }
+    */
 
-    /*
     std::cerr << ss.str() << std::endl;
     if ( 0 == system(ss.str().c_str()) ) {
         return dir/target;
@@ -581,7 +582,6 @@ static fs::path make(const fs::path& dir, const fs::path& target)
         std::cerr << __LINE__  << " makefile " << dir/target << " failed !!!" << std::endl;
         return "";
     }
-    */
 }
 
 /*
