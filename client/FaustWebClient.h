@@ -42,11 +42,7 @@ bool fw_get_available_targets(const std::string& url, std::map<std::string, std:
 
 //---------------------EXPORT IN 1 FUNCTION CALL
 
-<<<<<<< HEAD:clientinterface/FaustWebInterface.h
 /* Access to FaustWeb service - Upload your Faust application given a sourcefile, an operating system and an architecture
-=======
-/* Access to FaustWeb service - Get the Faust application given a sourcefile, an operating system and an architecture
->>>>>>> refs/heads/dev:client/FaustWebClient.h
  *
  * @param url - FaustWeb server URL
  * @param filename - Faust source file
