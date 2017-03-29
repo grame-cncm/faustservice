@@ -1,14 +1,14 @@
 ################################################################################
 # 
-#			FaustWeb Makefile for asm.js polyphonic applications
+#			FaustWeb Makefile for wasm polyphonic applications
 # 
 ################################################################################
 
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2asmjs -poly $(faustfile)
-	zip -r binary.zip $(faustfile:.dsp=.js)
+	faust2wasm -poly $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=.js) $(faustfile:.dsp=.wasm)
 
 src.cpp : $(faustfile)
-	faust -lang ajs -i -a webaudio/webaudio-asm-poly-standalone-wrapper.js $(faustfile) -o src.js
+	faust -lang wasm-e -i -a webaudio/webaudio-asm-poly-standalone-wrapper.js $(faustfile) -o src.js
