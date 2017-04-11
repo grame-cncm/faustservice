@@ -9,7 +9,7 @@ After=network.target network-online.target
 
 User=faust
 Group=faust
-WorkingDirectory=/home/faust/FaustInstall/faustservice
+WorkingDirectory=HOMEPATH/FaustInstall/faustservice
 
 Environment="ROS_ROOT=/opt/ros/jade/share/ros"
 Environment="ROS_PACKAGE_PATH=/opt/ros/jade/share:/opt/ros/jade/stacks"
@@ -26,7 +26,7 @@ Environment="CPATH=/opt/ros/jade/include"
 Environment="PATH=/usr/lib/jvm/java-8-openjdk-amd64/bin:/opt/ros/jade/bin:/home/faust/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/opt/android/ndk:/opt/android/sdk/platform-tools:/opt/android/sdk/tools:/home/faust/.rvm/bin:/home/faust/bin:/home/faust/.rvm/bin"
 
 Type=simple
-ExecStart=/home/faust/FaustInstall/faustservice/faustweb
+ExecStart=HOMEPATH/FaustInstall/faustservice/faustweb
 
 [Install]
 WantedBy=multi-user.target
