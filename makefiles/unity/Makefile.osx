@@ -1,14 +1,13 @@
 ################################################################################
-# 
-#			FaustWeb Makefile for asm.js polyphonic applications
-# 
+#							FaustWeb OSX script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
 ################################################################################
 
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2asmjs -poly $(faustfile)
-	zip -r binary.zip $(faustfile:.dsp=.js)
+	remoteOSX faust2unity $(faustfile) $(OPT)
 
 src.cpp : $(faustfile)
-	faust -lang ajs -i -a webaudio/webaudio-asm-poly-standalone-wrapper.js $(faustfile) -o src.js
+	faust -i -a unity.cpp $(faustfile) -o src.cpp

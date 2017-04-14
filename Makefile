@@ -27,6 +27,13 @@ clean :
 
 format :
 	astyle *.cpp *.hh
+
+install_systemd:
+	install faustweb.service /etc/systemd/system/faustweb.service
+	sed -i s%HOMEPATH%$(HOME)%g /etc/systemd/system/faustweb.service
+	systemctl enable faustweb
+	rm -rf sessions
+	systemctl start faustweb
 	
 install:
 	install upstart-faustweb.conf /etc/init/faustweb.conf
