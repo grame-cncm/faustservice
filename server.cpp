@@ -352,6 +352,32 @@ static void create_file_tree(fs::path sha1path, fs::path makefile_directory)
  * More info on the con_info structure is in server.hh.
  */
 
+static fs::path make(const fs::path& dir, const fs::path& target)
+{
+    std::stringstream ss;
+    ss << "make -C " << dir << " " << target;
+
+    /*
+    FILE* fp = popen(ss.str().c_str(), "r");
+    if (fp) {
+        getc(fp);
+        pclose(fp);
+        return dir/target;
+    } else  {
+        std::cerr << __LINE__  << " makefile " << dir/target << " failed !!!" << std::endl;
+        return "";
+    }
+    */
+
+    std::cerr << ss.str() << std::endl;
+    if ( 0 == system(ss.str().c_str()) ) {
+        return dir/target;
+    } else {
+        std::cerr << __LINE__  << " makefile " << dir/target << " failed !!!" << std::endl;
+        return "";
+    }
+}
+
 // TODO: merge with validate function if possible...
 static int make_initial_faust_directory(connection_info_struct *con_info, string sha1)
 {
@@ -558,31 +584,6 @@ static bool isValidTarget(const fs::path& target, const char*& mimetype)
 	}
 }
 
-static fs::path make(const fs::path& dir, const fs::path& target)
-{
-    std::stringstream ss;
-    ss << "make -C " << dir << " " << target;
-
-    /*
-    FILE* fp = popen(ss.str().c_str(), "r");
-    if (fp) {
-        getc(fp);
-        pclose(fp);
-        return dir/target;
-    } else  {
-        std::cerr << __LINE__  << " makefile " << dir/target << " failed !!!" << std::endl;
-        return "";
-    }
-    */
-
-    std::cerr << ss.str() << std::endl;
-    if ( 0 == system(ss.str().c_str()) ) {
-        return dir/target;
-    } else {
-        std::cerr << __LINE__  << " makefile " << dir/target << " failed !!!" << std::endl;
-        return "";
-    }
-}
 
 /*
  * Function that sends a file in response to a GET
@@ -710,6 +711,17 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
     fs::path 		makefile 	= fulldir / "Makefile";
 	const char*		mimetype;
 	bool			precompile 	= false;
+
+    // Check for svg block-diagram requests first
+    if (url.extension() == ".svg") {
+        std::cerr << "Processing SVG file request" << std::endl;
+        fs::path fullfile =  fulldir/target;
+        if ( !boost::filesystem::exists( fullfile ) ) {
+            std::cerr << "Diagram not created yet" << std::endl;
+            make(fullfile.parent_path().parent_path(), fs::path("diagram"));
+        }
+        return send_file(connection, fullfile, "image/svg+xml");
+    }
 
 	// Check if we are doing only a pre-compilation (without actually downloading the compiled file)
 	if (target == "precompile") {
