@@ -11,13 +11,16 @@ svgdir := $(faustfile)-svg
 svgfile := $(svgdir)/process.svg
 
 
+diagram : $(faustfile)
+	faust2svg $(faustfile)
+	mv $(applname)-svg diagram
 
 svg.zip : $(faustfile)
 	faust2svg $(faustfile)
 	zip -r svg.zip $(applname)-svg
 
 mdoc.zip : $(faustfile)
-	faust2mathdoc $(faustfile) 
+	faust2mathdoc $(faustfile)
 	zip -r mdoc.zip $(applname)-mdoc
 
 src.cpp : $(faustfile)
@@ -27,10 +30,10 @@ src.cpp : $(faustfile)
 binary : $(cppfile)
 	echo no binary allowed for $(faustfile) > errors.log
 	g++ $(cppfile)
-	
+
 source : $(cppfile)
 
-source-pkg : $(pkgfile) 
+source-pkg : $(pkgfile)
 
 highlighted : $(cppfile)
 	highlight -V -t 4 -S cpp -i $(cppfile) -o highlighted
@@ -41,17 +44,17 @@ mdoc : $(cppfile)
 	faust2mathdoc $(faustfile)
 
 clean :
-	rm -rf $(svgdir) $(pkgdir) $(binaryfile) $(pkgfile) 
-	
+	rm -rf $(svgdir) $(pkgdir) $(binaryfile) $(pkgfile)
+
 
 $(cppfile) : $(faustfile)
 	if test -d $(DSPDEPTS);then dep=0;else cp $(DSPDEPTS) .;fi
 	faust $(faustfile) $(OPT) -o $(cppfile) 2> errors.log
-	
+
 $(svgfile) : $(cppfile)
 	faust $(faustfile) $(OPT) -svg >/dev/null 2> errors.log
-	
-	
+
+
 $(pkgfile) : $(faustfile) $(cppfile)
 	mkdir $(pkgdir)
 	cp $(readme) $(faustfile) $(cppfile) Makefile $(pkgdir)
