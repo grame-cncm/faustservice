@@ -6,20 +6,20 @@
  and/or modify it under the terms of the GNU General Public License
  as published by the Free Software Foundation; either version 3 of
  the License, or (at your option) any later version.
- 
+
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
- 
+
  You should have received a copy of the GNU General Public License
  along with this program; If not, see <http://www.gnu.org/licenses/>.
- 
+
  EXCEPTION : As a special exception, you may create a larger work
  that contains this FAUST architecture section and distribute
  that work under terms of your choice, so long as this FAUST
  architecture section is not modified.
- 
+
  ************************************************************************
  ************************************************************************/
 
@@ -248,7 +248,7 @@ static int validate_faust(connection_info_struct *con_info)
 static string generate_sha1(connection_info_struct *con_info)
 {
     fs::path filepath = fs::path(con_info->tmppath) / fs::path(con_info->filename);
-    
+
     // read file content
     ifstream myFile (filepath.string().c_str (), ios::in | ios::binary);
     myFile.seekg(0, ios::end);
@@ -262,11 +262,11 @@ static string generate_sha1(connection_info_struct *con_info)
 	}
     myFile.read(content, length);
     myFile.close();
-    
+
     // compute SHA1 key
     unsigned char obuf[20];
     SHA1((const unsigned char*)content, length, obuf);
-    
+
 	// convert SHA1 key into hexadecimal string
     string sha1key;
     for (int i = 0; i < 20; i++) {
@@ -448,11 +448,11 @@ int FaustServer::send_page(struct MHD_Connection* connection, const char* page, 
                            int status_code, const char*  type = 0)
 {
     struct MHD_Response* response = MHD_create_response_from_buffer(length, (void*)page, MHD_RESPMEM_MUST_COPY);
-    
+
     if (response == 0) {
-    
+
         return MHD_NO;
-        
+
     } else {
 
 		MHD_add_response_header (response, "Content-Type", type ? type : "text/plain");
@@ -562,7 +562,7 @@ static fs::path make(const fs::path& dir, const fs::path& target)
 {
     std::stringstream ss;
     ss << "make -C " << dir << " " << target;
-   
+
     /*
     FILE* fp = popen(ss.str().c_str(), "r");
     if (fp) {
@@ -630,7 +630,7 @@ static void panicCallback(void* cls, const char* file, unsigned int line, const 
 bool FaustServer::start()
 {
 	MHD_set_panic_func(&panicCallback, NULL);
-  	
+
     daemon_ = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, port_, NULL, NULL,
                                &answer_to_connection, this,
                                MHD_OPTION_THREAD_POOL_SIZE, max_clients_,      // Experimental multi-threaded support...
@@ -716,7 +716,7 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
 		precompile = true;
 		target = "binary.zip";
 	}
-    
+
     // Analyze possible cases of errors
     if (!isValidTarget(target, mimetype)) {
     	std::cerr << "Error : not a valid target " << target << " in raw_url " << raw_url << std::endl;
@@ -728,7 +728,7 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
 
 	// we can call make
     fs::path filename = make(fulldir, target);
-    
+
 	if (!fs::is_regular_file(filename)) {
 		std::cerr << "Error : Make Failed " << " in raw_url " << raw_url << std::endl;
 		return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
@@ -862,7 +862,7 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
     if (con_info->fp == 0) {
         if (NULL != (fp = fopen(full_path.c_str(), "rb"))) {
             fclose(fp);
-            
+
             con_info->answerstring = fileexistspage;
             con_info->answercode = MHD_HTTP_FORBIDDEN;
             std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
@@ -901,7 +901,7 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
     // JSON formatted :   { "os1" : ["arch11", "arch12", ...],  "os2" : ["arch21", "arch22", ...], ...}
     // and stored in field targets
     std::stringstream ss;
-    
+
     ss << '{';
     char sep1 = ' ';
 
@@ -909,7 +909,7 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
     for (fs::directory_iterator os_iter(makefile_directory); os_iter != end_iter; ++os_iter) {
         if (fs::is_directory(os_iter->path())) {
             string OSname = os_iter->path().filename().string();
-            
+
             // collect a vector of target names
             vector<string> V;
             for (fs::directory_iterator makefile_iter(os_iter->path()); makefile_iter != end_iter; ++makefile_iter) {
@@ -918,7 +918,7 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
                     V.push_back(makefileName.substr(9));
                 }
             }
- 
+
  			// If it is a folder with makefiles inside, print it
             if (V.size() > 0) {
             	std::sort(V.begin(), V.end());
