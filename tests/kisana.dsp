@@ -4,10 +4,10 @@
 //
 //-----------------------------------------------
 
-declare name  	"Kisana";
+declare name  	"kisana";
 declare author  "Yann Orlarey";
 
-import("music.lib"); 
+import("music.lib");
 
 
 
@@ -17,7 +17,7 @@ CCY = 15;	// control cycle length
 BPS = 360;	// general tempo (beat per sec)
 
 
-process = kisana;    
+process = kisana;
 
 
 //-------------------------------kisana----------------------------------
@@ -25,19 +25,19 @@ process = kisana;
 // 		3-loops string instrument
 //-----------------------------------------------------------------------
 
-kisana = hgroup("Loops", harpe(C,11,48), harpe(C,11,60), (harpe(C,11,72) : *(1.5), *(1.5))) 
+kisana = hgroup("Loops", harpe(C,11,48), harpe(C,11,60), (harpe(C,11,72) : *(1.5), *(1.5)))
 	:> 	*(l),*(l)
 	with {
 		l = hslider("[1]master",-20, -60, 0, 0.01) : db2linear;
 		C = hslider("../[2]timbre",0, 0, 1, 0.01) : automat(BPS, CCY, 0.0);
 	};
- 
+
 
 
 //----------------------------------Harpe--------------------------------
 // USAGE:  harpe(C,10,60) : _,_;
 //		C is the filter coefficient 0..1
-// 		Build a N (10) strings harpe using a pentatonic scale 
+// 		Build a N (10) strings harpe using a pentatonic scale
 //		based on midi key b (60)
 //		Each string is triggered by a specific
 //		position of the "hand"
@@ -47,9 +47,9 @@ harpe(C,N,b) = 	hand <: par(i, N, position(i+1)
 							: pan((i+0.5)/N) )
 				 	:> _,_
 	with {
-		att  = 4; 
+		att  = 4;
 		hand = vgroup("loop%b", vslider("[1]note", 0, 0, N, 1) : int : automat(BPS, NCY, 0.0));
-		lvl  = vslider("v:loop/level", 0, 0, 6, 1) : int : automat(BPS, CCY, 0.0) : -(6) : db2linear; 
+		lvl  = vslider("v:loop/level", 0, 0, 6, 1) : int : automat(BPS, CCY, 0.0) : -(6) : db2linear;
 		pan(p) = _ <: *(sqrt(1-p)), *(sqrt(p));
 		position(a,x) = abs(x - a) < 0.5;
 		db2linear(x)	= pow(10, x/20.0);
@@ -65,19 +65,19 @@ harpe(C,N,b) = 	hand <: par(i, N, position(i+1)
 
 Penta(key) = environment {
 
-	A4Hz = 440; 
-	
+	A4Hz = 440;
+
 	degree2midi(0) = key+0;
 	degree2midi(1) = key+2;
 	degree2midi(2) = key+4;
 	degree2midi(3) = key+7;
 	degree2midi(4) = key+9;
 	degree2midi(d) = degree2midi(d-5)+12;
-	
+
 	degree2Hz(d) = A4Hz*semiton(degree2midi(d)-69) with { semiton(n) = 2.0^(n/12.0); };
 
-}; 
- 
+};
+
 
 //----------------------------------String-------------------------------
 // A karplus-strong string.
@@ -101,4 +101,4 @@ string(coef, freq, t60, level, trig) = noise*level
 		noise   		= random/2147483647.0;
 	};
 
-   
+
