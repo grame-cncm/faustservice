@@ -8,7 +8,7 @@ faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
 	faust2wasm -poly $(faustfile)
-	zip -r binary.zip $(faustfile:.dsp=.js) $(faustfile:.dsp=.wasm)
+	zip -r binary.zip $(faustfile:.dsp=.js) $(faustfile:.dsp=.wasm) webaudio/mixer32.wasm
 
 src.cpp : $(faustfile)
-	faust -lang wasm-e -i -a webaudio/webaudio-asm-poly-standalone-wrapper.js $(faustfile) -o src.js
+	faust -lang wasm-e -i -a webaudio/webaudio-wasm-poly-standalone-wrapper.js $(faustfile) -o src.js
