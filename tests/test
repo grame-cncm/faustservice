@@ -1,21 +1,37 @@
 #!/bin/bash
 
-#USAGE : test <architecture>
+#USAGE : test <architecture>|all
 
-rm -rf sandbox
-rm -rf build-Makefile.*
-rm -f LOG
-for f in *.dsp; do
-	echo "test file $f with $1 architecture"
-	for m in "../makefiles/$1/Makefile".*; do
-		echo -n "compile $f with $m : "
-		rm -rf sandbox
-		mkdir sandbox
-		cp $f sandbox/
-		cp $m sandbox/Makefile
-		cd sandbox
-		((make binary.zip  >> ../LOG 2>&1) && echo "passed" ) || echo "failed"
-		cd ..
-		mv sandbox build-$(basename $m)
+function testarchitecture {
+	rm -rf sandbox
+	rm -rf build-Makefile.*
+
+	for f in *.dsp; do
+		echo "test file $f with $1 architecture"
+		for m in "../makefiles/$1/Makefile".*; do
+			echo -n "compile $f with $m : "
+			rm -rf sandbox
+			mkdir sandbox
+			cp $f sandbox/
+			cp $m sandbox/Makefile
+			cd sandbox
+			((make binary.zip  >> ../LOG 2>&1) && echo "passed" ) || echo "failed"
+			cd ..
+			mv sandbox build-$(basename $m)
+		done
 	done
-done
+}
+
+rm -f LOG
+
+if [ "$1" == "all" ]; then
+	for arch in ../makefiles/*; do
+		if [ -d "$arch" ]; then
+			testarchitecture $(basename "$arch")
+		fi
+	done
+else
+	testarchitecture "$1"
+fi
+
+
