@@ -5,9 +5,10 @@
 ################################################################################
 
 faustfile ?= $(wildcard *.dsp)
+libraries	= $(wildcard *.lib)
 
 binary.zip : $(faustfile)
-	remoteOSX faust2plot $(faustfile) $(OPT)
+	remoteOSX faust2plot $(faustfile) $(libraries) $(OPT)
 
 src.cpp : $(faustfile)
 	faust -i -a matlabplot.cpp $(faustfile) -o src.cpp

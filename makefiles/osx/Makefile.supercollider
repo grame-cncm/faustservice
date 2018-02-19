@@ -5,9 +5,10 @@
 ################################################################################
 
 faustfile	?= $(wildcard *.dsp)
+libraries	= $(wildcard *.lib)
 
 binary.zip : $(faustfile)
-	remoteOSX faust2supercollider $(faustfile) $(OPT)
+	remoteOSX faust2supercollider $(faustfile) $(libraries) $(OPT)
 
 src.cpp : $(faustfile)
 	faust -i -a supercollider.cpp $(faustfile) -o src.cpp
