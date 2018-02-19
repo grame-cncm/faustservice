@@ -5,9 +5,10 @@
 ################################################################################
 
 faustfile	?= $(wildcard *.dsp)
+libraries	= $(wildcard *.lib)
 
 binary.zip : $(faustfile)
-	remoteOSX faust2caqt $(faustfile) -deploy $(OPT)
+	remoteOSX faust2caqt $(faustfile) $(libraries) -deploy $(OPT)
 
 src.cpp : $(faustfile)
 	faust -i -a ca-qt.cpp $(faustfile) -o src.cpp

@@ -5,9 +5,10 @@
 ################################################################################
 
 faustfile	?= $(wildcard *.dsp)
+libraries	= $(wildcard *.lib)
 
 binary.zip : $(faustfile)
-	remoteOSX faust2faustvst $(faustfile) $(OPT)
+	remoteOSX faust2faustvst $(faustfile) $(libraries) $(OPT)
 
 src.cpp : $(faustfile)
 	faust -i -a faustvst.cpp $(faustfile) -o src.cpp

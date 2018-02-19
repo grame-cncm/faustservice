@@ -1,13 +1,14 @@
 ################################################################################
-#							FaustWeb OSX script 
+#							FaustWeb OSX script
 #  The behaviour of this Makefile will only be correct if
 #  only one .dsp file exists in the folder
 ################################################################################
 
 faustfile	?= $(wildcard *.dsp)
+libraries	= $(wildcard *.lib)
 
 binary.zip : $(faustfile)
-	remoteOSX faust2puredata $(faustfile) $(OPT) -poly
+	remoteOSX faust2puredata $(faustfile) $(libraries) $(OPT) -poly
 	cp $(wildcard 	/usr/lib/pd/extra/faust*.pd  /usr/local/lib/pd/extra/faust*.pd /opt/lib/pd/extra/faust*.pd) .
 	zip -r binary.zip  *.pd
 
