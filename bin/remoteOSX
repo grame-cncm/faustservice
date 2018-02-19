@@ -1,25 +1,45 @@
 #!/bin/bash
 
-# settings
+# Server settings
+
 SERVER='faust@192.168.1.25'
 
-# parameters SCRIPT=$1 FILE=$2 OPT=remaining
-SCRIPT=$1
-FILE=$2
-shift 
-shift
-OPT=$*
 
-#echo script=$SCRIPT file=$FILE options=$OPT
+# Parameter analysis. The first one is the name of the script the others
+# are either options or files. Several source code files can be present
+# if we are compiling a zip archive.
 
-# produce binary.zip on remote server
+SCRIPT=$1; shift;
+FILES=
+LIBS=
+OPTIONS=
+
+while [ $1 ]
+do
+    if [ ${1:0:1} = "-" ]; then
+        OPTIONS="$OPTIONS $1"
+    elif [ "${1#*.}" = "dsp" ]; then
+        FILES="$FILES $1"
+    elif [ "${1#*.}" = "lib" ]; then
+        LIBS="$LIBS $1"
+    else
+        echo "unrecognized parameter $1"
+    fi
+    shift
+done
+
+# echo "script: $SCRIPT"
+# echo "files: $FILES"
+# echo "libs: $LIBS"
+# echo "options: $OPTIONS"
+
+# Produce binary.zip on remote server
 TMP=`ssh $SERVER "mktemp -d fwtemp.XXXXXX"`
-CMD="source /etc/profile; cd $TMP; $SCRIPT $OPT $FILE"
-#echo command="$CMD"
+CMD="source /etc/profile; cd $TMP; $SCRIPT $OPT $FILES"
 
-scp "$FILE" "$SERVER:$TMP/"
+scp "$FILES" "$LIBS" "$SERVER:$TMP/"
 ssh "$SERVER" "$CMD"
-ssh "$SERVER" "rm $TMP/$FILE"
+ssh "$SERVER" "rm $TMP/$FILES $TMP/$LIBS"
 ssh "$SERVER" "cd $TMP; zip -r binary.zip *"
 scp "$SERVER:$TMP/binary.zip" .
 ssh "$SERVER" "rm -rf $TMP"
