@@ -10,37 +10,37 @@ SERVER='faust@192.168.1.25'
 # if we are compiling a zip archive.
 
 SCRIPT=$1; shift;
-FILES=
-LIBS=
-OPTIONS=
 
+# Create a temporary dir on the remote machine
+TMP=`ssh $SERVER "mktemp -d fwtemp.XXXXXX"`
+
+# Copy in the temporary dir of the remote machine all
+# the *.dsp and *.lib files, while collecting the options in OPTIONS
 while [ $1 ]
 do
     if [ ${1:0:1} = "-" ]; then
         OPTIONS="$OPTIONS $1"
     elif [ "${1#*.}" = "dsp" ]; then
-        FILES="$FILES $1"
+        scp $1 "$SERVER:$TMP/"
     elif [ "${1#*.}" = "lib" ]; then
-        LIBS="$LIBS $1"
+        scp $1 "$SERVER:$TMP/"
     else
         echo "unrecognized parameter $1"
     fi
     shift
 done
 
-# echo "script: $SCRIPT"
-# echo "files: $FILES"
-# echo "libs: $LIBS"
-# echo "options: $OPTIONS"
-
 # Produce binary.zip on remote server
-TMP=`ssh $SERVER "mktemp -d fwtemp.XXXXXX"`
-CMD="source /etc/profile; cd $TMP; $SCRIPT $OPT $FILES"
+CMD1="source /etc/profile; cd $TMP; $SCRIPT $OPTIONS *.dsp"
+CMD2="cd $TMP; rm -f *.dsp *.lib"
+CMD3="cd $TMP; zip -r binary.zip *"
 
-scp "$FILES" "$LIBS" "$SERVER:$TMP/"
-ssh "$SERVER" "$CMD"
-ssh "$SERVER" "rm $TMP/$FILES $TMP/$LIBS"
-ssh "$SERVER" "cd $TMP; zip -r binary.zip *"
+ssh "$SERVER" "$CMD1"
+ssh "$SERVER" "$CMD2"
+ssh "$SERVER" "$CMD3"
+
+# Copy back the resulting binary.zip
 scp "$SERVER:$TMP/binary.zip" .
-ssh "$SERVER" "rm -rf $TMP"
 
+# Remove the temporary folder on the remote machine
+ssh "$SERVER" "rm -rf $TMP"

@@ -370,7 +370,7 @@ static fs::path make(const fs::path& dir, const fs::path& target)
     */
 
     std::cerr << ss.str() << std::endl;
-    if ( 0 == system(ss.str().c_str()) ) {
+    if (0 == system(ss.str().c_str())) {
         return dir/target;
     } else {
         std::cerr << __LINE__  << " makefile " << dir/target << " failed !!!" << std::endl;
@@ -596,7 +596,7 @@ int FaustServer::send_file(struct MHD_Connection* connection, const fs::path& fi
 
     std::cerr << __LINE__ << " ENTER send_file : " << filepath << endl;
 
-    if ((-1 == (fd = open(filepath.string().c_str(), O_RDONLY))) || (0 != fstat (fd, &sbuf))) {
+    if ((-1 == (fd = open(filepath.string().c_str(), O_RDONLY))) || (0 != fstat(fd, &sbuf))) {
         std::cerr << __LINE__  << " error accessing file : " << filepath << endl;
         return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     }
