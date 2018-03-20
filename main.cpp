@@ -52,8 +52,7 @@ static void process_cmdline(int argc, char* argv[])
 {
     po::options_description desc("faustserver program options.");
     desc.add_options()
-    ("daemon", "run the server in mode daemon")
-    ("directory,d", po::value<string>(), "directory in which files will be written")
+    ("sessions-dir,d", po::value<string>(), "directory in which sessions files will be written")
     ("help,h", "produce this help message")
     ("any-origin,a", "Adds any origin when answering requests")
     ("max-clients,m", po::value<int>(), "maximum number of clients allowed to concurrently upload")
@@ -65,7 +64,7 @@ static void process_cmdline(int argc, char* argv[])
 
     if (vm.count("help")) {
         cout << desc << endl;
-        return;
+        exit(0);
     }
 
     if (vm.count("port")) {
@@ -83,11 +82,11 @@ static void process_cmdline(int argc, char* argv[])
     if (vm.count("allow-any-origin")) {
         gAnyOrigin = true;
     }
-#if 0
-    if (vm.count("directory")) {
-        gDirectory = vm["directory"].as<string>();
+
+    if (vm.count("sessions-dir")) {
+        gSessionsDirectory = vm["sessions-dir"].as<string>();
     }
-#endif
+
 }
 
 int main(int argc, char* argv[], char* env[])
@@ -104,9 +103,11 @@ int main(int argc, char* argv[], char* env[])
         exit(1);
     }
 
+
     std::cerr << "faustweb starting "
             << " port:" << gPort
             << " directory:" << gCurrentDirectory
+            << " sessions-dir:" << gSessionsDirectory
             << std::endl;
 
     // Print running environment
@@ -135,7 +136,7 @@ int main(int argc, char* argv[], char* env[])
     FaustServer server(gPort, gMaxClients, gSessionsDirectory, gMakefilesDirectory, gLogfile);
 
     if (!server.start()) {
-        std::cerr << "unable to start webserver" << std::endl;
+        std::cerr << "unable to start webserver ! Check if port " << gPort << " is available" << std::endl;
         return 1;
     } else {
         std::cerr << "webserver started succesfully" << std::endl;
