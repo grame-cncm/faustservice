@@ -7,7 +7,7 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2smartkeyb -ios -nvoices 12 -source $(OPT) $(faustfile)
+	faust2smartkeyb -ios -nvoices 12 -effect auto -source $(OPT) $(faustfile)
 	zip -r binary.zip faustsmartkeyb.$(faustfile:.dsp=)
 
 src.cpp : $(faustfile)
