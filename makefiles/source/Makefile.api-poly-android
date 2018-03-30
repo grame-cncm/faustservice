@@ -7,7 +7,7 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2api -android -nvoices 12 $(OPT) $(faustfile)
+	faust2api -android -nvoices 12 -effect auto $(OPT) $(faustfile)
 	mv dsp-faust.zip binary.zip
 
 src.cpp : $(faustfile)
