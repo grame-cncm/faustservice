@@ -35,17 +35,18 @@ install_systemd:
 	rm -rf sessions
 	systemctl start faustweb
 	
+# faustservice should be run from /home/faust/Install/faustservice/faustweb
+# this is hard coded into faustweb.service
 install:
-	install upstart-faustweb.conf /etc/init/faustweb.conf
+	install faustweb.conf /etc/init/faustweb.conf
 	install apache2-faustweb.conf /etc/apache2/sites-available/002-faustweb.conf
-	install faustweb $(dest)
 	install bin/remoteOSX $(dest)
 	install -d $(pdsdk)/pdfaustextra/
 	install pdfaustextra/*.pd $(pdsdk)/pdfaustextra/
 		
 uninstall:
-	rm -f  $(dest)/faustweb
 	rm -f  $(dest)/remoteOSX 
+	rm -rf $(pdsdk)/pdfaustextra/
 
 start:
 	initctl start faustweb
