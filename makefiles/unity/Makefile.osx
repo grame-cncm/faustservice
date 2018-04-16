@@ -7,7 +7,7 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	remoteOSX faust2unity $(faustfile) $(OPT)
+	remoteOSX faust2unity $(faustfile) -osx $(OPT)
 
 src.cpp : $(faustfile)
 	faust -i -a unity.cpp $(faustfile) -o src.cpp
