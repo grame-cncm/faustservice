@@ -8,7 +8,7 @@ faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
 	faust2w64max6 $(faustfile) $(OPT)
-	zip -r binary.zip $(faustfile:.dsp=~.mxe)
+	zip -r binary.zip $(faustfile:.dsp=~.mxe64) $(faustfile:.dsp=.maxpat) ui.js
 
 src.cpp : $(faustfile)
 	faust -i -a max-msp/max-msp.cpp $(faustfile) -o src.cpp
