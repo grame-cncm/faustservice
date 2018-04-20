@@ -29,14 +29,14 @@ Select a file kisana.dsp and send it. The sent file can be a either a .dsp or an
 
 #### General API ####
 
- - http://localhost:8888/\<key\>/src.cpp	returns the 'src.cpp' file containing the cpp source code 
- - http://localhost:8888/\<key\>/svg.zip	returns a 'svg.zip' archive containing a svg folder with all .svg files
- - http://localhost:8888/\<key\>/mdoc.zip returns a ’mdoc.zip' archive  containing a kisana-mdoc folder with automatic documentation
+ - http://localhost:8888/<key\>/src.cpp returns the 'src.cpp' file containing the cpp source code 
+ - http://localhost:8888/<key\>/svg.zip returns a 'svg.zip' archive containing a svg folder with all .svg files
+ - http://localhost:8888/<key\>/mdoc.zip returns a ’mdoc.zip' archive  containing a kisana-mdoc folder with automatic documentation
 
 #### API for each architecture ####
 
- - http://localhost:8888/\<key\>/\<plateform\>/\<architecture\>/binary.zip returns the 'binary.zip' archive containing one or several binairies
- - http://localhost:8888/\<key\>/\<plateform\>/\<architecture\>/src.cpp	returns the architecture wrapped cpp source code 
+ - http://localhost:8888/<key\>/\<plateform\>/\<architecture\>/binary.zip returns the 'binary.zip' archive containing one or several binairies
+ - http://localhost:8888/<key\>/\<plateform\>/\<architecture\>/src.cpp	returns the architecture wrapped cpp source code 
 
 #### List of available architectures for each platform ####
 
