@@ -43,6 +43,7 @@
 
 #include "utilities.hh"
 #include "server.hh"
+#include "match.hh"
 
 // to use command line tools
 #include <stdlib.h>
@@ -632,23 +633,23 @@ bool FaustServer::start()
 {
 	MHD_set_panic_func(&panicCallback, NULL);
 
-    daemon_ = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, port_, NULL, NULL,
-                               &answer_to_connection, this,
-                               MHD_OPTION_THREAD_POOL_SIZE, max_clients_,      // Experimental multi-threaded support...
+    fDaemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, fPort, NULL, NULL,
+                               &staticAnswerToConnection, this,
+                               MHD_OPTION_THREAD_POOL_SIZE, fMaxClients,      // Experimental multi-threaded support...
                                MHD_OPTION_NOTIFY_COMPLETED, request_completed,
                                NULL, MHD_OPTION_END);
-    return daemon_ != NULL;
+    return fDaemon != NULL;
 }
 
 // Stop the Faust server - shallow wrapper around MHD_stop_daemon
 
 void FaustServer::stop()
 {
-    if (daemon_) {
-        MHD_stop_daemon(daemon_);
+    if (fDaemon) {
+        MHD_stop_daemon(fDaemon);
     }
 
-    daemon_ = 0;
+    fDaemon = 0;
 }
 
 /*
@@ -656,12 +657,12 @@ void FaustServer::stop()
  * by the server.
  */
 
-int FaustServer::answer_to_connection(void* cls, struct MHD_Connection* connection,
+int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* connection,
                                       const char* url, const char* method,
                                       const char* version, const char* upload_data,
                                       size_t* upload_data_size, void** con_cls)
 {
-    std::cerr << "FaustServer::answer_to_connection(" << url << ", " << method  << ", " << version << ")" << std::endl;
+    std::cerr << "FaustServer::staticAnswerToConnection(" << url << ", " << method  << ", " << version << ")" << std::endl;
     FaustServer* server = (FaustServer*)cls;
     if (server == 0) {
         std::cerr << "REAL BAD ERROR, NO SERVER !!!" << std::endl;
@@ -686,7 +687,7 @@ int FaustServer::answerGET(struct MHD_Connection* connection, const char* url)
         int r = send_page(connection, ss.str().c_str (), ss.str().size(), MHD_HTTP_OK, "text/html");
         return r;
     } else if (strcmp(url, "/targets") == 0) {
-        int r = send_page(connection, targets.c_str (), targets.size(), MHD_HTTP_OK, "application/json");
+        int r = send_page(connection, fTargets.c_str (), fTargets.size(), MHD_HTTP_OK, "application/json");
         return r;
     } else if (strcmp(url, "/favicon.ico") == 0) {
         int r = page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
@@ -901,13 +902,13 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
 }
 
 FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory, const fs::path& logfile)
-                        : port_(port),
-                        max_clients_(max_clients),
-                        directory_(directory),
-                        makefile_directory_(makefile_directory),
-                        logfile_(logfile),
-                        daemon_(0),
-                        targets("")
+                        : fPort(port),
+                        fMaxClients(max_clients),
+                        fDirectory(directory),
+                        fMakefileDirectory(makefile_directory),
+                        fLogfile(logfile),
+                        fDaemon(0),
+                        fTargets("")
 {
     // create a string containing the list possible targets by scanning the makefile directory. The list is
     // JSON formatted :   { "os1" : ["arch11", "arch12", ...],  "os2" : ["arch21", "arch22", ...], ...}
@@ -942,6 +943,6 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
         }
     }
     ss << std::endl << "}";
-    targets = ss.str();
+    fTargets = ss.str();
 }
 

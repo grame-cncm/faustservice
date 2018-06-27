@@ -56,13 +56,13 @@ struct string_and_exitstatus {
 
 class FaustServer
 {
-    int 				port_;
-    unsigned int 		max_clients_;
-    fs::path 			directory_;
-    fs::path 			makefile_directory_;
-    fs::path 			logfile_;
-    struct MHD_Daemon* 	daemon_;
-    string				targets;
+    int 				fPort;
+    unsigned int 		fMaxClients;
+    fs::path 			fDirectory;
+    fs::path 			fMakefileDirectory;
+    fs::path 			fLogfile;
+    struct MHD_Daemon* 	fDaemon;
+    string				fTargets;
 
 public:
     FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory, const fs::path& logfile);
@@ -74,19 +74,19 @@ public:
 
     const unsigned int getMaxClients()
     {
-        return max_clients_;                ///< Max number of clients allowed to connect at a given time.
+        return fMaxClients;                ///< Max number of clients allowed to connect at a given time.
     }
     fs::path getDirectory()
     {
-        return directory_;                  ///< Directory to which the uploaded files are being written.
+        return fDirectory;                  ///< Directory to which the uploaded files are being written.
     }
     fs::path getMakefileDirectory()
     {
-        return makefile_directory_;         ///< Directory that the makefiles should be copied from.
+        return fMakefileDirectory;         ///< Directory that the makefiles should be copied from.
     }
     fs::path getLogfile()
     {
-        return logfile_;                    ///< Path to the logfile.
+        return fLogfile;                    ///< Path to the logfile.
     }
 
 private:
@@ -103,7 +103,7 @@ private:
 
     static void request_completed(void *cls, struct MHD_Connection *connection,
                                      void **con_cls, enum MHD_RequestTerminationCode toe);
-    static int answer_to_connection	(void *cls, struct MHD_Connection *connection,
+    static int staticAnswerToConnection	(void *cls, struct MHD_Connection *connection,
                                      const char *url, const char *method,
                                      const char *version, const char *upload_data,
                                      size_t *upload_data_size, void **con_cls);
