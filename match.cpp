@@ -1,7 +1,7 @@
 #include "match.hh"
-#include <vector>
-#include <string>
 #include <iostream>
+#include <string>
+#include <vector>
 
 // Boost libraries
 #include <boost/filesystem.hpp>
@@ -22,7 +22,7 @@ void segmentUrl(const char* url)
 vector<string> decomposeURL(const char* url)
 {
     boost::filesystem::path U(url);
-    vector<string> decomposition;
+    vector<string>          decomposition;
     for (auto n : U) {
         decomposition.push_back(n.string());
     }
@@ -35,7 +35,9 @@ bool matchURL(const char* url, const char* pat)
     vector<string> P = decomposeURL(pat);
     if (P.size() <= U.size()) {
         for (size_t i = 0; i < P.size(); i++) {
-            if ((P[i] != "*") && (P[i] != U[i])) { return false; }
+            if ((P[i] != "*") && (P[i] != U[i])) {
+                return false;
+            }
         }
         return true;
     } else {
@@ -49,7 +51,9 @@ bool matchURL(const char* url, const char* pat, vector<string>& data)
     vector<string> P = decomposeURL(pat);
     if (P.size() <= U.size()) {
         for (size_t i = 0; i < P.size(); i++) {
-            if ((P[i] != "*") && (P[i] != U[i])) { return false; }
+            if ((P[i] != "*") && (P[i] != U[i])) {
+                return false;
+            }
         }
         data = U;
         return true;

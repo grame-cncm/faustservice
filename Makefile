@@ -26,7 +26,7 @@ clean :
 	rm faustweb
 
 format :
-	astyle *.cpp *.hh
+	clang-format-mp-5.0 -i -style=file *.cpp *.hh
 
 install_systemd:
 	install faustweb.service /etc/systemd/system/faustweb.service
