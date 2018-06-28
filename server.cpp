@@ -625,7 +625,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/targets")) {
         return send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK, "application/json");
 
-    } else if (matchURL(url, "/favicon.ico") == 0) {
+    } else if (matchURL(url, "/favicon.ico")) {
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
 
     } else {
