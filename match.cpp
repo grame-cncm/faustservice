@@ -19,45 +19,42 @@ void segmentUrl(const char* url)
     cout << endl;
 }
 
+// decompose an URL into a vector of strings. Trailing / are removed
 vector<string> decomposeURL(const char* url)
 {
     boost::filesystem::path U(url);
     vector<string>          decomposition;
     for (auto n : U) {
-        decomposition.push_back(n.string());
+        string s = n.string();
+        if (s != ".") decomposition.push_back(s);
     }
     return decomposition;
 }
 
-bool matchURL(const char* url, const char* pat)
-{
-    vector<string> U = decomposeURL(url);
-    vector<string> P = decomposeURL(pat);
-    if (P.size() <= U.size()) {
-        for (size_t i = 0; i < P.size(); i++) {
-            if ((P[i] != "*") && (P[i] != U[i])) {
-                return false;
-            }
-        }
-        return true;
-    } else {
-        return false;
-    }
-}
+// true if the url and the pattern match
+// To match they must have the same number of elements
+// and these elements are identical (or '*' element)
 
 bool matchURL(const char* url, const char* pat, vector<string>& data)
 {
     vector<string> U = decomposeURL(url);
     vector<string> P = decomposeURL(pat);
-    if (P.size() <= U.size()) {
+    if (P.size() == U.size()) {
         for (size_t i = 0; i < P.size(); i++) {
             if ((P[i] != "*") && (P[i] != U[i])) {
                 return false;
             }
         }
         data = U;
+        cout << "PATTERN " << pat << " MATCHES URL " << url << endl;
         return true;
     } else {
         return false;
     }
+}
+
+bool matchURL(const char* url, const char* pat)
+{
+    vector<string> ignore;
+    return matchURL(url, pat, ignore);
 }

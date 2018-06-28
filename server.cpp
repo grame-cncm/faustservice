@@ -576,14 +576,34 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
                                           const char* method, const char* version, const char* upload_data,
                                           size_t* upload_data_size, void** con_cls)
 {
-    std::cerr << "FaustServer::staticAnswerToConnection(" << url << ", " << method << ", " << version << ")"
-              << std::endl;
+    std::cerr   << "FaustServer::staticAnswerToConnection(" << url << ", " 
+                << method << ", " << version << ")"
+                << std::endl;
+
+    segmentUrl(url);
+
+    if (matchURL(url, "/")) cout << "MATCH ROOT\n";
+    else if (matchURL(url, "/targets")) cout << "MATCH TARGETS\n";
+
     FaustServer* server = (FaustServer*)cls;
     if (server == 0) {
         std::cerr << "REAL BAD ERROR, NO SERVER !!!" << std::endl;
         exit(1);
     }
     return server->dispatchPOSTandGETConnections(connection, url, method, version, upload_data, upload_data_size, con_cls);
+}
+
+int FaustServer::dispatchPOSTandGETConnections(struct MHD_Connection* connection, const char* url, const char* method,
+                                  const char* version, const char* upload_data, size_t* upload_data_size,
+                                  void** con_cls)
+{
+    if (0 == strcmp(method, "GET")) {
+        return dispatchGETConnections(connection, url);
+    } else if (0 == strcmp(method, "POST")) {
+        return dispatchPOSTConnections(connection, url, upload_data, upload_data_size, con_cls);
+    } else {
+        return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+    }
 }
 
 /*
@@ -596,22 +616,20 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     // TArgs args;
     // MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
     std::cerr << "dispatchGETConnections " << url << std::endl;
-    if (/*!args.size() &&*/ strcmp(url, "/") == 0) {
+
+    if (matchURL(url, "/")) {
         stringstream ss;
         ss << askpage_head << nr_of_uploading_clients << askpage_tail;
-        int r = send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
-        return r;
-    } else if (strcmp(url, "/targets") == 0) {
-        int r = send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK, "application/json");
-        return r;
-    } else if (strcmp(url, "/favicon.ico") == 0) {
-        int r = page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
-        return r;
+        return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
+
+    } else if (matchURL(url, "/targets")) {
+        return send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK, "application/json");
+
+    } else if (matchURL(url, "/favicon.ico") == 0) {
+        return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
+
     } else {
-        // struct connection_info_struct *con_info = (connection_info_struct*)*con_cls;
-        // std::cerr << "this->getDirectory() = " << this->getDirectory() << std::endl;
-        int r = faustGet(connection, url);
-        return r;
+        return makeAndSendResourceFile(connection, url);
     }
 }
 
@@ -619,7 +637,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
  * Handle a GET command by "making" the appropriate resource and returning it
  */
 
-int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url)
+int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, const char* raw_url)
 {
     fs::path    url      = fs::path(raw_url);
     fs::path    fulldir  = this->getDirectory() / url.parent_path();
@@ -670,19 +688,6 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
         } else {
             return send_page(connection, "DONE", 4, MHD_HTTP_OK, "text/html");
         }
-    }
-}
-
-int FaustServer::dispatchPOSTandGETConnections(struct MHD_Connection* connection, const char* url, const char* method,
-                                  const char* version, const char* upload_data, size_t* upload_data_size,
-                                  void** con_cls)
-{
-    if (0 == strcmp(method, "GET")) {
-        return dispatchGETConnections(connection, url);
-    } else if (0 == strcmp(method, "POST")) {
-        return dispatchPOSTConnections(connection, url, upload_data, upload_data_size, con_cls);
-    } else {
-        return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     }
 }
 
