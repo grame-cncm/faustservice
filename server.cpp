@@ -44,6 +44,7 @@
 #include "match.hh"
 #include "server.hh"
 #include "utilities.hh"
+#include "htmlPages.hh"
 
 // to use command line tools
 #include <stdlib.h>
@@ -58,84 +59,6 @@ extern bool gAnyOrigin;  // when true adds Access-Control-Allow-Origin to http a
 
 #define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
 
-static string askpage_head =
-    "<html><body>\n\
-                       Upload a Faust file, please.<br>\n\
-                       There are ";
-
-static string askpage_tail =
-    " clients uploading at the moment.<br>\n\
-                       <form action=\"/filepost\" method=\"post\" enctype=\"multipart/form-data\">\n\
-                       <input name=\"file\" type=\"file\">\n\
-                       <input type=\"submit\" value=\" Send \"></form>\n\
-                       </body></html>";
-
-static string cannotcompile =
-    "<html><body>Could not execute the provided DSP program for the given architecture file.</body></html>";
-
-static string nosha1present = "<html><body>The given SHA1 key is not present in the directory.</body></html>";
-
-static string invalidosorarchitecture =
-    "<html><body>You have entered either an invalid operating system, an invalid architecture, or an invalid makefile command.\
-    Requests should be of the form:<br/>os/architecture/command<br/>For example:<br/>osx/csound/binary</body></html>";
-
-static string invalidinstruction =
-    "<html><body>The server only can generate binary, source, or svg for a given architecture.</body></html>";
-
-static string busypage = "<html><body>This server is busy, please try again later.</body></html>";
-
-static string completebuterrorpage =
-    "<html><body>The upload has been completed but your Faust file is corrupt. It has not been "
-    "registered.</body></html>";
-
-static string completebutmorethanoneDSPfile =
-    "<html><body>The upload has been completed but there is more than one DSP file in your archive. Only one is "
-    "allowed..</body></html>";
-
-static string completebutnoDSPfile =
-    "<html><body>The upload has been completed but there is no DSP file in your archive. You must have one and only "
-    "one.</body></html>";
-
-static string completebutdecompressionproblem =
-    "<html><body>The upload has been completed but the server could not decompress the archive.</body></html>";
-
-static string completebutendoftheworld =
-    "<html><body>An internal server error of epic proportions has occurred. This likely portends the end of the "
-    "world.</body></html>";
-
-static string completebutnopipe = "<html><body>Could not create a PIPE to faust on the server.</body></html>";
-
-static string completebutnohash =
-    "<html><body>The upload is completed but we could not generate a hash for your file.</body></html>";
-
-static string completebutcorrupt_head =
-    "<html><body><p>The upload is completed but the file you uploaded is not a valid Faust file. \
-  Make sure that it is either a file with an extension .dsp or an archive (tar.gz, tar.bz, tar \
-  or zip) containing one .dsp file and potentially .lib files included by the .dsp file. \
-  Furthermore, the code in these files must be valid Faust code.</p> \
-  <p>Below is the STDOUT and STDERR for the Faust code you tried to compile. \
-  If the two are empty, then your file structure is wrong. Otherwise, they will tell you \
-  why Faust failed.</p>";
-
-static string completebutcorrupt_tail = "</body></html>";
-
-static string completebutalreadythere_head =
-    "<html><body>The upload is completed but it looks like you have already uploaded this file.<br />Here is its SHA1 "
-    "key: ";
-
-static string completebutalreadythere_tail = "<br />Use this key for all subsequent GET commands.</body></html>";
-
-static string completepage_head = "<html><body>The upload is completed.<br />Here is its SHA1 key: ";
-
-static string completepage_tail = "<br />Use this key for all subsequent GET commands.</body></html>";
-
-static string errorpage = "<html><body>This doesn't seem to be right.</body></html>";
-
-static string servererrorpage = "<html><body>An internal server error has occured.</body></html>";
-
-static string fileexistspage = "<html><body>This file already exists.</body></html>";
-
-static string debugstub = "<html><body>Rien ne s'est cass&eacute; la figure. F&eacute;licitations !</body></html>";
 
 /*
  * Validates that a Faust file or archive is sane and returns 0 for success
@@ -660,7 +583,7 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
         std::cerr << "REAL BAD ERROR, NO SERVER !!!" << std::endl;
         exit(1);
     }
-    return server->answerConnection(connection, url, method, version, upload_data, upload_data_size, con_cls);
+    return server->dispatchPOSTandGETConnections(connection, url, method, version, upload_data, upload_data_size, con_cls);
 }
 
 /*
@@ -668,11 +591,11 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
  * by the server.
  */
 
-int FaustServer::answerGET(struct MHD_Connection* connection, const char* url)
+int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const char* url)
 {
     // TArgs args;
     // MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
-    std::cerr << "answerGET " << url << std::endl;
+    std::cerr << "dispatchGETConnections " << url << std::endl;
     if (/*!args.size() &&*/ strcmp(url, "/") == 0) {
         stringstream ss;
         ss << askpage_head << nr_of_uploading_clients << askpage_tail;
@@ -750,20 +673,20 @@ int FaustServer::faustGet(struct MHD_Connection* connection, const char* raw_url
     }
 }
 
-int FaustServer::answerConnection(struct MHD_Connection* connection, const char* url, const char* method,
+int FaustServer::dispatchPOSTandGETConnections(struct MHD_Connection* connection, const char* url, const char* method,
                                   const char* version, const char* upload_data, size_t* upload_data_size,
                                   void** con_cls)
 {
     if (0 == strcmp(method, "GET")) {
-        return answerGET(connection, url);
+        return dispatchGETConnections(connection, url);
     } else if (0 == strcmp(method, "POST")) {
-        return answerPOST(connection, url, upload_data, upload_data_size, con_cls);
+        return dispatchPOSTConnections(connection, url, upload_data, upload_data_size, con_cls);
     } else {
         return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     }
 }
 
-int FaustServer::answerPOST(struct MHD_Connection* connection, const char* url, const char* upload_data,
+int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const char* url, const char* upload_data,
                             size_t* upload_data_size, void** con_cls)
 {
     if (NULL == *con_cls) {
