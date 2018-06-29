@@ -24,12 +24,13 @@
 #include <string>
 #include <vector>
 
-// void segmentUrl(const char* url);
-
-// std::vector<std::string> decomposeURL(const char* url);
-
-bool matchURL(const char* url, const char* pat);
+//----------------------------------------------------------------
+// matchURL() returns true if the url and the pattern match
+// To match they must have the same number of elements
+// and all these elements must be identical, or wildcards ( '*' ).
+// Data contains the decomposition of the URL
 
 bool matchURL(const char* url, const char* pat, std::vector<std::string>& data);
+bool matchURL(const char* url, const char* pat);
 
 #endif

@@ -583,18 +583,10 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
         std::cerr << "REAL BAD ERROR, NO SERVER !!!" << std::endl;
         exit(1);
     }
-    return server->dispatchPOSTandGETConnections(connection, url, method, version, upload_data, upload_data_size,
-                                                 con_cls);
-}
-
-int FaustServer::dispatchPOSTandGETConnections(struct MHD_Connection* connection, const char* url, const char* method,
-                                               const char* version, const char* upload_data, size_t* upload_data_size,
-                                               void** con_cls)
-{
     if (0 == strcmp(method, "GET")) {
-        return dispatchGETConnections(connection, url);
+        return server->dispatchGETConnections(connection, url);
     } else if (0 == strcmp(method, "POST")) {
-        return dispatchPOSTConnections(connection, url, upload_data, upload_data_size, con_cls);
+        return server->dispatchPOSTConnections(connection, url, upload_data, upload_data_size, con_cls);
     } else {
         return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     }

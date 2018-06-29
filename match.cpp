@@ -10,22 +10,8 @@
 using namespace std;
 
 //----------------------------------------------------------------
-// segmentUrl(), print the segments of an URL
-// (used for debugging).
-
-static void segmentUrl(const char* url)
-{
-    boost::filesystem::path U(url);
-    cout << "SEGMENT URL: ";
-    for (auto n : U) {
-        cout << "[" << n.string() << "] ";
-    }
-    cout << endl;
-}
-
-//----------------------------------------------------------------
 // decomposeURL(), decompose an URL into a vector of strings.
-// Trailing / are removed
+// Used internally by matchURL. Trailing / are removed
 
 static vector<string> decomposeURL(const char* url)
 {
