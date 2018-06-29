@@ -41,10 +41,10 @@
 #include <archive.h>
 #include <archive_entry.h>
 
+#include "htmlPages.hh"
 #include "match.hh"
 #include "server.hh"
 #include "utilities.hh"
-#include "htmlPages.hh"
 
 // to use command line tools
 #include <stdlib.h>
@@ -58,7 +58,6 @@ using namespace std;
 extern bool gAnyOrigin;  // when true adds Access-Control-Allow-Origin to http answers
 
 #define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
-
 
 /*
  * Validates that a Faust file or archive is sane and returns 0 for success
@@ -576,26 +575,21 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
                                           const char* method, const char* version, const char* upload_data,
                                           size_t* upload_data_size, void** con_cls)
 {
-    std::cerr   << "FaustServer::staticAnswerToConnection(" << url << ", " 
-                << method << ", " << version << ")"
-                << std::endl;
-
-    segmentUrl(url);
-
-    if (matchURL(url, "/")) cout << "MATCH ROOT\n";
-    else if (matchURL(url, "/targets")) cout << "MATCH TARGETS\n";
+    std::cerr << "FaustServer::staticAnswerToConnection(" << url << ", " << method << ", " << version << ")"
+              << std::endl;
 
     FaustServer* server = (FaustServer*)cls;
     if (server == 0) {
         std::cerr << "REAL BAD ERROR, NO SERVER !!!" << std::endl;
         exit(1);
     }
-    return server->dispatchPOSTandGETConnections(connection, url, method, version, upload_data, upload_data_size, con_cls);
+    return server->dispatchPOSTandGETConnections(connection, url, method, version, upload_data, upload_data_size,
+                                                 con_cls);
 }
 
 int FaustServer::dispatchPOSTandGETConnections(struct MHD_Connection* connection, const char* url, const char* method,
-                                  const char* version, const char* upload_data, size_t* upload_data_size,
-                                  void** con_cls)
+                                               const char* version, const char* upload_data, size_t* upload_data_size,
+                                               void** con_cls)
 {
     if (0 == strcmp(method, "GET")) {
         return dispatchGETConnections(connection, url);
@@ -692,7 +686,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 }
 
 int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const char* url, const char* upload_data,
-                            size_t* upload_data_size, void** con_cls)
+                                         size_t* upload_data_size, void** con_cls)
 {
     if (NULL == *con_cls) {
         struct connection_info_struct* con_info;

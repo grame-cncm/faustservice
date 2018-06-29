@@ -24,9 +24,9 @@
 #include <string>
 #include <vector>
 
-void segmentUrl(const char* url);
+// void segmentUrl(const char* url);
 
-std::vector<std::string> decomposeURL(const char* url);
+// std::vector<std::string> decomposeURL(const char* url);
 
 bool matchURL(const char* url, const char* pat);
 
