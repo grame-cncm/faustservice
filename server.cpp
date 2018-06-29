@@ -611,6 +611,12 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/targets")) {
         return send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK, "application/json");
 
+    } else if (matchURL(url, "*/*/*/binary.zip")) {
+        return makeAndSendResourceFile(connection, url);
+
+    } else if (matchURL(url, "*/*/*/binary.apk")) {
+        return makeAndSendResourceFile(connection, url);
+
     } else if (matchURL(url, "/favicon.ico")) {
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
 
@@ -619,9 +625,9 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     }
 }
 
-/*
- * Handle a GET command by "making" the appropriate resource and returning it
- */
+//------------------------------------------------------------------
+// Handle a GET command by "making" the appropriate resource file
+// and returning it
 
 int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, const char* raw_url)
 {
@@ -676,6 +682,9 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
         }
     }
 }
+
+//------------------------------------------------------------------
+// dispatchPOSTConnections(), handle POST of a Faust source file 
 
 int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const char* url, const char* upload_data,
                                          size_t* upload_data_size, void** con_cls)
@@ -802,6 +811,7 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
 
     return MHD_YES;
 }
+
 
 FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory,
                          const fs::path& logfile)
