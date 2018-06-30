@@ -623,6 +623,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
 
     } else {
+        std::cerr << "WARNING: We should have a rule to match this URL " << url << std::endl;
         return makeAndSendResourceFile(connection, url);
     }
 }
@@ -692,7 +693,7 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
                                          size_t* upload_data_size, void** con_cls)
 {
     if (NULL == *con_cls) {
-        std::cerr << "PRE POST processing ???" << std::endl;
+        std::cerr << "PRE POST processing" << std::endl;
         struct connection_info_struct* con_info;
 
         if (nr_of_uploading_clients >= this->getMaxClients()) {
