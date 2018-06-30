@@ -575,7 +575,7 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
                                           const char* method, const char* version, const char* upload_data,
                                           size_t* upload_data_size, void** con_cls)
 {
-    std::cerr << "FaustServer::staticAnswerToConnection(" << url << ", " << method << ", " << version << ")"
+    std::cerr << "\n==> ANSWER CONNECTION (" << url << ", " << method << ", " << version << ")"
               << std::endl;
 
     FaustServer* server = (FaustServer*)cls;
@@ -592,10 +592,9 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
     }
 }
 
-/*
- * Actual callback method called every time a GET or POST request is received.
- * by the server.
- */
+//------------------------------------------------------------------
+// Actual callback method called every time a GET or POST request is received.
+// by the server.
 
 int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const char* url)
 {
@@ -611,10 +610,13 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/targets")) {
         return send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK, "application/json");
 
-    } else if (matchURL(url, "*/*/*/binary.zip")) {
+    } else if (matchURL(url, "/*/*/*/binary.zip")) {
         return makeAndSendResourceFile(connection, url);
 
-    } else if (matchURL(url, "*/*/*/binary.apk")) {
+    } else if (matchURL(url, "/*/*/*/binary.apk")) {
+        return makeAndSendResourceFile(connection, url);
+
+    } else if (matchURL(url, "/*/diagram/process.svg")) {
         return makeAndSendResourceFile(connection, url);
 
     } else if (matchURL(url, "/favicon.ico")) {
@@ -684,12 +686,13 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 }
 
 //------------------------------------------------------------------
-// dispatchPOSTConnections(), handle POST of a Faust source file 
+// dispatchPOSTConnections(), handle POST of a Faust source file
 
 int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const char* url, const char* upload_data,
                                          size_t* upload_data_size, void** con_cls)
 {
     if (NULL == *con_cls) {
+        std::cerr << "PRE POST processing ???" << std::endl;
         struct connection_info_struct* con_info;
 
         if (nr_of_uploading_clients >= this->getMaxClients()) {
@@ -720,33 +723,52 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
         *con_cls = (void*)con_info;
 
         return MHD_YES;
-    }
 
-    std::cerr << "POST processing" << std::endl;
-    struct connection_info_struct* con_info = (connection_info_struct*)*con_cls;
-
-    if (0 != *upload_data_size) {
-        int result        = MHD_post_process(con_info->postprocessor, upload_data, *upload_data_size);
-        *upload_data_size = 0;
-        return result;
     } else {
-        // need to close the file before request_completed
-        // so that it can be opened by the methods below
-        if (con_info->fp) {
-            fclose(con_info->fp);
-            con_info->fp = 0;
+        std::cerr << "POST processing" << std::endl;
+        struct connection_info_struct* con_info = (connection_info_struct*)*con_cls;
+
+        if (0 != *upload_data_size) {
+            std::cerr << "POST processing, we have data to upload !" << std::endl;
+            int result        = MHD_post_process(con_info->postprocessor, upload_data, *upload_data_size);
+            *upload_data_size = 0;
+            return result;
+        } else {
+            std::cerr << "POST processing, NO MORE data to upload !" << std::endl;
+            // need to close the file before request_completed
+            // so that it can be opened by the methods below
+            if (con_info->fp) {
+                std::cerr << "POST processing, We can close the file !" << std::endl;
+                fclose(con_info->fp);
+                con_info->fp = 0;
+            }
+
+            string sha1;
+            if (validate_faust(con_info) == 0) {
+                // warning validate_faust returns errocode 0 when the faust code is correct !
+                std::vector<std::string> segments;
+                sha1 = generate_sha1(con_info);
+                make_initial_faust_directory(con_info, sha1);
+                std::cerr << "POST processing, We have valid faust code. Its SHA1 key is = " << sha1 << std::endl;
+                if (matchURL(url, "/compile/*/*/*", segments)) {
+                    string newurl("/");
+                    newurl += sha1 + "/" + segments[2] + "/" + segments[3] + "/" + segments[4];
+                    std::cerr << "We are trying a direct compilation at " << newurl << endl;
+                    return makeAndSendResourceFile(connection, newurl.c_str());
+                } else {
+                    return send_page(connection, con_info->answerstring.c_str(), con_info->answerstring.size(),
+                                     con_info->answercode, "text/html");
+                }
+            } else {
+                std::cerr << "POST processing, We have an INVALID faust code" << std::endl;
+                return send_page(connection, con_info->answerstring.c_str(), con_info->answerstring.size(),
+                                 con_info->answercode, "text/html");
+            }
         }
 
-        if (!validate_faust(con_info)) {
-            string sha1 = generate_sha1(con_info);
-            make_initial_faust_directory(con_info, sha1);
-        }
-        return send_page(connection, con_info->answerstring.c_str(), con_info->answerstring.size(),
-                         con_info->answercode, "text/html");
+        std::cerr << "NEVER EXECUTED" << std::endl;
+        return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     }
-
-    std::cerr << "NEVER EXECUTED" << std::endl;
-    return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
 }
 
 /*
@@ -811,7 +833,6 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
 
     return MHD_YES;
 }
-
 
 FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory,
                          const fs::path& logfile)

@@ -52,7 +52,11 @@ For OSX :
 
 #### Testing the service using Curl ####
 
-curl http://localhost:8888/targets
-curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"'  http://localhost:8888/filepost
-returned SHA key: 5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF
-curl http://localhost:8888/5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF/android/smartkeyb/binary.apk --output binary.apk
+	curl http://localhost:8888/targets
+	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"'  http://localhost:8888/filepost
+	returned SHA key: 5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF
+	curl http://localhost:8888/5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF/android/smartkeyb/binary.apk --output binary.apk
+
+#### Direct compilation
+
+	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"'  http://localhost:8888/compile/android/android/binary.apk --output binary3.apk
