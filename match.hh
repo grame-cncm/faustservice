@@ -24,13 +24,15 @@
 #include <string>
 #include <vector>
 
+std::string simplifyURL(const char* url);
+
 //----------------------------------------------------------------
 // matchURL() returns true if the url and the pattern match
 // To match they must have the same number of elements
 // and all these elements must be identical, or wildcards ( '*' ).
 // Data contains the decomposition of the URL
 
-bool matchURL(const char* url, const char* pat, std::vector<std::string>& data);
-bool matchURL(const char* url, const char* pat);
+bool matchURL(const std::string& url, const char* pat, std::vector<std::string>& data);
+bool matchURL(const std::string& url, const char* pat);
 
 #endif

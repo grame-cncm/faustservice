@@ -571,12 +571,13 @@ void FaustServer::stop()
  * by the server.
  */
 
-int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* connection, const char* url,
+int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* connection, const char* rawurl,
                                           const char* method, const char* version, const char* upload_data,
                                           size_t* upload_data_size, void** con_cls)
 {
-    std::cerr << "\n==> ANSWER CONNECTION (" << url << ", " << method << ", " << version << ")"
+    std::cerr << "\n==> ANSWER CONNECTION (" << rawurl << ", " << method << ", " << version << ")"
               << std::endl;
+    string URL = simplifyURL(rawurl);
 
     FaustServer* server = (FaustServer*)cls;
     if (server == 0) {
@@ -584,9 +585,9 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
         exit(1);
     }
     if (0 == strcmp(method, "GET")) {
-        return server->dispatchGETConnections(connection, url);
+        return server->dispatchGETConnections(connection, URL);
     } else if (0 == strcmp(method, "POST")) {
-        return server->dispatchPOSTConnections(connection, url, upload_data, upload_data_size, con_cls);
+        return server->dispatchPOSTConnections(connection, URL, upload_data, upload_data_size, con_cls);
     } else {
         return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     }
@@ -596,7 +597,7 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
 // Actual callback method called every time a GET or POST request is received.
 // by the server.
 
-int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const char* url)
+int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const string& url)
 {
     // TArgs args;
     // MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
@@ -632,7 +633,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 // Handle a GET command by "making" the appropriate resource file
 // and returning it
 
-int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, const char* raw_url)
+int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, const string& raw_url)
 {
     fs::path    url      = fs::path(raw_url);
     fs::path    fulldir  = this->getDirectory() / url.parent_path();
@@ -689,7 +690,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 //------------------------------------------------------------------
 // dispatchPOSTConnections(), handle POST of a Faust source file
 
-int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const char* url, const char* upload_data,
+int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const string& url, const char* upload_data,
                                          size_t* upload_data_size, void** con_cls)
 {
     if (NULL == *con_cls) {

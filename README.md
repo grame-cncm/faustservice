@@ -67,4 +67,7 @@ For OSX :
 	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"'  
 	curl http://35.229.105.70/faustservice/compile/android/android/binary.apk --output binary3.apk
 	curl http://35.229.105.70/faustservice/5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF/android/android/binary.apk --output binary3.apk
+	journalctl -f /home/orlarey/FaustInstall/faustservice/faustweb
+	sudo systemctl restart faustweb
+	sudo systemctl restart apache2
 

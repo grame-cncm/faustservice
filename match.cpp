@@ -10,10 +10,26 @@
 using namespace std;
 
 //----------------------------------------------------------------
+// simplifyURL(), remove duplicated /
+string simplifyURL(const char* url)
+{
+    const char*   p=url;  // current char in url
+    int     n=0;    // number of successive '/'
+    string  r;      // resulting simplified URL
+
+    for (char c = *p; c != 0; c = *(++p)) {
+        n = (c == '/') ? n+1 : 0;
+        if (n < 2) r += c;
+    }
+    cerr << "Simplify url " << url << " --> " << r << endl;
+    return r;
+}
+
+//----------------------------------------------------------------
 // decomposeURL(), decompose an URL into a vector of strings.
 // Used internally by matchURL. Trailing / are removed
 
-static vector<string> decomposeURL(const char* url)
+static vector<string> decomposeURL(const string& url)
 {
     boost::filesystem::path U(url);
     vector<string>          decomposition;
@@ -30,7 +46,7 @@ static vector<string> decomposeURL(const char* url)
 // and all these elements must be identical, or wildcards ( '*' ).
 // Data contains the decomposition of the URL
 
-bool matchURL(const char* url, const char* pat, vector<string>& data)
+bool matchURL(const string& url, const char* pat, vector<string>& data)
 {
     vector<string> U = decomposeURL(url);
     vector<string> P = decomposeURL(pat);
@@ -53,7 +69,7 @@ bool matchURL(const char* url, const char* pat, vector<string>& data)
 // To match they must have the same number of elements
 // and all these elements must be identical, or wildcards ( '*' ).
 
-bool matchURL(const char* url, const char* pat)
+bool matchURL(const string& url, const char* pat)
 {
     vector<string> ignore;
     return matchURL(url, pat, ignore);
