@@ -575,8 +575,7 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
                                           const char* method, const char* version, const char* upload_data,
                                           size_t* upload_data_size, void** con_cls)
 {
-    std::cerr << "\n==> ANSWER CONNECTION (" << rawurl << ", " << method << ", " << version << ")"
-              << std::endl;
+    std::cerr << "\n==> ANSWER CONNECTION (" << rawurl << ", " << method << ", " << version << ")" << std::endl;
     string URL = simplifyURL(rawurl);
 
     FaustServer* server = (FaustServer*)cls;

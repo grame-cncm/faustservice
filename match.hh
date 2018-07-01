@@ -24,6 +24,9 @@
 #include <string>
 #include <vector>
 
+//----------------------------------------------------------------
+// simplifyURL(), remove duplicated '/' in the URL
+
 std::string simplifyURL(const char* url);
 
 //----------------------------------------------------------------

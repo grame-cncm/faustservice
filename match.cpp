@@ -10,15 +10,16 @@
 using namespace std;
 
 //----------------------------------------------------------------
-// simplifyURL(), remove duplicated /
+// simplifyURL(), remove duplicated '/' in the URL
+
 string simplifyURL(const char* url)
 {
-    const char*   p=url;  // current char in url
-    int     n=0;    // number of successive '/'
-    string  r;      // resulting simplified URL
+    const char* p = url;  // current char in url
+    int         n = 0;    // number of successive '/'
+    string      r;        // resulting simplified URL
 
     for (char c = *p; c != 0; c = *(++p)) {
-        n = (c == '/') ? n+1 : 0;
+        n = (c == '/') ? n + 1 : 0;
         if (n < 2) r += c;
     }
     cerr << "Simplify url " << url << " --> " << r << endl;

@@ -39,8 +39,8 @@ using namespace std;
 
 struct connection_info_struct {
     int                       connectiontype;  // GET or POST
-    struct MHD_PostProcessor *postprocessor;   // the POST processor used internally by microhttpd
-    FILE *                    fp;              // a pointer to the file to which the data is being written
+    struct MHD_PostProcessor* postprocessor;   // the POST processor used internally by microhttpd
+    FILE*                     fp;              // a pointer to the file to which the data is being written
     string                    tmppath;         // the path in which the provisional file exists
     string                    filename;        // the name of the file
     string                    answerstring;    // the answer sent to the user after upload
@@ -60,12 +60,12 @@ class FaustServer {
     fs::path           fDirectory;
     fs::path           fMakefileDirectory;
     fs::path           fLogfile;
-    struct MHD_Daemon *fDaemon;
+    struct MHD_Daemon* fDaemon;
     string             fTargets;
 
    public:
-    FaustServer(int port, int max_clients, const fs::path &directory, const fs::path &makefile_directory,
-                const fs::path &logfile);
+    FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory,
+                const fs::path& logfile);
 
     virtual ~FaustServer(){};
 
@@ -92,25 +92,25 @@ class FaustServer {
    private:
     static unsigned int nr_of_uploading_clients;
 
-    static int get_params(void *cls, enum MHD_ValueKind, const char *key, const char *data);
-    static int send_page(struct MHD_Connection *connection, const char *page, int length, int status_code,
-                         const char *type);
-    static int send_file(struct MHD_Connection *connection, const fs::path &filepath, const char *mimetype);
-    static int iterate_post(void *coninfo_cls, enum MHD_ValueKind kind, const char *key, const char *filename,
-                            const char *content_type, const char *transfer_encoding, const char *data, uint64_t off,
+    static int get_params(void* cls, enum MHD_ValueKind, const char* key, const char* data);
+    static int send_page(struct MHD_Connection* connection, const char* page, int length, int status_code,
+                         const char* type);
+    static int send_file(struct MHD_Connection* connection, const fs::path& filepath, const char* mimetype);
+    static int iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const char* key, const char* filename,
+                            const char* content_type, const char* transfer_encoding, const char* data, uint64_t off,
                             size_t size);
 
-    static void request_completed(void *cls, struct MHD_Connection *connection, void **con_cls,
+    static void request_completed(void* cls, struct MHD_Connection* connection, void** con_cls,
                                   enum MHD_RequestTerminationCode toe);
-    static int  staticAnswerToConnection(void *cls, struct MHD_Connection *connection, const char *url,
-                                         const char *method, const char *version, const char *upload_data,
-                                         size_t *upload_data_size, void **con_cls);
+    static int  staticAnswerToConnection(void* cls, struct MHD_Connection* connection, const char* url,
+                                         const char* method, const char* version, const char* upload_data,
+                                         size_t* upload_data_size, void** con_cls);
 
-    int dispatchGETConnections(struct MHD_Connection *connection, const string& url);
-    int dispatchPOSTConnections(struct MHD_Connection *connection, const string& url, const char *upload_data,
-                                size_t *upload_data_size, void **con_cls);
+    int dispatchGETConnections(struct MHD_Connection* connection, const string& url);
+    int dispatchPOSTConnections(struct MHD_Connection* connection, const string& url, const char* upload_data,
+                                size_t* upload_data_size, void** con_cls);
 
-    int makeAndSendResourceFile(struct MHD_Connection *connection, const string& raw_url);
+    int makeAndSendResourceFile(struct MHD_Connection* connection, const string& raw_url);
 };
 
 #endif
