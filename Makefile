@@ -13,7 +13,7 @@ LDFLAGS = -L/opt/local/lib
 CXXFLAGS = -Wall -Wno-unused-local-typedef -O3 -I/opt/local/include
 else
 EXT = ""
-CXXFLAGS = -Wall -O3
+CXXFLAGS = -Wall -O3 -DBOOST_NO_CXX11_SCOPED_ENUMS
 endif
 
 faustweb: *.cpp *.hh
