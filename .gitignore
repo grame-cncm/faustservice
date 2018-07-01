@@ -1,0 +1,7 @@
+sessions
+.vscode
+faustweb
+faustwebclient
+faustwebtest
+build-Makefile.*
+

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+#USAGE : test <architecture>|all
+
+function testarchitecture {
+    echo "test file $f with $1 architectures"
+    for m in "../makefiles/$1/Makefile".*; do
+        a="${m##*.}"
+        echo -n "compile $f / $a : "
+        ((curl  -F'file=@"kisana.dsp";filename="kisana.dsp"'  http://localhost:8888/compile/$1/$a/binary.zip --output binary.zip) && echo "passed" ) || echo "failed"
+    done
+}
+
+rm -f LOG
+
+if [ "$1" == "all" ]; then
+	for arch in ../makefiles/*; do
+		if [ -d "$arch" ]; then
+			testarchitecture $(basename "$arch")
+		fi
+	done
+else
+	testarchitecture "$1"
+fi
+
+

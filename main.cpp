@@ -6,20 +6,20 @@
  and/or modify it under the terms of the GNU General Public License
  as published by the Free Software Foundation; either version 3 of
  the License, or (at your option) any later version.
- 
+
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
- 
+
  You should have received a copy of the GNU General Public License
  along with this program; If not, see <http://www.gnu.org/licenses/>.
- 
+
  EXCEPTION : As a special exception, you may create a larger work
  that contains this FAUST architecture section and distribute
  that work under terms of your choice, so long as this FAUST
  architecture section is not modified.
- 
+
  ************************************************************************
  ************************************************************************/
 
@@ -31,32 +31,31 @@
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
 
+#include <unistd.h>
 #include "server.hh"
 #include "utilities.hh"
-#include <unistd.h>
 
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 
-int gPort = 8888;
-int gMaxClients = 2;
-bool gAnyOrigin = true;
+int  gPort       = 8888;
+int  gMaxClients = 2;
+bool gAnyOrigin  = true;
 
-fs::path gCurrentDirectory;			///< root directory were makefiles and sessions and log are located
-fs::path gSessionsDirectory;		///< directory where sessions are stored
-fs::path gMakefilesDirectory;		///< directory containing all the "<os>/Makefile.<architecture>[-32bits|-64bits]" makefiles
-fs::path gLogfile;					///< faustweb logfile
+fs::path gCurrentDirectory;   ///< root directory were makefiles and sessions and log are located
+fs::path gSessionsDirectory;  ///< directory where sessions are stored
+fs::path
+         gMakefilesDirectory;  ///< directory containing all the "<os>/Makefile.<architecture>[-32bits|-64bits]" makefiles
+fs::path gLogfile;             ///< faustweb logfile
 
 // Processes command line arguments using boost/parse_options
 static void process_cmdline(int argc, char* argv[])
 {
     po::options_description desc("faustserver program options.");
-    desc.add_options()
-    ("sessions-dir,d", po::value<string>(), "directory in which sessions files will be written")
-    ("help,h", "produce this help message")
-    ("any-origin,a", "Adds any origin when answering requests")
-    ("max-clients,m", po::value<int>(), "maximum number of clients allowed to concurrently upload")
-    ("port,p", po::value<int>(), "the listening port");
+    desc.add_options()("sessions-dir,d", po::value<string>(), "directory in which sessions files will be written")(
+        "help,h", "produce this help message")("any-origin,a", "Adds any origin when answering requests")(
+        "max-clients,m", po::value<int>(), "maximum number of clients allowed to concurrently upload")(
+        "port,p", po::value<int>(), "the listening port");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -86,15 +85,14 @@ static void process_cmdline(int argc, char* argv[])
     if (vm.count("sessions-dir")) {
         gSessionsDirectory = vm["sessions-dir"].as<string>();
     }
-
 }
 
 int main(int argc, char* argv[], char* env[])
 {
     // Set the various default paths
-    gCurrentDirectory = fs::absolute(fs::current_path());
+    gCurrentDirectory   = fs::absolute(fs::current_path());
     gMakefilesDirectory = gCurrentDirectory / "makefiles";
-    gSessionsDirectory = gCurrentDirectory / "sessions";
+    gSessionsDirectory  = gCurrentDirectory / "sessions";
 
     try {
         process_cmdline(argc, argv);
@@ -103,12 +101,9 @@ int main(int argc, char* argv[], char* env[])
         exit(1);
     }
 
-
     std::cerr << "faustweb starting "
-            << " port:" << gPort
-            << " directory:" << gCurrentDirectory
-            << " sessions-dir:" << gSessionsDirectory
-            << std::endl;
+              << " port:" << gPort << " directory:" << gCurrentDirectory << " sessions-dir:" << gSessionsDirectory
+              << std::endl;
 
     // Print running environment
     std::cerr << "\n\nBEGIN ENVIRONMENT" << std::endl;
@@ -132,7 +127,7 @@ int main(int argc, char* argv[], char* env[])
         std::cerr << "Reuse \"sessions\" directory at path " << gSessionsDirectory << std::endl;
     }
 
-	// Create, start and stop the http server
+    // Create, start and stop the http server
     FaustServer server(gPort, gMaxClients, gSessionsDirectory, gMakefilesDirectory, gLogfile);
 
     if (!server.start()) {
@@ -143,7 +138,7 @@ int main(int argc, char* argv[], char* env[])
     }
 
     std::cerr << "type ctrl-c to quit" << std::endl;
-    
+
     while (true) {
         // We never stop the server
         sleep(30);
