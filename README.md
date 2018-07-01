@@ -50,6 +50,24 @@ For OSX :
 	osx/puredata	
 	osx/vst
 
-#### Building a port with curl ####
+#### Testing the service using Curl ####
 
-curl -F'file=@"/Users/yannorlarey/Develop/faust/examples/highShelf.dsp";filename="highShelf.dsp"'  http://localhost:8080/filepost
+	curl http://localhost:8888/targets
+	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"'  http://localhost:8888/filepost
+	returned SHA key: 5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF
+	curl http://localhost:8888/5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF/android/smartkeyb/binary.apk --output binary.apk
+
+#### Direct compilation
+
+	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"'  http://localhost:8888/compile/android/android/binary.apk --output binary3.apk
+
+#### google cloud compilation
+
+	curl http://35.229.105.70/faustservice/targets
+	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"'  
+	curl http://35.229.105.70/faustservice/compile/android/android/binary.apk --output binary3.apk
+	curl http://35.229.105.70/faustservice/5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF/android/android/binary.apk --output binary3.apk
+	journalctl -f /home/orlarey/FaustInstall/faustservice/faustweb
+	sudo systemctl restart faustweb
+	sudo systemctl restart apache2
+

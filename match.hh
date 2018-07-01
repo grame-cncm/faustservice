@@ -1,6 +1,6 @@
 /************************************************************************
- FAUST Architecture File
- Copyright (C) 2017 GRAME, Centre National de Creation Musicale
+ FAUST Service
+ Copyright (C) 2018, GRAME, Centre National de Creation Musicale
  ---------------------------------------------------------------------
  This Architecture section is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public License
@@ -15,28 +15,27 @@
  You should have received a copy of the GNU General Public License
  along with this program; If not, see <http://www.gnu.org/licenses/>.
 
- EXCEPTION : As a special exception, you may create a larger work
- that contains this FAUST architecture section and distribute
- that work under terms of your choice, so long as this FAUST
- architecture section is not modified.
-
  ************************************************************************
  ************************************************************************/
 
-#ifndef _UTILITIES_
-#define _UTILITIES_
+#ifndef _MATCH_
+#define _MATCH_
 
-#include <map>
 #include <string>
 #include <vector>
 
-using namespace std;
+//----------------------------------------------------------------
+// simplifyURL(), remove duplicated '/' in the URL
 
-#define POSTBUFFERSIZE 512
+std::string simplifyURL(const char* url);
 
-#define GET 0
-#define POST 1
+//----------------------------------------------------------------
+// matchURL() returns true if the url and the pattern match
+// To match they must have the same number of elements
+// and all these elements must be identical, or wildcards ( '*' ).
+// Data contains the decomposition of the URL
 
-typedef map<string, string> TArgs;
+bool matchURL(const std::string& url, const char* pat, std::vector<std::string>& data);
+bool matchURL(const std::string& url, const char* pat);
 
 #endif

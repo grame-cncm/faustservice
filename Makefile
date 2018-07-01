@@ -17,7 +17,7 @@ CXXFLAGS = -Wall -O3
 endif
 
 faustweb: *.cpp *.hh
-	g++ $(CXXFLAGS) *.cpp $(LDFLAGS) \
+	g++ -std=c++11 $(CXXFLAGS) *.cpp $(LDFLAGS) \
 	-lmicrohttpd -lboost_filesystem$(EXT) -lboost_system$(EXT) -lboost_program_options$(EXT) \
 	-larchive -lcrypto -lm \
 	-o faustweb
@@ -26,7 +26,7 @@ clean :
 	rm faustweb
 
 format :
-	astyle *.cpp *.hh
+	clang-format-mp-5.0 -i -style=file *.cpp *.hh
 
 install_systemd:
 	install faustweb.service /etc/systemd/system/faustweb.service
