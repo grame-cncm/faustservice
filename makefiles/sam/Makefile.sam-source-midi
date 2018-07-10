@@ -1,0 +1,14 @@
+################################################################################
+#							FaustWeb OSX script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2sam -midi $(faustfile) 
+	mv *-sam.zip binary.zip
+
+src.cpp : $(faustfile)
+	faust $(faustfile) -o src.cpp
