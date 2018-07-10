@@ -8,7 +8,6 @@ faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
 	faust2webaudiowasm -poly $(faustfile)
-	cp /usr/local/share/faust/webaudio/mixer32.wasm .
 	zip -r binary.zip $(faustfile:.dsp=.html) $(faustfile:.dsp=.wasm) mixer32.wasm
 
 src.cpp : $(faustfile)
