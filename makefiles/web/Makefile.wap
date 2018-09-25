@@ -1,14 +1,14 @@
 ################################################################################
 # 
-#			FaustWeb Makefile for wasm applications
+#			FaustWeb Makefile for WAP (Web Audio Plugin)
 # 
 ################################################################################
 
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2wasm -worklet $(faustfile)
-	zip -r binary.zip $(faustfile:.dsp=.js) $(faustfile:.dsp=-processor.js) $(faustfile:.dsp=.wasm)
+	faust2wasm -wap $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=.js) $(faustfile:.dsp=-processor.js) $(faustfile:.dsp=.wasm) main.json
 
 src.cpp : $(faustfile)
 	faust -lang wasm -i -a webaudio/webaudio-wasm-standalone-wrapper.js $(faustfile) -o src.js
