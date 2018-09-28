@@ -7,7 +7,7 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2wasm -wap $(faustfile)
+	faust2wasm -wap -poly $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=.js) $(faustfile:.dsp=-processor.js) test$(faustfile:.dsp=.html) main.json
 
 src.cpp : $(faustfile)
