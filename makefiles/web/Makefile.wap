@@ -8,7 +8,7 @@ faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
 	faust2wasm -wap $(faustfile)
-	zip -r binary.zip $(faustfile:.dsp=.js) $(faustfile:.dsp=-processor.js) test$(faustfile:.dsp=.html) main.json
+	zip -r binary.zip $(faustfile:.dsp=.js) $(faustfile:.dsp=-processor.js) test$(faustfile:.dsp=.html) main.json CleanGuitarRiff.mp3
 
 src.cpp : $(faustfile)
 	faust -lang wasm -i -a webaudio/webaudio-wasm-standalone-wrapper.js $(faustfile) -o src.js
