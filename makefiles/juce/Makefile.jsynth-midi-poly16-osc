@@ -7,7 +7,7 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2juce -midi $(faustfile)
+	faust2juce -midi -jsynth -nvoices 16 -osc $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=)
 
 src.cpp : $(faustfile)
