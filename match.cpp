@@ -73,5 +73,10 @@ bool matchURL(const string& url, const char* pat, vector<string>& data)
 bool matchURL(const string& url, const char* pat)
 {
     vector<string> ignore;
-    return matchURL(url, pat, ignore);
+    bool           r = matchURL(url, pat, ignore);
+    if (r)
+        cout << "MATCH " << pat << " <== " << url << endl;
+    else
+        cout << "DONT MATCH " << pat << " <== " << url << endl;
+    return r;
 }

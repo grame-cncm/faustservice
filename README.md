@@ -70,3 +70,13 @@ For OSX :
 	sudo systemctl restart faustweb
 	sudo systemctl restart apache2
 
+#### Playing with faustservice on google VM
+
+	curl http://35.190.180.34/targets
+	curl http://104.196.34.150/targets
+
+
+#### Tests en local
+
+	curl localhost:8888/targets
+	curl -F'file=@"kisana.dsp";filename="kisana.dsp"' localhost:8888/compile/android/android/binary.apk --output kisana.apk

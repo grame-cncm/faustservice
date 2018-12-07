@@ -7,7 +7,7 @@ function testarchitecture {
     for m in "../makefiles/$1/Makefile".*; do
         a="${m##*.}"
         echo -n "compile $f / $a : "
-        ((curl  -F'file=@"kisana.dsp";filename="kisana.dsp"'  http://localhost:8888/compile/$1/$a/binary.zip --output binary.zip) && echo "passed" ) || echo "failed"
+        ((curl  -F'file=@"kisana.dsp";filename="kisana.dsp"'  http://35.229.105.70/compile/$1/$a/binary.zip --output binary.zip) && echo "passed" ) || echo "failed"
     done
 }
 

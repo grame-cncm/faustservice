@@ -600,7 +600,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 {
     // TArgs args;
     // MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
-    std::cerr << "dispatchGETConnections " << url << std::endl;
+    std::cerr << "ANSWER GET CONNECTION " << url << std::endl;
 
     if (matchURL(url, "/")) {
         stringstream ss;
@@ -692,6 +692,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const string& url, const char* upload_data,
                                          size_t* upload_data_size, void** con_cls)
 {
+    std::cerr << "ANSWER POST CONNECTION " << url << std::endl;
     if (NULL == *con_cls) {
         std::cerr << "PRE POST processing" << std::endl;
         struct connection_info_struct* con_info;
@@ -726,7 +727,7 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
         return MHD_YES;
 
     } else {
-        std::cerr << "POST processing" << std::endl;
+        std::cerr << "HEY! POST processing" << std::endl;
         struct connection_info_struct* con_info = (connection_info_struct*)*con_cls;
 
         if (0 != *upload_data_size) {
@@ -754,7 +755,7 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
                 if (matchURL(url, "/compile/*/*/*", segments)) {
                     string newurl("/");
                     newurl += sha1 + "/" + segments[2] + "/" + segments[3] + "/" + segments[4];
-                    std::cerr << "We are trying a direct compilation at " << newurl << endl;
+                    std::cerr << "DIRECT COMPILATION: We are trying a direct compilation at " << newurl << endl;
                     return makeAndSendResourceFile(connection, newurl.c_str());
                 } else {
                     return send_page(connection, con_info->answerstring.c_str(), con_info->answerstring.size(),
