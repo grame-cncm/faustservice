@@ -79,4 +79,5 @@ For OSX :
 #### Tests en local
 
 	curl localhost:8888/targets
-	curl -F'file=@"kisana.dsp";filename="kisana.dsp"' localhost:8888/compile/android/android/binary.apk --output kisana.apk
+	curl -F'file=@"kisana.dsp";filename="kisana.dsp"' localhost:8888/filepost
+	curl -F'file=@"kisana.dsp";filename="kisana.dsp"' localhost:8888/compile/android/android/binary.zip --output kisana.apk
