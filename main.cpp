@@ -87,6 +87,23 @@ static void process_cmdline(int argc, char* argv[])
     }
 }
 
+static void printFaustVersion()
+{
+    int err = system("faust -v");
+    if (err != 0) std::cerr << "ERROR: Faust not found";
+}
+
+static size_t computeSessionSize()
+{
+    size_t size = 0;
+
+    fs::recursive_directory_iterator it(gSessionsDirectory);
+    for (; it != fs::recursive_directory_iterator(); ++it) {
+        if (!fs::is_directory(*it)) size += fs::file_size(*it);
+    }
+    return size;
+}
+
 int main(int argc, char* argv[], char* env[])
 {
     // Set the various default paths
@@ -101,9 +118,16 @@ int main(int argc, char* argv[], char* env[])
         exit(1);
     }
 
-    std::cerr << "faustweb starting "
-              << " port:" << gPort << " directory:" << gCurrentDirectory << " sessions-dir:" << gSessionsDirectory
+    std::cerr << "faustweb starting \n"
+              << "\n"
+              << "         port: " << gPort << "\n"
+              << "    directory: " << gCurrentDirectory << "\n"
+              << " sessions dir: " << gSessionsDirectory << "\n"
+              << "sessions size: " << computeSessionSize() << "\n"
               << std::endl;
+
+    // Print Faust version
+    printFaustVersion();
 
     // Print running environment
     std::cerr << "\n\nBEGIN ENVIRONMENT" << std::endl;
