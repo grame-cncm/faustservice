@@ -141,7 +141,7 @@ int main(int argc, char* argv[], char* env[])
     for (int i = 0; env[i] != 0; i++) {
         std::cerr << env[i] << std::endl;
     }
-    std::cerr << "END ENVIRONMENT\n" << std::endl;
+    std::cerr << "END ENVIRONMENT\n\n" << std::endl;
 
     // Check for ".../makefiles/" directory
     if (is_directory(gMakefilesDirectory)) {
