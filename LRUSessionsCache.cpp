@@ -1,4 +1,4 @@
-#include "sessioncache.hh"
+#include "LRUSessionsCache.hh"
 
 // LRUSessionsCache : a system that limits the number of cached sessions
 LRUSessionsCache::LRUSessionsCache(const fs::path& aSessionsDir, int aMaxSize)

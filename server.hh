@@ -26,8 +26,8 @@
 #ifndef _FAUST_SERVER_
 #define _FAUST_SERVER_
 
+#include "LRUSessionsCache.hh"
 #include "microhttpd.h"
-#include "sessioncache.hh"
 #include "utilities.hh"
 
 // Boost libraries
