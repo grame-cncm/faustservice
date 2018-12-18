@@ -30,7 +30,7 @@ string simplifyURL(const char* url)
 // decomposeURL(), decompose an URL into a vector of strings.
 // Used internally by matchURL. Trailing / are removed
 
-static vector<string> decomposeURL(const string& url)
+vector<string> decomposeURL(const string& url)
 {
     boost::filesystem::path U(url);
     vector<string>          decomposition;

@@ -29,6 +29,8 @@
 
 std::string simplifyURL(const char* url);
 
+std::vector<std::string> decomposeURL(const std::string& url);
+
 //----------------------------------------------------------------
 // matchURL() returns true if the url and the pattern match
 // To match they must have the same number of elements
