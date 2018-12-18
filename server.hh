@@ -67,7 +67,7 @@ class FaustServer {
 
    public:
     FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory,
-                const fs::path& logfile);
+                const fs::path& logfile, int maxSessions);
 
     virtual ~FaustServer(){};
 

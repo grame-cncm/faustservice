@@ -38,9 +38,10 @@
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 
-int  gPort       = 8888;
-int  gMaxClients = 2;
-bool gAnyOrigin  = true;
+int  gPort        = 8888;
+int  gMaxClients  = 2;
+bool gAnyOrigin   = true;
+int  gMaxSessions = 50;
 
 fs::path gCurrentDirectory;   ///< root directory were makefiles and sessions and log are located
 fs::path gSessionsDirectory;  ///< directory where sessions are stored
@@ -51,11 +52,13 @@ fs::path gLogfile;             ///< faustweb logfile
 // Processes command line arguments using boost/parse_options
 static void process_cmdline(int argc, char* argv[])
 {
-    po::options_description desc("faustserver program options.");
-    desc.add_options()("sessions-dir,d", po::value<string>(), "directory in which sessions files will be written")(
-        "help,h", "produce this help message")("any-origin,a", "Adds any origin when answering requests")(
-        "max-clients,m", po::value<int>(), "maximum number of clients allowed to concurrently upload")(
-        "port,p", po::value<int>(), "the listening port");
+    po::options_description desc("faustweb program options");
+    desc.add_options()("sessions-dir,d", po::value<string>(), "directory in which sessions files will be written");
+    desc.add_options()("help,h", "produce this help message");
+    desc.add_options()("any-origin,a", "Adds any origin when answering requests");
+    desc.add_options()("max-clients,m", po::value<int>(), "maximum number of clients allowed to concurrently upload");
+    desc.add_options()("port,p", po::value<int>(), "the listening port");
+    desc.add_options()("max-sessions,n", po::value<int>(), "maximum number of cached sessions");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -72,6 +75,10 @@ static void process_cmdline(int argc, char* argv[])
 
     if (vm.count("max-clients")) {
         gMaxClients = vm["max-clients"].as<int>();
+    }
+
+    if (vm.count("max-sessions")) {
+        gMaxSessions = vm["max-sessions"].as<int>();
     }
 
     if (vm.count("logfile")) {
@@ -152,7 +159,7 @@ int main(int argc, char* argv[], char* env[])
     }
 
     // Create, start and stop the http server
-    FaustServer server(gPort, gMaxClients, gSessionsDirectory, gMakefilesDirectory, gLogfile);
+    FaustServer server(gPort, gMaxClients, gSessionsDirectory, gMakefilesDirectory, gLogfile, gMaxSessions);
 
     if (!server.start()) {
         std::cerr << "unable to start webserver ! Check if port " << gPort << " is available" << std::endl;

@@ -841,7 +841,7 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
 }
 
 FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory,
-                         const fs::path& logfile)
+                         const fs::path& logfile, int maxSessions)
     : fPort(port),
       fMaxClients(max_clients),
       fDirectory(directory),
@@ -849,7 +849,7 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
       fLogfile(logfile),
       fDaemon(0),
       fTargets(""),
-      fSessionCache(directory, 4)
+      fSessionCache(directory, maxSessions)
 {
     // create a string containing the list possible targets by scanning the makefile directory. The list is
     // JSON formatted :   { "os1" : ["arch11", "arch12", ...],  "os2" : ["arch21", "arch22", ...], ...}
