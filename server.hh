@@ -27,6 +27,7 @@
 #define _FAUST_SERVER_
 
 #include "microhttpd.h"
+#include "sessioncache.hh"
 #include "utilities.hh"
 
 // Boost libraries
@@ -62,6 +63,7 @@ class FaustServer {
     fs::path           fLogfile;
     struct MHD_Daemon* fDaemon;
     string             fTargets;
+    SessionCache       fSessionCache;
 
    public:
     FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory,

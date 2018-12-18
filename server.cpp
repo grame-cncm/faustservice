@@ -634,12 +634,16 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 
 int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, const string& raw_url)
 {
-    fs::path    url      = fs::path(raw_url);
-    fs::path    fulldir  = this->getDirectory() / url.parent_path();
-    fs::path    target   = url.filename();
-    fs::path    makefile = fulldir / "Makefile";
-    const char* mimetype;
-    bool        precompile = false;
+    vector<string> U        = decomposeURL(raw_url);
+    fs::path       url      = fs::path(raw_url);
+    fs::path       fulldir  = this->getDirectory() / url.parent_path();
+    fs::path       target   = url.filename();
+    fs::path       makefile = fulldir / "Makefile";
+    const char*    mimetype;
+    bool           precompile = false;
+
+    std::cerr << "\nUSING SESSION " << U[1] << "\n\n";
+    fSessionCache.refer(U[1]);
 
     // Check for svg block-diagram requests first
     if (url.extension() == ".svg") {
@@ -844,7 +848,8 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
       fMakefileDirectory(makefile_directory),
       fLogfile(logfile),
       fDaemon(0),
-      fTargets("")
+      fTargets(""),
+      fSessionCache(directory, 4)
 {
     // create a string containing the list possible targets by scanning the makefile directory. The list is
     // JSON formatted :   { "os1" : ["arch11", "arch12", ...],  "os2" : ["arch21", "arch22", ...], ...}
