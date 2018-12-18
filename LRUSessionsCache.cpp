@@ -4,9 +4,16 @@
 LRUSessionsCache::LRUSessionsCache(const fs::path& aSessionsDir, int aMaxSize)
     : fSessionsDir(aSessionsDir), fMaxSize(aMaxSize)
 {
-    // init the cache using the actual sessions in the sessions directory
-    for (const auto& session : fs::directory_iterator(fSessionsDir)) {
-        refer(session.path().filename());
+    try {
+        // init the cache using the actual sessions in the sessions directory
+        if (fs::is_directory(fSessionsDir)) {
+            for (const auto& session : fs::directory_iterator(fSessionsDir)) {
+                refer(session.path().filename());
+            }
+        }
+    } catch (const boost::filesystem::filesystem_error& e) {
+        std::cerr << "Warning : sessions directory " << fSessionsDir << " doesn't exist yet " << e.code().message()
+                  << std::endl;
     }
 }
 
