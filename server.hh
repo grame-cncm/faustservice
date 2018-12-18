@@ -63,7 +63,7 @@ class FaustServer {
     fs::path           fLogfile;
     struct MHD_Daemon* fDaemon;
     string             fTargets;
-    SessionCache       fSessionCache;
+    LRUSessionsCache   fSessionCache;
 
    public:
     FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory,

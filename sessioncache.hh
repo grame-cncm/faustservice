@@ -5,16 +5,18 @@
 
 namespace fs = boost::filesystem;
 
-class SessionCache {
-    const fs::path      fSessionsDir;
-    int                 fMaxSize;    // maximum capacity of cache
-    std::list<fs::path> fCacheList;  // store keys of cache
+// LRUSessionsCache : a system that limits the number of cached sessions
+class LRUSessionsCache {
+    typedef std::map<fs::path, std::list<fs::path>::iterator> PosMap;
 
-    // store references of key in cache
-    std::map<fs::path, std::list<fs::path>::iterator> fCachePos;
+    const fs::path      fSessionsDir;   // directory containing all the sessions
+    int                 fMaxSize;       // maximum capacity of sessions
+    std::list<fs::path> fSessionsList;  // list of sessions
+    PosMap              fSessionPos;    // session position in the list
 
    public:
-    SessionCache(const fs::path& sessionDir, int size);
-    void refer(const fs::path&);    // refer to an element in the cache
-    void dispose(const fs::path&);  // this element is removed from the cache
+    LRUSessionsCache(const fs::path& aSessionsDir, int aMaxSize);
+
+    void refer(const fs::path& aSession);    // refer to a session in the cache
+    void dispose(const fs::path& aSession);  // LRU session is removed from the cache
 };

@@ -1,38 +1,41 @@
 #include "sessioncache.hh"
 
-SessionCache::SessionCache(const fs::path& sessionDir, int size) : fSessionsDir(sessionDir), fMaxSize(size)
+// LRUSessionsCache : a system that limits the number of cached sessions
+LRUSessionsCache::LRUSessionsCache(const fs::path& aSessionsDir, int aMaxSize)
+    : fSessionsDir(aSessionsDir), fMaxSize(aMaxSize)
 {
-    for (const auto& x : fs::directory_iterator(fSessionsDir)) {
-        refer(x.path().filename());
+    // init the cache using the actual sessions in the sessions directory
+    for (const auto& session : fs::directory_iterator(fSessionsDir)) {
+        refer(session.path().filename());
     }
 }
 
 /* Refers key x with in the LRU cache */
-void SessionCache::refer(const fs::path& x)
+void LRUSessionsCache::refer(const fs::path& x)
 {
     std::cerr << "REFER TO " << x << std::endl;
 
     // not present in cache
-    if (fCachePos.find(x) == fCachePos.end()) {
+    if (fSessionPos.find(x) == fSessionPos.end()) {
         // cache is full
-        if (fCacheList.size() == fMaxSize) {
+        if (fSessionsList.size() == fMaxSize) {
             // delete least recently used element
-            fs::path last = fCacheList.back();
-            fCacheList.pop_back();
-            fCachePos.erase(last);
+            fs::path last = fSessionsList.back();
+            fSessionsList.pop_back();
+            fSessionPos.erase(last);
             dispose(last);
         }
     } else {
-        fCacheList.erase(fCachePos[x]);
+        fSessionsList.erase(fSessionPos[x]);
     }
 
     // update reference
-    fCacheList.push_front(x);
-    fCachePos[x] = fCacheList.begin();
+    fSessionsList.push_front(x);
+    fSessionPos[x] = fSessionsList.begin();
 }
 
 // dispose an element that leave the cache
-void SessionCache::dispose(const fs::path& s)
+void LRUSessionsCache::dispose(const fs::path& s)
 {
     std::cerr << "DISPOSE OF " << s << std::endl;
     try {
