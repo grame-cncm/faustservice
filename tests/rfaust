@@ -9,6 +9,7 @@ function targetrequest {
 
 function compilation {
     curl  -F"file=@\"$4\";filename=\"$4\""  "$1/compile/$2/$3/binary.zip" --output binary.zip
+    unzip -o binary.zip
 }
 
 
