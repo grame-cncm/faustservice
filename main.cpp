@@ -104,11 +104,15 @@ static size_t computeSessionSize()
 {
     size_t size = 0;
 
-    fs::recursive_directory_iterator it(gSessionsDirectory);
-    for (; it != fs::recursive_directory_iterator(); ++it) {
-        if (!fs::is_directory(*it)) size += fs::file_size(*it);
+    try {
+        fs::recursive_directory_iterator it(gSessionsDirectory);
+        for (; it != fs::recursive_directory_iterator(); ++it) {
+            if (!fs::is_directory(*it)) size += fs::file_size(*it);
+        }
+        return size;
+    } catch (const boost::filesystem::filesystem_error& e) {
+        return 0;
     }
-    return size;
 }
 
 int main(int argc, char* argv[], char* env[])
