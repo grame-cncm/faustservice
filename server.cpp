@@ -253,9 +253,10 @@ static void create_file_tree(fs::path sha1path, fs::path makefile_directory)
                 string makefileName = makefile_iter->path().filename().string();
                 if (makefileName.substr(0, 9) == "Makefile.") {
                     string archName = makefileName.substr(9);
-                    // std::cerr << "scanning makefile " << makefile_iter->path() << ", makefile : " << makefileName <<
-                    // ", architecture : " << archName << std::endl;
+                    std::cerr << "scanning makefile " << makefile_iter->path() << ", makefile : " << makefileName
+                              << ", architecture : " << archName << std::endl;
                     fs::path dstdir = sha1path / OSname / archName;
+                    std::cerr << "dstdir = " << dstdir << std::endl;
                     create_directories(dstdir);
                     copy(makefile_iter->path(), dstdir / "Makefile");
                     copyFaustFiles(sha1path, dstdir);
@@ -295,11 +296,16 @@ static fs::path make(const fs::path& dir, const fs::path& target)
 static int make_initial_faust_directory(connection_info_struct* con_info, string sha1)
 {
     fs::path sha1path = fs::path(con_info->directory) / fs::path(sha1);
-    if (!fs::is_directory(sha1path)) {
-        std::cerr << "ENTER make_initial_faust_directory(" << con_info << ", " << sha1 << std::endl;
 
-        // first time we have this file
-        fs::create_directory(sha1path);
+    if (!fs::is_directory(sha1path)) {
+        std::cerr << "ENTER make_initial_faust_directory(" << con_info << ", " << sha1path << std::endl;
+
+        try {
+            // first time we have this file
+            fs::create_directory(sha1path);
+        } catch (const fs::filesystem_error& e) {
+            std::cerr << "Warning : can't create directory " << sha1path << ":" << e.code().message() << std::endl;
+        }
         string   filename(con_info->filename);
         fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
 
