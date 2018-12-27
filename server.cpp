@@ -275,28 +275,20 @@ static void create_file_tree(fs::path sha1path, fs::path makefile_directory)
 
 static fs::path make(const fs::path& dir, const fs::path& target)
 {
+    fs::path          p;
     std::stringstream ss;
     ss << "make -C " << dir << " " << target;
 
-    /*
-    FILE* fp = popen(ss.str().c_str(), "r");
-    if (fp) {
-        getc(fp);
-        pclose(fp);
-        return dir/target;
-    } else  {
-        std::cerr << __LINE__  << " makefile " << dir/target << " failed !!!" << std::endl;
-        return "";
-    }
-    */
-
-    std::cerr << ss.str() << std::endl;
+    std::cerr << "ENTER MAKE " << ss.str() << std::endl;
     if (0 == system(ss.str().c_str())) {
-        return dir / target;
+        p = dir / target;
     } else {
         std::cerr << __LINE__ << " makefile " << dir / target << " failed !!!" << std::endl;
-        return "";
+        p = "";
     }
+    std::cerr << "EXIT MAKE " << p << std::endl;
+
+    return p;
 }
 
 // TODO: merge with validate function if possible...
@@ -548,10 +540,9 @@ static void panicCallback(void* cls, const char* file, unsigned int line, const 
 bool FaustServer::start()
 {
     MHD_set_panic_func(&panicCallback, NULL);
-
-    fDaemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, fPort, NULL, NULL, &staticAnswerToConnection, this,
-                               MHD_OPTION_THREAD_POOL_SIZE, fMaxClients,  // Experimental multi-threaded support...
+    fDaemon = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION, fPort, NULL, NULL, &staticAnswerToConnection, this,
                                MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL, MHD_OPTION_END);
+
     return fDaemon != NULL;
 }
 
