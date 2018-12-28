@@ -133,6 +133,7 @@ int main(int argc, char* argv[], char* env[])
               << "\n"
               << "         port: " << gPort << "\n"
               << "    directory: " << gCurrentDirectory << "\n"
+              << "    makefiles: " << gMakefilesDirectory << "\n"
               << " sessions dir: " << gSessionsDirectory << "\n"
               << "sessions size: " << computeSessionSize() << "\n"
               << std::endl;

@@ -17,7 +17,7 @@ CXXFLAGS = -Wall -O1 -g -DBOOST_NO_CXX11_SCOPED_ENUMS
 endif
 
 faustweb: *.cpp *.hh
-	g++ -std=c++11 $(CXXFLAGS) *.cpp $(LDFLAGS) \
+	$(CXX) -std=c++11 $(CXXFLAGS) *.cpp $(LDFLAGS) \
 	-lmicrohttpd -lboost_filesystem$(EXT) -lboost_system$(EXT) -lboost_program_options$(EXT) \
 	-larchive -lcrypto -lm \
 	-o faustweb
