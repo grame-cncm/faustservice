@@ -231,7 +231,7 @@ static void copyFaustFiles(const fs::path& src, const fs::path& dst)
     for (fs::directory_iterator f_iter(src); f_iter != end_iter; ++f_iter) {
         if (isFaustFile(f_iter->path())) {
             // std::cerr << "copying(" << f_iter->path() << ", " << dst/f_iter->path().filename() << ") " << std::endl;
-            copy(f_iter->path(), dst / f_iter->path().filename());
+            fs::copy_file(f_iter->path(), dst / f_iter->path().filename());
         }
     }
 }
@@ -258,7 +258,7 @@ static void create_file_tree(fs::path sha1path, fs::path makefile_directory)
                     fs::path dstdir = sha1path / OSname / archName;
                     std::cerr << "dstdir = " << dstdir << std::endl;
                     create_directories(dstdir);
-                    copy(makefile_iter->path(), dstdir / "Makefile");
+                    fs::copy_file(makefile_iter->path(), dstdir / "Makefile");
                     copyFaustFiles(sha1path, dstdir);
                 }
             }
