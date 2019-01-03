@@ -1,0 +1,43 @@
+#!/bin/bash
+
+#--------------------------------------------------------------------
+# Compile for osx by using a docker command.
+# $DOCKERIMAGE is the docker image to be used
+# $SFF is used as a communication folder with the docker container
+
+CDIR=`pwd`
+DOCKERIMAGE='faust:cross-osx'
+SFF='/tmp/sharedfaustfolder'
+rm -rf $SFF/*
+
+
+# Parameter analysis. The first one is the name of the script the others
+# are either options or files. Several source code files can be present
+# if we are compiling a zip archive.
+
+SCRIPT=$1; shift;
+
+
+# Copy in the temporary dir of the remote machine all
+# the *.dsp and *.lib files, while collecting the options in OPTIONS
+while [ $1 ]
+do
+    if [ ${1:0:1} = "-" ]; then
+        OPTIONS="$OPTIONS $1"
+    elif [ "${1#*.}" = "dsp" ]; then
+        cp $1 "$SFF/"
+        FILE=`basename $1` 
+    elif [ "${1#*.}" = "lib" ]; then
+        cp $1 "$SFF/"
+    else
+        echo "unrecognized parameter $1"
+    fi
+    shift
+done
+
+# Produce binary.zip on remote server
+docker run -t -w /grame/shared -v $SFF:/grame/shared $DOCKERIMAGE $SCRIPT $OPTIONS $FILE
+
+# copy compilation result to the current directory
+rm -f $SFF/*.dsp $SFF/*.lib
+mv -rf $SFF/* "$CDIR"/
