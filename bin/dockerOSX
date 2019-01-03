@@ -40,4 +40,4 @@ docker run -t -w /grame/shared -v $SFF:/grame/shared $DOCKERIMAGE $SCRIPT $OPTIO
 
 # copy compilation result to the current directory
 rm -f $SFF/*.dsp $SFF/*.lib
-mv -rf $SFF/* "$CDIR"/
+mv -f $SFF/* "$CDIR"/
