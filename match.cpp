@@ -80,3 +80,8 @@ bool matchURL(const string& url, const char* pat)
         cout << "DONT MATCH " << pat << " <== " << url << endl;
     return r;
 }
+
+bool matchExtension(const string& url, const std::string& ext)
+{
+    return url.rfind(ext) == (url.length() - ext.length());
+}

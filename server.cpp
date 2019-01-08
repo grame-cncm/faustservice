@@ -616,7 +616,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/*/*/*/binary.apk")) {
         return makeAndSendResourceFile(connection, url);
 
-    } else if (matchURL(url, "/*/diagram/process.svg")) {
+    } else if (matchURL(url, "/*/diagram/*") && matchExtension(url, ".svg")) {
         return makeAndSendResourceFile(connection, url);
 
     } else if (matchURL(url, "/favicon.ico")) {
