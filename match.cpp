@@ -47,7 +47,7 @@ vector<string> decomposeURL(const string& url)
 // and all these elements must be identical, or wildcards ( '*' ).
 // Data contains the decomposition of the URL
 
-bool matchURL(const string& url, const char* pat, vector<string>& data)
+bool matchURL(const string& url, const std::string& pat, vector<string>& data)
 {
     vector<string> U = decomposeURL(url);
     vector<string> P = decomposeURL(pat);
@@ -70,7 +70,7 @@ bool matchURL(const string& url, const char* pat, vector<string>& data)
 // To match they must have the same number of elements
 // and all these elements must be identical, or wildcards ( '*' ).
 
-bool matchURL(const string& url, const char* pat)
+bool matchURL(const string& url, const std::string& pat)
 {
     vector<string> ignore;
     bool           r = matchURL(url, pat, ignore);
