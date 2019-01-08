@@ -610,6 +610,9 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/*/*/*/binary.zip")) {
         return makeAndSendResourceFile(connection, url);
 
+    } else if (matchURL(url, "/*/*/*/precompile")) {
+        return makeAndSendResourceFile(connection, url);
+
     } else if (matchURL(url, "/*/*/*/binary.apk")) {
         return makeAndSendResourceFile(connection, url);
 
@@ -621,7 +624,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 
     } else {
         std::cerr << "WARNING: We should have a rule to match this URL " << url << std::endl;
-        return makeAndSendResourceFile(connection, url);
+        return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
     }
 }
 
