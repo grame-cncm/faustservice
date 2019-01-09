@@ -31,9 +31,29 @@
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
 
+#include <signal.h>
 #include <unistd.h>
 #include "server.hh"
 #include "utilities.hh"
+
+static void _sigaction(int signal, siginfo_t*, void*)
+{
+    cerr << "Signal #" << signal << " catched!" << endl;
+    exit(-2);
+}
+
+static void catchsigs()
+{
+    struct sigaction sa;
+
+    memset(&sa, 0, sizeof(struct sigaction));
+    sigemptyset(&sa.sa_mask);
+    sa.sa_sigaction = _sigaction;
+    sa.sa_flags     = SA_SIGINFO;
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGILL, &sa, NULL);
+    sigaction(SIGFPE, &sa, NULL);
+}
 
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
@@ -117,6 +137,8 @@ static size_t computeSessionSize()
 
 int main(int argc, char* argv[], char* env[])
 {
+    catchsigs();
+
     // Set the various default paths
     gCurrentDirectory   = fs::absolute(fs::current_path());
     gMakefilesDirectory = gCurrentDirectory / "makefiles";

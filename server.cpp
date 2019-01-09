@@ -432,8 +432,7 @@ static int page_not_found(struct MHD_Connection* connection, const char* page, i
  * this is called after every chunk.
  */
 
-void FaustServer::request_completed(void* cls, struct MHD_Connection* connection, void** con_cls,
-                                    enum MHD_RequestTerminationCode toe)
+void FaustServer::request_completed(void*, struct MHD_Connection*, void** con_cls, enum MHD_RequestTerminationCode)
 {
     std::cerr << "FaustServer::request_completed()" << endl;
 
@@ -538,7 +537,7 @@ int FaustServer::send_file(struct MHD_Connection* connection, const fs::path& fi
 
 // Start the Faust server - shallow wrapper around MHD_start_daemon
 
-static void panicCallback(void* cls, const char* file, unsigned int line, const char* reason)
+static void panicCallback(void*, const char* file, unsigned int line, const char* reason)
 {
     cerr << "PANIC " << line << ':' << file << ' ' << reason << endl;
 }
@@ -580,11 +579,16 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
         std::cerr << "REAL BAD ERROR, NO SERVER !!!" << std::endl;
         exit(1);
     }
-    if (0 == strcmp(method, "GET")) {
-        return server->dispatchGETConnections(connection, URL);
-    } else if (0 == strcmp(method, "POST")) {
-        return server->dispatchPOSTConnections(connection, URL, upload_data, upload_data_size, con_cls);
-    } else {
+    try {
+        if (0 == strcmp(method, "GET")) {
+            return server->dispatchGETConnections(connection, URL);
+        } else if (0 == strcmp(method, "POST")) {
+            return server->dispatchPOSTConnections(connection, URL, upload_data, upload_data_size, con_cls);
+        } else {
+            return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+        }
+    } catch (exception const& e) {
+        std::cerr << "GLOBAL ERROR CATCHED " << e.what() << std::endl;
         return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     }
 }
@@ -607,9 +611,15 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/targets")) {
         return send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK, "application/json");
 
-    } else if (matchURL(url, "/crash")) {
+    } else if (matchURL(url, "/crash1")) {
         // simulate crash -- to be removed in production
         exit(-1);
+
+    } else if (matchURL(url, "/crash2")) {
+        // simulate crash -- to be removed in production
+        int* p = 0;
+        *p     = 5 / (*p);
+        return page_not_found(connection, "/crash2", 7, "image/x-icon");
 
     } else if (matchURL(url, "/*/*/*/binary.zip")) {
         return makeAndSendResourceFile(connection, url);
@@ -788,8 +798,8 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
  */
 
 int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const char* key, const char* filename,
-                              const char* content_type, const char* transfer_encoding, const char* data, uint64_t off,
-                              size_t size)
+                              const char* content_type, const char* /*transfer_encoding*/, const char* data,
+                              uint64_t /*off*/, size_t size)
 {
     struct connection_info_struct* con_info = (connection_info_struct*)coninfo_cls;
     FILE*                          fp;
