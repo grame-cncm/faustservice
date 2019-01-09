@@ -10,7 +10,7 @@ class LRUSessionsCache {
     typedef std::map<fs::path, std::list<fs::path>::iterator> PosMap;
 
     const fs::path      fSessionsDir;   // directory containing all the sessions
-    int                 fMaxSize;       // maximum capacity of sessions
+    size_t              fMaxSize;       // maximum capacity of sessions
     std::list<fs::path> fSessionsList;  // list of sessions
     PosMap              fSessionPos;    // session position in the list
 
