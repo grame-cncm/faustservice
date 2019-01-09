@@ -9,6 +9,8 @@
 
 using namespace std;
 
+extern int gVerbosity;
+
 //----------------------------------------------------------------
 // simplifyURL(), remove duplicated '/' in the URL
 
@@ -22,7 +24,7 @@ string simplifyURL(const char* url)
         n = (c == '/') ? n + 1 : 0;
         if (n < 2) r += c;
     }
-    cerr << "Simplify url " << url << " --> " << r << endl;
+    if (gVerbosity >= 2) cerr << "Simplify url " << url << " --> " << r << endl;
     return r;
 }
 
@@ -58,7 +60,7 @@ bool matchURL(const string& url, const std::string& pat, vector<string>& data)
             }
         }
         data = U;
-        cout << "PATTERN " << pat << " MATCHES URL " << url << endl;
+        if (gVerbosity >= 2) cout << "PATTERN " << pat << " MATCHES URL " << url << endl;
         return true;
     } else {
         return false;
@@ -74,10 +76,12 @@ bool matchURL(const string& url, const std::string& pat)
 {
     vector<string> ignore;
     bool           r = matchURL(url, pat, ignore);
-    if (r)
-        cout << "MATCH " << pat << " <== " << url << endl;
-    else
-        cout << "DONT MATCH " << pat << " <== " << url << endl;
+    if (gVerbosity >= 2) {
+        if (r)
+            cout << "MATCH " << pat << " <== " << url << endl;
+        else
+            cout << "DONT MATCH " << pat << " <== " << url << endl;
+    }
     return r;
 }
 
