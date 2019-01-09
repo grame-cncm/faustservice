@@ -83,5 +83,12 @@ bool matchURL(const string& url, const std::string& pat)
 
 bool matchExtension(const string& url, const std::string& ext)
 {
-    return url.rfind(ext) == (url.length() - ext.length());
+    size_t u = url.length();
+    size_t e = ext.length();
+    if (u > e) {
+        size_t p = u - e;
+        return url.find(ext, p) == p;
+    } else {
+        return false;
+    }
 }
