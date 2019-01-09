@@ -603,7 +603,10 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     // MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
     std::cerr << "ANSWER GET CONNECTION " << url << std::endl;
 
-    if (matchURL(url, "/")) {
+    if (matchExtension(url, ".php") || matchExtension(url, ".js")) {
+        return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
+
+    } else if (matchURL(url, "/")) {
         stringstream ss;
         ss << askpage_head << nr_of_uploading_clients << askpage_tail;
         return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
