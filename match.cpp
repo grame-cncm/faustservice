@@ -9,6 +9,8 @@
 
 using namespace std;
 
+extern int gVerbosity;
+
 //----------------------------------------------------------------
 // simplifyURL(), remove duplicated '/' in the URL
 
@@ -22,7 +24,7 @@ string simplifyURL(const char* url)
         n = (c == '/') ? n + 1 : 0;
         if (n < 2) r += c;
     }
-    cerr << "Simplify url " << url << " --> " << r << endl;
+    if (gVerbosity >= 2) cerr << "Simplify url " << url << " --> " << r << endl;
     return r;
 }
 
@@ -47,7 +49,7 @@ vector<string> decomposeURL(const string& url)
 // and all these elements must be identical, or wildcards ( '*' ).
 // Data contains the decomposition of the URL
 
-bool matchURL(const string& url, const char* pat, vector<string>& data)
+bool matchURL(const string& url, const std::string& pat, vector<string>& data)
 {
     vector<string> U = decomposeURL(url);
     vector<string> P = decomposeURL(pat);
@@ -58,7 +60,7 @@ bool matchURL(const string& url, const char* pat, vector<string>& data)
             }
         }
         data = U;
-        cout << "PATTERN " << pat << " MATCHES URL " << url << endl;
+        if (gVerbosity >= 2) cout << "PATTERN " << pat << " MATCHES URL " << url << endl;
         return true;
     } else {
         return false;
@@ -70,13 +72,27 @@ bool matchURL(const string& url, const char* pat, vector<string>& data)
 // To match they must have the same number of elements
 // and all these elements must be identical, or wildcards ( '*' ).
 
-bool matchURL(const string& url, const char* pat)
+bool matchURL(const string& url, const std::string& pat)
 {
     vector<string> ignore;
     bool           r = matchURL(url, pat, ignore);
-    if (r)
-        cout << "MATCH " << pat << " <== " << url << endl;
-    else
-        cout << "DONT MATCH " << pat << " <== " << url << endl;
+    if (gVerbosity >= 2) {
+        if (r)
+            cout << "MATCH " << pat << " <== " << url << endl;
+        else
+            cout << "DONT MATCH " << pat << " <== " << url << endl;
+    }
     return r;
+}
+
+bool matchExtension(const string& url, const std::string& ext)
+{
+    size_t u = url.length();
+    size_t e = ext.length();
+    if (u > e) {
+        size_t p = u - e;
+        return url.find(ext, p) == p;
+    } else {
+        return false;
+    }
 }

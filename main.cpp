@@ -31,9 +31,29 @@
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
 
+#include <signal.h>
 #include <unistd.h>
 #include "server.hh"
 #include "utilities.hh"
+
+static void _sigaction(int signal, siginfo_t*, void*)
+{
+    cerr << "Signal #" << signal << " catched!" << endl;
+    exit(-2);
+}
+
+static void catchsigs()
+{
+    struct sigaction sa;
+
+    memset(&sa, 0, sizeof(struct sigaction));
+    sigemptyset(&sa.sa_mask);
+    sa.sa_sigaction = _sigaction;
+    sa.sa_flags     = SA_SIGINFO;
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGILL, &sa, NULL);
+    sigaction(SIGFPE, &sa, NULL);
+}
 
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
@@ -42,6 +62,7 @@ int  gPort        = 8888;
 int  gMaxClients  = 2;
 bool gAnyOrigin   = true;
 int  gMaxSessions = 50;
+int  gVerbosity   = 0;
 
 fs::path gCurrentDirectory;   ///< root directory were makefiles and sessions and log are located
 fs::path gSessionsDirectory;  ///< directory where sessions are stored
@@ -59,6 +80,7 @@ static void process_cmdline(int argc, char* argv[])
     desc.add_options()("max-clients,m", po::value<int>(), "maximum number of clients allowed to concurrently upload");
     desc.add_options()("port,p", po::value<int>(), "the listening port");
     desc.add_options()("max-sessions,n", po::value<int>(), "maximum number of cached sessions");
+    desc.add_options()("verbose,v", po::value<int>(), "0: normal; 1: verbose; 2: very verbose");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -92,6 +114,10 @@ static void process_cmdline(int argc, char* argv[])
     if (vm.count("sessions-dir")) {
         gSessionsDirectory = vm["sessions-dir"].as<string>();
     }
+
+    if (vm.count("verbose")) {
+        gVerbosity = vm["verbose"].as<int>();
+    }
 }
 
 static void printFaustVersion()
@@ -117,6 +143,8 @@ static size_t computeSessionSize()
 
 int main(int argc, char* argv[], char* env[])
 {
+    catchsigs();
+
     // Set the various default paths
     gCurrentDirectory   = fs::absolute(fs::current_path());
     gMakefilesDirectory = gCurrentDirectory / "makefiles";
@@ -129,48 +157,53 @@ int main(int argc, char* argv[], char* env[])
         exit(1);
     }
 
-    std::cerr << "faustweb starting \n"
-              << "\n"
-              << "         port: " << gPort << "\n"
-              << "    directory: " << gCurrentDirectory << "\n"
-              << "    makefiles: " << gMakefilesDirectory << "\n"
-              << " sessions dir: " << gSessionsDirectory << "\n"
-              << "sessions size: " << computeSessionSize() << "\n"
-              << std::endl;
+    if (gVerbosity >= 0) {
+        std::cerr << "faustweb starting \n"
+                  << "\n"
+                  << "         port: " << gPort << "\n"
+                  << "    directory: " << gCurrentDirectory << "\n"
+                  << "    makefiles: " << gMakefilesDirectory << "\n"
+                  << " sessions dir: " << gSessionsDirectory << "\n"
+                  << "sessions size: " << computeSessionSize() << "\n"
+                  << "    verbosity: " << gVerbosity << "\n"
+                  << std::endl;
 
-    // Print Faust version
-    printFaustVersion();
+        // Print Faust version
+        printFaustVersion();
 
-    // Print running environment
-    std::cerr << "\n\nBEGIN ENVIRONMENT" << std::endl;
-    for (int i = 0; env[i] != 0; i++) {
-        std::cerr << env[i] << std::endl;
+        // Print running environment
+        if (gVerbosity >= 2) {
+            std::cerr << "\n\nBEGIN ENVIRONMENT" << std::endl;
+            for (int i = 0; env[i] != 0; i++) {
+                std::cerr << env[i] << std::endl;
+            }
+            std::cerr << "END ENVIRONMENT\n\n" << std::endl;
+        }
     }
-    std::cerr << "END ENVIRONMENT\n\n" << std::endl;
 
     // Check for ".../makefiles/" directory
     if (is_directory(gMakefilesDirectory)) {
-        std::cerr << "Makefiles directory available at path " << gMakefilesDirectory << std::endl;
+        if (gVerbosity >= 2) std::cerr << "Makefiles directory available at path " << gMakefilesDirectory << std::endl;
     } else {
-        std::cerr << "ERROR : no makefiles directory available at path " << gMakefilesDirectory << std::endl;
+        std::cerr << "ERROR: no makefiles directory available at path " << gMakefilesDirectory << std::endl;
         exit(1);
     }
 
     // If needed creates ".../sessions/" directory
     if (create_directory(gSessionsDirectory)) {
-        std::cerr << "Create \"sessions\" directory at path " << gSessionsDirectory << std::endl;
+        if (gVerbosity >= 1) std::cerr << "Create \"sessions\" directory at path " << gSessionsDirectory << std::endl;
     } else {
-        std::cerr << "Reuse \"sessions\" directory at path " << gSessionsDirectory << std::endl;
+        if (gVerbosity >= 1) std::cerr << "Reuse \"sessions\" directory at path " << gSessionsDirectory << std::endl;
     }
 
     // Create, start and stop the http server
     FaustServer server(gPort, gMaxClients, gSessionsDirectory, gMakefilesDirectory, gLogfile, gMaxSessions);
 
     if (!server.start()) {
-        std::cerr << "unable to start webserver ! Check if port " << gPort << " is available" << std::endl;
-        return 1;
+        std::cerr << "ERROR: unable to start webserver ! Check if port " << gPort << " is available" << std::endl;
+        exit(1);
     } else {
-        std::cerr << "webserver started succesfully" << std::endl;
+        if (gVerbosity >= 2) std::cerr << "webserver started succesfully" << std::endl;
     }
 
     std::cerr << "type ctrl-c to quit" << std::endl;

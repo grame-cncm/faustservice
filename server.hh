@@ -74,18 +74,21 @@ class FaustServer {
     bool start();
     void stop();
 
-    const unsigned int getMaxClients()
+    unsigned int getMaxClients()
     {
         return fMaxClients;  ///< Max number of clients allowed to connect at a given time.
     }
+
     fs::path getDirectory()
     {
         return fDirectory;  ///< Directory to which the uploaded files are being written.
     }
+
     fs::path getMakefileDirectory()
     {
         return fMakefileDirectory;  ///< Directory that the makefiles should be copied from.
     }
+    
     fs::path getLogfile()
     {
         return fLogfile;  ///< Path to the logfile.

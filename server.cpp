@@ -51,6 +51,7 @@
 
 using namespace std;
 
+extern int gVerbosity;
 /*
  * Various responses to GET requests
  */
@@ -72,7 +73,7 @@ static int validate_faust(connection_info_struct* con_info)
     fs::path filename          = fs::path(con_info->filename);
     fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
 
-    std::cerr << "ENTER validate_faust for file : " << old_full_filename << std::endl;
+    if (gVerbosity >= 2) std::cerr << "ENTER validate_faust for file : " << old_full_filename << std::endl;
 
     // libarchive stuff
     struct archive*       my_archive;
@@ -88,7 +89,8 @@ static int validate_faust(connection_info_struct* con_info)
     if (!fs::is_regular_file(old_full_filename)) {
         fs::remove_all(tmpdir);
         con_info->answerstring = completebuterrorpage;
-        std::cerr << "EXIT validate_faust with failure : not regular file : " << old_full_filename << std::endl;
+        if (gVerbosity >= 1)
+            std::cerr << "EXIT validate_faust with failure : not regular file : " << old_full_filename << std::endl;
         return 1;
     } else if (old_full_filename.string().substr(old_full_filename.string().find_last_of(".") + 1) == "dsp") {
         fs::copy_file(old_full_filename, tmpdir / filename);
@@ -114,14 +116,17 @@ static int validate_faust(connection_info_struct* con_info)
         if (archive_status != ARCHIVE_OK) {
             fs::remove_all(tmpdir);
             con_info->answerstring = completebutdecompressionproblem;
-            std::cerr << "EXIT validate_faust with failure : Archive not OK case 1 : " << old_full_filename
-                      << std::endl;
+            if (gVerbosity >= 1)
+                std::cerr << "EXIT validate_faust with failure : Archive not OK case 1 : " << old_full_filename
+                          << std::endl;
             return 1;
         }
     } else {
         fs::remove_all(tmpdir);
         con_info->answerstring = completebutendoftheworld;
-        std::cerr << "EXIT validate_faust with failure : Archive not OK case 2 : " << old_full_filename << std::endl;
+        if (gVerbosity >= 1)
+            std::cerr << "EXIT validate_faust with failure : Archive not OK case 2 : " << old_full_filename
+                      << std::endl;
         return 1;
     }
 
@@ -129,11 +134,12 @@ static int validate_faust(connection_info_struct* con_info)
     if (filename.string() == "") {
         fs::remove_all(tmpdir);
         con_info->answerstring = completebutnoDSPfile;
-        std::cerr << "EXIT validate_faust with failure : empty filename : " << old_full_filename << std::endl;
+        if (gVerbosity >= 1)
+            std::cerr << "EXIT validate_faust with failure : empty filename : " << old_full_filename << std::endl;
         return 1;
     }
 
-    std::cerr << "TRY TO COMPILE validate_faust : " << (tmpdir / filename).string() << std::endl;
+    if (gVerbosity >= 1) std::cerr << "TRY TO COMPILE validate_faust : " << (tmpdir / filename).string() << std::endl;
     string result = "";
     FILE*  pipe   = popen(("faust -a plot.cpp " + (tmpdir / filename).string() + " 2>&1").c_str(), "r");
     if (!pipe) {
@@ -153,11 +159,13 @@ static int validate_faust(connection_info_struct* con_info)
     fs::remove_all(tmpdir);
 
     if (exitstatus) {
-        std::cerr << "EXIT validate_faust with failure : completebutcorrupt_head  : " << old_full_filename << std::endl;
+        if (gVerbosity >= 1)
+            std::cerr << "EXIT validate_faust with failure : completebutcorrupt_head  : " << old_full_filename
+                      << std::endl;
         con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
     }
 
-    std::cerr << "EXIT validate_faust : " << old_full_filename << std::endl;
+    if (gVerbosity >= 2) std::cerr << "EXIT validate_faust : " << old_full_filename << std::endl;
     return exitstatus;
 }
 
@@ -253,10 +261,11 @@ static void create_file_tree(fs::path sha1path, fs::path makefile_directory)
                 string makefileName = makefile_iter->path().filename().string();
                 if (makefileName.substr(0, 9) == "Makefile.") {
                     string archName = makefileName.substr(9);
-                    std::cerr << "scanning makefile " << makefile_iter->path() << ", makefile : " << makefileName
-                              << ", architecture : " << archName << std::endl;
+                    if (gVerbosity >= 2)
+                        std::cerr << "scanning makefile " << makefile_iter->path() << ", makefile : " << makefileName
+                                  << ", architecture : " << archName << std::endl;
                     fs::path dstdir = sha1path / OSname / archName;
-                    std::cerr << "dstdir = " << dstdir << std::endl;
+                    if (gVerbosity >= 2) std::cerr << "dstdir = " << dstdir << std::endl;
                     create_directories(dstdir);
                     fs::copy_file(makefile_iter->path(), dstdir / "Makefile");
                     copyFaustFiles(sha1path, dstdir);
@@ -280,14 +289,14 @@ static fs::path make(const fs::path& dir, const fs::path& target)
     std::stringstream ss;
     ss << "make -C " << dir << " " << target;
 
-    std::cerr << "ENTER MAKE " << ss.str() << std::endl;
+    if (gVerbosity >= 2) std::cerr << "ENTER MAKE " << ss.str() << std::endl;
     if (0 == system(ss.str().c_str())) {
         p = dir / target;
     } else {
-        std::cerr << __LINE__ << " makefile " << dir / target << " failed !!!" << std::endl;
+        if (gVerbosity >= 2) std::cerr << __LINE__ << " makefile " << dir / target << " failed !!!" << std::endl;
         p = "";
     }
-    std::cerr << "EXIT MAKE " << p << std::endl;
+    if (gVerbosity >= 2) std::cerr << "EXIT MAKE " << p << std::endl;
 
     return p;
 }
@@ -298,7 +307,8 @@ static int make_initial_faust_directory(connection_info_struct* con_info, string
     fs::path sha1path = fs::path(con_info->directory) / fs::path(sha1);
 
     if (!fs::is_directory(sha1path)) {
-        std::cerr << "ENTER make_initial_faust_directory(" << con_info << ", " << sha1path << std::endl;
+        if (gVerbosity >= 2)
+            std::cerr << "ENTER make_initial_faust_directory(" << con_info << ", " << sha1path << std::endl;
 
         try {
             // first time we have this file
@@ -348,7 +358,7 @@ static int make_initial_faust_directory(connection_info_struct* con_info, string
         // create the architecture-specific folders
         create_file_tree(sha1path, fs::path(con_info->makefile_directory));
 
-        std::cerr << "EXIT make_initial_faust_directory" << con_info << ", " << sha1 << std::endl;
+        if (gVerbosity >= 2) std::cerr << "EXIT make_initial_faust_directory" << con_info << ", " << sha1 << std::endl;
     }
     con_info->answerstring = sha1;
     // con_info->answerstring = completepage_head + sha1 + completepage_tail;
@@ -432,10 +442,9 @@ static int page_not_found(struct MHD_Connection* connection, const char* page, i
  * this is called after every chunk.
  */
 
-void FaustServer::request_completed(void* cls, struct MHD_Connection* connection, void** con_cls,
-                                    enum MHD_RequestTerminationCode toe)
+void FaustServer::request_completed(void*, struct MHD_Connection*, void** con_cls, enum MHD_RequestTerminationCode)
 {
-    std::cerr << "FaustServer::request_completed()" << endl;
+    if (gVerbosity >= 2) std::cerr << "FaustServer::request_completed()" << endl;
 
     struct connection_info_struct* con_info = (connection_info_struct*)*con_cls;
     *con_cls                                = NULL;
@@ -509,7 +518,7 @@ int FaustServer::send_file(struct MHD_Connection* connection, const fs::path& fi
     struct stat sbuf;
     int         fd;
 
-    std::cerr << __LINE__ << " ENTER send_file : " << filepath << endl;
+    if (gVerbosity >= 2) std::cerr << __LINE__ << " ENTER send_file : " << filepath << endl;
 
     if ((-1 == (fd = open(filepath.string().c_str(), O_RDONLY))) || (0 != fstat(fd, &sbuf))) {
         std::cerr << __LINE__ << " error accessing file : " << filepath << endl;
@@ -525,20 +534,22 @@ int FaustServer::send_file(struct MHD_Connection* connection, const fs::path& fi
     MHD_add_response_header(response, "Content-Type", mimetype);
     MHD_add_response_header(response, "Content-Location", filepath.filename().string().c_str());
     int ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
-    if (ret == MHD_YES) {
-        std::cerr << __LINE__ << " MHD_queue_response() return MHD_YES " << endl;
-    } else {
-        std::cerr << __LINE__ << " MHD_queue_response() return NOT MHD_YES but " << ret << endl;
+    if (gVerbosity >= 2) {
+        if (ret == MHD_YES) {
+            std::cerr << __LINE__ << " MHD_queue_response() return MHD_YES " << endl;
+        } else {
+            std::cerr << __LINE__ << " MHD_queue_response() return NOT MHD_YES but " << ret << endl;
+        }
     }
     MHD_destroy_response(response);
 
-    std::cerr << __LINE__ << " EXIT send_file : " << filepath << endl;
+    if (gVerbosity >= 2) std::cerr << __LINE__ << " EXIT send_file : " << filepath << endl;
     return ret;
 }
 
 // Start the Faust server - shallow wrapper around MHD_start_daemon
 
-static void panicCallback(void* cls, const char* file, unsigned int line, const char* reason)
+static void panicCallback(void*, const char* file, unsigned int line, const char* reason)
 {
     cerr << "PANIC " << line << ':' << file << ' ' << reason << endl;
 }
@@ -572,19 +583,25 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
                                           const char* method, const char* version, const char* upload_data,
                                           size_t* upload_data_size, void** con_cls)
 {
-    std::cerr << "\n==> ANSWER CONNECTION (" << rawurl << ", " << method << ", " << version << ")" << std::endl;
+    if (gVerbosity >= 1)
+        std::cerr << "\n==> ANSWER CONNECTION (" << rawurl << ", " << method << ", " << version << ")" << std::endl;
     string URL = simplifyURL(rawurl);
 
     FaustServer* server = (FaustServer*)cls;
     if (server == 0) {
-        std::cerr << "REAL BAD ERROR, NO SERVER !!!" << std::endl;
+        std::cerr << "ERROR: REAL BAD ERROR, NO SERVER !!!" << std::endl;
         exit(1);
     }
-    if (0 == strcmp(method, "GET")) {
-        return server->dispatchGETConnections(connection, URL);
-    } else if (0 == strcmp(method, "POST")) {
-        return server->dispatchPOSTConnections(connection, URL, upload_data, upload_data_size, con_cls);
-    } else {
+    try {
+        if (0 == strcmp(method, "GET")) {
+            return server->dispatchGETConnections(connection, URL);
+        } else if (0 == strcmp(method, "POST")) {
+            return server->dispatchPOSTConnections(connection, URL, upload_data, upload_data_size, con_cls);
+        } else {
+            return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+        }
+    } catch (exception const& e) {
+        std::cerr << "ERROR: GLOBAL ERROR CATCHED " << e.what() << std::endl;
         return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
     }
 }
@@ -597,9 +614,12 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 {
     // TArgs args;
     // MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
-    std::cerr << "ANSWER GET CONNECTION " << url << std::endl;
+    if (gVerbosity >= 2) std::cerr << "ANSWER GET CONNECTION " << url << std::endl;
 
-    if (matchURL(url, "/")) {
+    if (matchExtension(url, ".php") || matchExtension(url, ".js")) {
+        return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
+
+    } else if (matchURL(url, "/")) {
         stringstream ss;
         ss << askpage_head << nr_of_uploading_clients << askpage_tail;
         return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
@@ -607,21 +627,34 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/targets")) {
         return send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK, "application/json");
 
+    } else if (matchURL(url, "/crash1")) {
+        // simulate crash -- to be removed in production
+        exit(-1);
+
+    } else if (matchURL(url, "/crash2")) {
+        // simulate crash -- to be removed in production
+        int* p = 0;
+        *p     = 5 / (*p);
+        return page_not_found(connection, "/crash2", 7, "image/x-icon");
+
     } else if (matchURL(url, "/*/*/*/binary.zip")) {
+        return makeAndSendResourceFile(connection, url);
+
+    } else if (matchURL(url, "/*/*/*/precompile")) {
         return makeAndSendResourceFile(connection, url);
 
     } else if (matchURL(url, "/*/*/*/binary.apk")) {
         return makeAndSendResourceFile(connection, url);
 
-    } else if (matchURL(url, "/*/diagram/process.svg")) {
+    } else if (matchURL(url, "/*/diagram/*") && matchExtension(url, ".svg")) {
         return makeAndSendResourceFile(connection, url);
 
     } else if (matchURL(url, "/favicon.ico")) {
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
 
     } else {
-        std::cerr << "WARNING: We should have a rule to match this URL " << url << std::endl;
-        return makeAndSendResourceFile(connection, url);
+        if (gVerbosity >= 1) std::cerr << "WARNING: We should have a rule to match this URL " << url << std::endl;
+        return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
     }
 }
 
@@ -639,15 +672,15 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     const char*    mimetype;
     bool           precompile = false;
 
-    std::cerr << "\nUSING SESSION " << U[1] << "\n\n";
+    if (gVerbosity >= 2) std::cerr << "\nUSING SESSION " << U[1] << "\n\n";
     fSessionCache.refer(U[1]);
 
     // Check for svg block-diagram requests first
     if (url.extension() == ".svg") {
-        std::cerr << "Processing SVG file request" << std::endl;
+        if (gVerbosity >= 2) std::cerr << "Processing SVG file request" << std::endl;
         fs::path fullfile = fulldir / target;
         if (!boost::filesystem::exists(fullfile)) {
-            std::cerr << "Diagram not created yet" << std::endl;
+            if (gVerbosity >= 2) std::cerr << "Diagram not created yet" << std::endl;
             make(fullfile.parent_path().parent_path(), fs::path("diagram"));
         }
         return send_file(connection, fullfile, "image/svg+xml");
@@ -693,9 +726,9 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const string& url, const char* upload_data,
                                          size_t* upload_data_size, void** con_cls)
 {
-    std::cerr << "ANSWER POST CONNECTION " << url << std::endl;
+    if (gVerbosity >= 2) std::cerr << "ANSWER POST CONNECTION " << url << std::endl;
     if (NULL == *con_cls) {
-        std::cerr << "PRE POST processing" << std::endl;
+        if (gVerbosity >= 2) std::cerr << "PRE POST processing" << std::endl;
         struct connection_info_struct* con_info;
 
         if (nr_of_uploading_clients >= this->getMaxClients()) {
@@ -728,20 +761,20 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
         return MHD_YES;
 
     } else {
-        std::cerr << "HEY! POST processing" << std::endl;
+        if (gVerbosity >= 2) std::cerr << "HEY! POST processing" << std::endl;
         struct connection_info_struct* con_info = (connection_info_struct*)*con_cls;
 
         if (0 != *upload_data_size) {
-            std::cerr << "POST processing, we have data to upload !" << std::endl;
+            if (gVerbosity >= 2) std::cerr << "POST processing, we have data to upload !" << std::endl;
             int result        = MHD_post_process(con_info->postprocessor, upload_data, *upload_data_size);
             *upload_data_size = 0;
             return result;
         } else {
-            std::cerr << "POST processing, NO MORE data to upload !" << std::endl;
+            if (gVerbosity >= 2) std::cerr << "POST processing, NO MORE data to upload !" << std::endl;
             // need to close the file before request_completed
             // so that it can be opened by the methods below
             if (con_info->fp) {
-                std::cerr << "POST processing, We can close the file !" << std::endl;
+                if (gVerbosity >= 2) std::cerr << "POST processing, We can close the file !" << std::endl;
                 fclose(con_info->fp);
                 con_info->fp = 0;
             }
@@ -752,11 +785,15 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
                 std::vector<std::string> segments;
                 sha1 = generate_sha1(con_info);
                 make_initial_faust_directory(con_info, sha1);
-                std::cerr << "POST processing, We have valid faust code. Its SHA1 key is = " << sha1 << std::endl;
+                if (gVerbosity >= 2)
+                    if (gVerbosity >= 1)
+                        std::cerr << "POST processing, We have valid faust code. Its SHA1 key is = " << sha1
+                                  << std::endl;
                 if (matchURL(url, "/compile/*/*/*", segments)) {
                     string newurl("/");
                     newurl += sha1 + "/" + segments[2] + "/" + segments[3] + "/" + segments[4];
-                    std::cerr << "DIRECT COMPILATION: We are trying a direct compilation at " << newurl << endl;
+                    if (gVerbosity >= 2)
+                        std::cerr << "DIRECT COMPILATION: We are trying a direct compilation at " << newurl << endl;
                     return makeAndSendResourceFile(connection, newurl.c_str());
                 } else {
                     return send_page(connection, con_info->answerstring.c_str(), con_info->answerstring.size(),
@@ -781,17 +818,19 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
  */
 
 int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const char* key, const char* filename,
-                              const char* content_type, const char* transfer_encoding, const char* data, uint64_t off,
-                              size_t size)
+                              const char* content_type, const char* /*transfer_encoding*/, const char* data,
+                              uint64_t /*off*/, size_t size)
 {
     struct connection_info_struct* con_info = (connection_info_struct*)coninfo_cls;
     FILE*                          fp;
 
-    std::cerr << "ENTER iterate_post ("
-              << "kind : " << kind << ", key : " << key << ", filename: " << filename << ", content type: "
-              << content_type
-              //<< ", transfer_encoding: " << transfer_encoding
-              << ", data pointer: " << (void*)data << ", size: " << size << ")" << std::endl;
+    if (gVerbosity >= 2) {
+        std::cerr << "ENTER iterate_post ("
+                  << "kind : " << kind << ", key : " << key << ", filename: " << filename << ", content type: "
+                  << content_type
+                  //<< ", transfer_encoding: " << transfer_encoding
+                  << ", data pointer: " << (void*)data << ", size: " << size << ")" << std::endl;
+    }
     if (con_info->tmppath.empty()) {
         con_info->filename = filename;
         con_info->tmppath  = (fs::temp_directory_path() / fs::unique_path("%%%%-%%%%-%%%%-%%%%")).string();
@@ -804,7 +843,7 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
     con_info->answercode   = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
     if (0 != strcmp(key, "file")) {
-        std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+        if (gVerbosity >= 2) std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
         return MHD_NO;
     }
 
@@ -814,20 +853,20 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
 
             con_info->answerstring = fileexistspage;
             con_info->answercode   = MHD_HTTP_FORBIDDEN;
-            std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+            if (gVerbosity >= 2) std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
             return MHD_NO;
         }
 
         con_info->fp = fopen(full_path.c_str(), "ab");
         if (con_info->fp == 0) {
-            std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+            if (gVerbosity >= 2) std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
             return MHD_NO;
         }
     }
 
     if (size > 0) {
         if (!fwrite(data, size, sizeof(char), con_info->fp)) {
-            std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+            if (gVerbosity >= 2) std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
             return MHD_NO;
         }
     }

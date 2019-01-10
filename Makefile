@@ -10,10 +10,10 @@ pdsdk  := /usr/include/pd
 ifeq ($(shell uname -s), Darwin)
 EXT = -mt
 LDFLAGS = -L/opt/local/lib
-CXXFLAGS = -Wall -Wno-unused-local-typedef -O1 -g -I/opt/local/include
+CXXFLAGS = -Wall -Wextra -Wno-unused-local-typedef -O3 -I/opt/local/include
 else
 EXT = ""
-CXXFLAGS = -Wall -O1 -g -DBOOST_NO_CXX11_SCOPED_ENUMS
+CXXFLAGS = -Wall -Wextra -O3 -DBOOST_NO_CXX11_SCOPED_ENUMS
 endif
 
 faustweb: *.cpp *.hh
