@@ -1,0 +1,14 @@
+#!/bin/bash
+
+./testbela $1
+./testweb $1
+./testandroid $1
+./testjuce $1
+./testwindows32 $1
+./testlinux $1
+./testowl $1
+./testsource $1
+./testmisc $1
+./testosx $1
+./testsam $1
+./testunity $1

@@ -1,0 +1,33 @@
+#!/bin/bash
+
+#SERVICE=https://faustservicecloud.grame.fr
+SERVICE=http://localhost:8888
+#SERVICE=35.244.223.146
+#SERVICE=35.233.113.48
+
+echo "TARGETS"
+./rfaust $SERVICE
+
+echo "TESTS"
+
+echo "\n\nBELA\n"
+for a in "bela" "bela-midi" "bela-midi-poly-1" "bela-midi-poly-2" "bela-midi-poly-4" "bela-midi-poly-8"; do
+    echo
+    echo "bela/$a"
+	./rfaust $SERVICE bela $a kisana.dsp
+done
+
+echo "\n\nWEB\n"
+for a in "asmjs" "asmjs-poly" "wap" "wap-poly" "wasmjs" "wasmjs-poly" "wasmjs-worklet" "webaudioasm" "webaudioasm-links" "webaudioasm-poly" "webaudiowasm" "webaudiowasm-links" "webaudiowasm-poly" "webaudiowasm-worklet"; do
+    echo
+	echo "web/$a"
+	./rfaust $SERVICE web $a kisana.dsp
+done
+
+echo "\n\nOSX\n"
+for a in "coreaudio-qt" "csound" "jack-qt" "max" "plot" "puredata" "puredata-poly" "supercollider" "vst" "vsti"; do
+    echo
+	echo "web/$a"
+	./rfaust $SERVICE web $a kisana.dsp
+done
+

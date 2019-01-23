@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Enviroment variable that can be set a default faustservice url
+[ ! -z "$1" ] && SERVICE="$1" || SERVICE=${CLOUDSERVICE:="https://faustservicecloud.grame.fr"}
+
+PLATFORM=osx
+ARCHLIST="coreaudio-qt csound jack-qt max plot puredata puredata-poly supercollider vst vsti"
+
+echo "$PLATFORM"
+for ARCH in $ARCHLIST; do
+    echo
+	echo "$PLATFORM/$ARCH"
+	[ -d kisana.app ] && rm -rf kisana.app
+	./rfaust $SERVICE $PLATFORM $ARCH kisana.dsp
+done

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Enviroment variable that can be set a default faustservice url
+[ ! -z "$1" ] && SERVICE="$1" || SERVICE=${CLOUDSERVICE:="https://faustservicecloud.grame.fr"}
+
+PLATFORM=juce
+ARCHLIST="application application-midi-poly16 application-midi-poly16-osc jsynth jsynth-midi-poly16 jsynth-midi-poly16-osc plug-in plug-in-midi-poly16 plug-in-midi-poly16-osc"
+
+echo "$PLATFORM"
+for ARCH in $ARCHLIST; do
+    echo
+	echo "$PLATFORM/$ARCH"
+	./rfaust $SERVICE $PLATFORM $ARCH kisana.dsp
+done
