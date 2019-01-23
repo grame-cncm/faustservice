@@ -1,0 +1,16 @@
+################################################################################
+#							FaustWeb LINUX script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2jaqt $(OPT) -midi $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=)
+
+src.cpp : $(faustfile)
+	faust -i -a jack-qt.cpp $(faustfile) -o src.cpp
+
+
