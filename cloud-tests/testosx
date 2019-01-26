@@ -4,7 +4,7 @@
 [ ! -z "$1" ] && SERVICE="$1" || SERVICE=${CLOUDSERVICE:="https://faustservicecloud.grame.fr"}
 
 PLATFORM=osx
-ARCHLIST="coreaudio-qt csound jack-qt max plot puredata puredata-poly supercollider vst vsti"
+ARCHLIST="coreaudio-qt coreaudio-qt-midi csound jack-qt max plot puredata puredata-poly supercollider vst vsti"
 
 echo "$PLATFORM"
 for ARCH in $ARCHLIST; do
