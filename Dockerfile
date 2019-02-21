@@ -14,7 +14,7 @@ FROM grame/faustready-ubuntu-1604:004
 # Now we can clone and compile all the Faust related git repositories
 ########################################################################
 
-RUN echo "CHANGE THIS NUMBER TO FORCE REGENERATION : 012"
+RUN echo "CHANGE THIS NUMBER TO FORCE REGENERATION : 013"
 
 
 # faustservice first as it changes less often
