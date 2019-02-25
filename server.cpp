@@ -627,16 +627,17 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/targets")) {
         return send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK, "application/json");
 
-    } else if (matchURL(url, "/crash1")) {
-        // simulate crash -- to be removed in production
-        exit(-1);
+        /*
+            } else if (matchURL(url, "/crash1")) {
+                // simulate crash -- to be removed in production
+                exit(-1);
 
-    } else if (matchURL(url, "/crash2")) {
-        // simulate crash -- to be removed in production
-        int* p = 0;
-        *p     = 5 / (*p);
-        return page_not_found(connection, "/crash2", 7, "image/x-icon");
-
+            } else if (matchURL(url, "/crash2")) {
+                // simulate crash -- to be removed in production
+                int* p = 0;
+                *p     = 5 / (*p);
+                return page_not_found(connection, "/crash2", 7, "image/x-icon");
+        */
     } else if (matchURL(url, "/*/*/*/binary.zip")) {
         return makeAndSendResourceFile(connection, url);
 
