@@ -7,9 +7,10 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
+	faust2puredata $(faustfile) $(OPT) -poly
 	dockerOSX faust2puredata $(faustfile) $(OPT) -poly
 	cp $(wildcard 	/usr/lib/pd/extra/faust*.pd  /usr/local/lib/pd/extra/faust*.pd /opt/lib/pd/extra/faust*.pd) .
-	zip -r binary.zip *
+	zip -r binary.zip *.dsp *.pd *.pd_darwin
 
 src.cpp : $(faustfile)
 	faust -i -a puredata.cpp $(faustfile) -o src.cpp
