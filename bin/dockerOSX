@@ -9,4 +9,4 @@ CDIR=`pwd`
 DOCKERIMAGE='faust:cross-osx'
 
 # Produce binary.zip on remote server
-docker run -t -rm -w "$CDIR" -v /tmp/sessions:/tmp/sessions $DOCKERIMAGE $@
+docker run -t --rm -w "$CDIR" -v /tmp/sessions:/tmp/sessions $DOCKERIMAGE $@
