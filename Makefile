@@ -51,11 +51,15 @@ uninstall:
 start:
 	initctl start faustweb
 
+test:
+	./faustweb -v 1 -p 80 -d /tmp/sessions -r $(shell pwd)/faustweb
+
 
 help:
-	echo "faustweb : compiles faustweb"
-	echo "clean    : remove faustweb"
-	echo "format   : format source code using astyle"
-	echo "install  : install upstart config and other files"
-	echo "uninstall: "
-	echo "start    : starts faustweb as an upstart service"
+	@echo "faustweb : compiles faustweb"
+	@echo "clean    : remove faustweb"
+	@echo "format   : format source code using astyle"
+	@echo "install  : install upstart config and other files"
+	@echo "uninstall: "
+	@echo "start    : starts faustweb as an upstart service"
+	@echo "test     : starts faustweb for tests"

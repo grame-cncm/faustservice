@@ -33,27 +33,10 @@
 
 #include <signal.h>
 #include <unistd.h>
+#include <string>
+
 #include "server.hh"
 #include "utilities.hh"
-
-static void _sigaction(int signal, siginfo_t*, void*)
-{
-    cerr << "Signal #" << signal << " catched!" << endl;
-    exit(-2);
-}
-
-static void catchsigs()
-{
-    struct sigaction sa;
-
-    memset(&sa, 0, sizeof(struct sigaction));
-    sigemptyset(&sa.sa_mask);
-    sa.sa_sigaction = _sigaction;
-    sa.sa_flags     = SA_SIGINFO;
-    sigaction(SIGSEGV, &sa, NULL);
-    sigaction(SIGILL, &sa, NULL);
-    sigaction(SIGFPE, &sa, NULL);
-}
 
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
@@ -69,6 +52,8 @@ fs::path gSessionsDirectory;  ///< directory where sessions are stored
 fs::path
          gMakefilesDirectory;  ///< directory containing all the "<os>/Makefile.<architecture>[-32bits|-64bits]" makefiles
 fs::path gLogfile;             ///< faustweb logfile
+string   gRecoverCmd;          ///< system command to launch for recovery after intercepted crash
+char*    gArguments[256];
 
 // Processes command line arguments using boost/parse_options
 static void process_cmdline(int argc, char* argv[])
@@ -81,6 +66,8 @@ static void process_cmdline(int argc, char* argv[])
     desc.add_options()("port,p", po::value<int>(), "the listening port");
     desc.add_options()("max-sessions,n", po::value<int>(), "maximum number of cached sessions");
     desc.add_options()("verbose,v", po::value<int>(), "0: normal; 1: verbose; 2: very verbose");
+    desc.add_options()("recover-cmd,r", po::value<std::string>(),
+                       "program (usually self) to launch after crash recovery");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -118,6 +105,10 @@ static void process_cmdline(int argc, char* argv[])
     if (vm.count("verbose")) {
         gVerbosity = vm["verbose"].as<int>();
     }
+
+    if (vm.count("recover-cmd")) {
+        gRecoverCmd = vm["recover-cmd"].as<string>();
+    }
 }
 
 static void printFaustVersion()
@@ -141,9 +132,47 @@ static size_t computeSessionSize()
     }
 }
 
+// static void recover()
+// {
+//     std::cerr << "execv(" << gRecoverCmd << ")" << endl;
+//     execv(gRecoverCmd.c_str(), gArguments);
+// }
+
+static void _sigaction(int signal, siginfo_t*, void*)
+{
+    cerr << "\n\n";
+    cerr << "SIGNAL #" << signal << " CATCHED!" << endl;
+    if (gRecoverCmd.size() > 0) {
+        std::cerr << "EXEC RECOVERING CMD: " << gRecoverCmd << endl;
+        execv(gRecoverCmd.c_str(), gArguments);
+    } else {
+        std::cerr << "NO RECOVERING CMD -> EXIT" << endl;
+        exit(-1);
+    }
+}
+
+static void catchsigs()
+{
+    struct sigaction sa;
+
+    memset(&sa, 0, sizeof(struct sigaction));
+    sigemptyset(&sa.sa_mask);
+    sa.sa_sigaction = _sigaction;
+    sa.sa_flags     = SA_SIGINFO;
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGILL, &sa, NULL);
+    sigaction(SIGFPE, &sa, NULL);
+}
+
 int main(int argc, char* argv[], char* env[])
 {
     catchsigs();
+
+    // Make a copy the command arguments
+    for (int i = 0; i < argc; i++) {
+        gArguments[i] = argv[i];
+    }
+    gArguments[argc] = nullptr;
 
     // Set the various default paths
     gCurrentDirectory   = fs::absolute(fs::current_path());
@@ -166,6 +195,7 @@ int main(int argc, char* argv[], char* env[])
                   << " sessions dir: " << gSessionsDirectory << "\n"
                   << "sessions size: " << computeSessionSize() << "\n"
                   << "    verbosity: " << gVerbosity << "\n"
+                  << "  recover-cmd: " << gRecoverCmd << "\n"
                   << std::endl;
 
         // Print Faust version
