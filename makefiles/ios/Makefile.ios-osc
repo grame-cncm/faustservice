@@ -7,7 +7,7 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2ios -xcodeproj $(faustfile) $(OPT)
+	faust2ios -xcodeproj $(faustfile) -osc $(OPT)
 	zip -r binary.zip $(faustfile:.dsp=)
 
 src.cpp : $(faustfile)
