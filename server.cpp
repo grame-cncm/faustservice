@@ -626,6 +626,9 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 
     } else if (matchURL(url, "/targets")) {
         return send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK, "application/json");
+    } else if (matchURL(url, "/stopfaustservice")) {
+        // for test purposes only
+        exit(0);
 
         /*
             } else if (matchURL(url, "/crash1")) {
