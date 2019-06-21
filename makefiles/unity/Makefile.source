@@ -7,8 +7,8 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust -i -a unity.cpp "$(faustfile)" -o "$(faustfile:.dsp=.cpp)" 
-	zip -r binary.zip $(faustfile) $(faustfile:.dsp=.cpp)
+	faust2unity -source "$(faustfile)"
+	zip -r binary.zip FaustPlugin*
 
 src.cpp : $(faustfile)
 	faust -uim -i -a unity.cpp $(faustfile) -o src.cpp
