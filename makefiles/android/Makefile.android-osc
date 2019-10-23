@@ -7,7 +7,7 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2smartkeyb -android $(OPT) $(faustfile)
+	faust2android $(faustfile) -osc $(OPT)
 	zip -r binary.zip $(faustfile:.dsp=.apk)
 
 binary.apk : binary.zip
