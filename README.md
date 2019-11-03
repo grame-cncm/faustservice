@@ -61,7 +61,7 @@ For OSX :
 
 	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"'  http://localhost:8888/compile/android/android/binary.apk --output binary3.apk
 
-#### google cloud compilation
+#### Google Cloud compilation
 
 	curl http://35.229.105.70/faustservice/targets
 	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"' http://35.229.105.70/faustservice/compile/android/android/binary.apk --output binary3.apk
@@ -70,14 +70,14 @@ For OSX :
 	sudo systemctl restart faustweb
 	sudo systemctl restart apache2
 
-#### Playing with faustservice on google VM
+#### Playing with faustservice on Google VM
 
 	curl http://35.190.180.34/targets
 	curl http://104.196.34.150/targets
 
-
-#### Tests en local
+#### Testing locally
 
 	curl localhost:8888/targets
 	curl -F'file=@"kisana.dsp";filename="kisana.dsp"' localhost:8888/filepost
 	curl -F'file=@"kisana.dsp";filename="kisana.dsp"' localhost:8888/compile/android/android/binary.zip --output kisana.apk
+
