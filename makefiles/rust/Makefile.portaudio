@@ -1,0 +1,14 @@
+################################################################################
+#
+#			FaustWeb Makefile for Rust
+#
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2portaudiorust -source $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=)-portaudiorust
+
+src.rs : $(faustfile)
+	faust -lang rust -a minimal-portaudio.rs $(faustfile) -o main.rs

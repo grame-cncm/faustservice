@@ -1,0 +1,14 @@
+################################################################################
+#
+#			FaustWeb Makefile for Rust
+#
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2jackrust -source $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=)-jackrust
+
+src.rs : $(faustfile)
+	faust -lang rust -a minimal-jack.rs $(faustfile) -o main.rs
