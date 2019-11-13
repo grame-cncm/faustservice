@@ -8,7 +8,7 @@ faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
 	faust2soul $(OPT) $(faustfile)
-	zip -r binary.zip $(faustfile:.dsp=.soul) $(faustfile:.dsp=.soulpatch)
+	zip -r binary.zip $(faustfile:.dsp=)
 
 src.soul : $(faustfile)
 	faust -a soul/minimal.soul $(faustfile) -o src.soul
