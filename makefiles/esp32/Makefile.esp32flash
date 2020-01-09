@@ -1,0 +1,23 @@
+################################################################################
+#							FaustWeb OSX script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	mv $(faustfile) FaustBasic.dsp
+	faust2esp32 -lib -wm8978 FaustBasic.dsp
+	mkdir faustBasic
+	cp -ar /user/local/shared/faust/esp32/faustBasic/* faustBasic/ #which esp32 project is grabbed by the makefile. must reflect server architecture. 
+	mv *.zip faustBasic/main/faust.zip
+	unzip faustBasic/main/faust.zip -d faustBasic/main
+	mv faustBasic/main/FaustBasic/* faustBasic/main/FaustBasic/..
+	. /opt/esp/esp-idf/export.sh && make -C faustBasic #path for export must reflect server architecture
+	mkdir binary
+	cp faustBasic/build/faustBasic.bin faustBasic/build/partitions_singleapp.bin faustBasic/build/bootloader/bootloader.bin binary
+	zip -r binary binary
+
+src.cpp : $(faustfile)
+	faust $(faustfile) -o src.cpp
