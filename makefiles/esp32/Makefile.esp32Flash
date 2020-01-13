@@ -6,15 +6,17 @@
 
 faustfile	?= $(wildcard *.dsp)
 
-binary.zip : $(faustfile)
-	mv $(faustfile) FaustBasic.dsp
+FaustBasic.dsp : $(faustfile)
+	mv $(faustfile) FaustBasic.dsp;
+
+binary.zip : FaustBasic.dsp
 	faust2esp32 -lib -wm8978 FaustBasic.dsp
 	mkdir faustBasic
-	cp -ar /user/local/shared/faust/esp32/faustBasic/* faustBasic/ #which esp32 project is grabbed by the makefile. must reflect server architecture. 
+	cp -ar /usr/local/share/faust/esp32/faustBasic/* faustBasic/ #which esp32 project is grabbed by the makefile. must reflect server architecture. 
 	mv *.zip faustBasic/main/faust.zip
 	unzip faustBasic/main/faust.zip -d faustBasic/main
 	mv faustBasic/main/FaustBasic/* faustBasic/main/FaustBasic/..
-	. /opt/esp/esp-idf/export.sh && make -C faustBasic #path for export must reflect server architecture
+	/bin/bash -c "source /opt/esp/idf/export.sh; make -C faustBasic"
 	mkdir binary
 	cp faustBasic/build/faustBasic.bin faustBasic/build/partitions_singleapp.bin faustBasic/build/bootloader/bootloader.bin binary
 	zip -r binary binary
