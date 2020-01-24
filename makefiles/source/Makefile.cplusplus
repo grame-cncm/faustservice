@@ -11,4 +11,4 @@ binary.zip : $(faustfile)
 	zip -r binary.zip $(faustfile) $(faustfile:.dsp=.cpp)
 
 src.cpp : $(faustfile)
-	faust -i -a android.cpp $(faustfile) -o src.cpp
+	faust -i -a minimal.cpp $(faustfile) -o src.cpp

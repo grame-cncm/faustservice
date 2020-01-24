@@ -7,8 +7,8 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2api -juce -nvoices 12 -effect auto $(OPT) $(faustfile)
-	mv dsp-faust.zip binary.zip
+	faust -lang c $(faustfile) -o $(faustfile:.dsp=.c)
+	zip -r binary.zip $(faustfile) $(faustfile:.dsp=.c)
 
 src.cpp : $(faustfile)
-	faust -i -a juce/juce-plugin.cpp $(faustfile) -o src.cpp
+	faust -i -a minimal.c $(faustfile) -o src.c

@@ -11,4 +11,4 @@ binary.zip : $(faustfile)
 	mv dsp-faust.zip binary.zip
 
 src.cpp : $(faustfile)
-	faust -i -a android.cpp $(faustfile) -o src.cpp
+	faust -i -a juce/juce-plugin.cpp $(faustfile) -o src.cpp
