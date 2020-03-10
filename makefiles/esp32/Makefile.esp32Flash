@@ -10,7 +10,7 @@ FaustBasic.dsp : $(faustfile)
 	mv $(faustfile) FaustBasic.dsp;
 
 binary.zip : FaustBasic.dsp
-	faust2esp32 -lib -wm8978 FaustBasic.dsp
+	faust2esp32 -lib -wm8978 -I /usr/local/share/faust/embedded/ FaustBasic.dsp
 	mkdir faustBasic
 	cp -ar /usr/local/share/faust/esp32/faustBasic/* faustBasic/ #which esp32 project is grabbed by the makefile. must reflect server architecture. 
 	mv *.zip faustBasic/main/faust.zip

@@ -7,7 +7,7 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2esp32 -lib -wm8978 $(faustfile)
+	faust2esp32 -lib -wm8978 -I /usr/local/share/faust/embedded/ $(faustfile)
 	mv *.zip binary.zip
 
 src.cpp : $(faustfile)
