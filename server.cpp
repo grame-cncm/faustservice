@@ -557,7 +557,7 @@ static void panicCallback(void*, const char* file, unsigned int line, const char
 bool FaustServer::start()
 {
     MHD_set_panic_func(&panicCallback, NULL);
-    fDaemon = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION, fPort, NULL, NULL, &staticAnswerToConnection, this,
+    fDaemon = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION, fPort, NULL, NULL, (MHD_AccessHandlerCallback)&staticAnswerToConnection, this,
                                MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL, MHD_OPTION_END);
 
     return fDaemon != NULL;
@@ -744,7 +744,7 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
         con_info->makefile_directory = this->getMakefileDirectory().string();
 
         con_info->fp            = NULL;
-        con_info->postprocessor = MHD_create_post_processor(connection, POSTBUFFERSIZE, iterate_post, (void*)con_info);
+        con_info->postprocessor = MHD_create_post_processor(connection, POSTBUFFERSIZE, (MHD_PostDataIterator)iterate_post, (void*)con_info);
 
         if (NULL == con_info->postprocessor) {
             delete con_info;
