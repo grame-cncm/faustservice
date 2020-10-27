@@ -10,9 +10,9 @@ Gramophone.dsp : $(faustfile)
 	mv $(faustfile) Gramophone.dsp;
 
 binary.zip : Gramophone.dsp
-	faust2esp32 -lib -gramophone -wm8978 Gramophone.dsp
+	faust2esp32 -lib -gramophone -midi -wm8978 Gramophone.dsp
 	mkdir gramo
-	cp -ar /usr/local/share/faust/esp32/gramo-precomp/* gramo/ #which esp32 project is grabbed by the makefile. must reflect server architecture. 
+	cp -ar /usr/local/share/faust/esp32/gramo-bt-precomp/* gramo/ #which esp32 project is grabbed by the makefile. must reflect server architecture. 
 	unzip Gramophone.zip
 	mv Gramophone/Gramophone.cpp gramo/main/
 	/bin/bash -c "get_idf; make -C gramo"
