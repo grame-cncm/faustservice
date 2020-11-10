@@ -7,7 +7,7 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2vcvrack -nvoices 16 $(OPT) $(faustfile)
+	faust2vcvrack -source -nvoices 16 $(OPT) $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=)
 
 src.cpp : $(faustfile)
