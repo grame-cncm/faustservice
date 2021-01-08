@@ -15,7 +15,7 @@ binary.zip : Gramophone.dsp
 	cp -ar /usr/local/share/faust/esp32/gramo-precomp/* gramo/ #which esp32 project is grabbed by the makefile. must reflect server architecture. 
 	unzip Gramophone.zip
 	mv Gramophone/Gramophone.cpp gramo/main/
-	/bin/bash -c "get_idf; make -C gramo"
+	/bin/bash -c "source /opt/esp/idf/export.sh; make -C gramo"
 	mkdir binary
 	cp gramo/build/GramophoneBTMidi.bin binary/faustBasic.bin
 	cp gramo/build/partitions_singleapp.bin binary
