@@ -18,6 +18,7 @@ BPS = 360;	// general tempo (beat per sec)
 
 
 process = kisana;
+effect = _,_; 
 
 
 //-------------------------------kisana----------------------------------
