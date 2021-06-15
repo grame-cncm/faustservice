@@ -12,10 +12,8 @@ In order to compile FaustWeb links against the following libraries:
  - **libcrypto** (sudo apt-get install libcrypto++-dev)
  - **libmicrohttpd**
 
-Make sure to download the current development trunk of all these libraries. Then, the standard:
+Make sure to download the current development trunk of all these libraries and install. Then, the standard:
 
- - **mkdir build && cd build**
- - **../configure**
  - **make**
  - **sudo make install**
 
@@ -38,17 +36,20 @@ Select a file kisana.dsp and send it. The sent file can be a either a .dsp or an
  - http://localhost:8888/<key\>/\<plateform\>/\<architecture\>/binary.zip returns the 'binary.zip' archive containing one or several binairies
  - http://localhost:8888/<key\>/\<plateform\>/\<architecture\>/src.cpp	returns the architecture wrapped cpp source code 
 
-#### List of available architectures for each platform ####
+#### List of available architectures for each platform (here of OSX as en example) ####
 
 For OSX :
-	osx/coreaudio-qt	
-	osx/jack-qt				
-	osx/supercollider	
-	osx/vsti
-	osx/csound		
-	osx/max-msp		
-	osx/puredata	
-	osx/vst
+ osx/coreaudio-qt	
+ osx/coreaudio-qt-midi  
+ osx/csound
+ osx/jack-qt    
+ osx/max
+ osx/plot
+ osx/puredata
+ osx/puredata-poly
+ osx/supercollider	
+ osx/vst
+ osx/vsti
 
 #### Testing the service using Curl ####
 
