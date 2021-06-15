@@ -23,7 +23,7 @@ Make sure to download the current development trunk of all these libraries and i
 
 #### From a browser at URL http://localhost:8888/ ####
 
-Select a file kisana.dsp and send it. The sent file can be a either a .dsp or an .zip archive containing a .dsp .lib files. Next use the returned <key> for example cf55531c580cc7d3485a5161259f0571d3e6bdef
+Select a file *kisana.dsp* and send it. The sent file can be a either a .dsp or an .zip archive containing a .dsp .lib files. Next use the returned <key> for example cf55531c580cc7d3485a5161259f0571d3e6bdef
 
 #### General API ####
 
@@ -53,12 +53,16 @@ For OSX :
 
 #### Testing the service using Curl ####
 
+The local service run on the http://localhost:8888/ URL, and can be tested like in the following examples:
+
 	curl http://localhost:8888/targets
 	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"'  http://localhost:8888/filepost
 	returned SHA key: 5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF
 	curl http://localhost:8888/5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF/android/smartkeyb/binary.apk --output binary.apk
 
 #### Direct compilation
+
+Or with a single complete command:
 
 	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"'  http://localhost:8888/compile/android/android/binary.apk --output binary3.apk
 
@@ -81,4 +85,12 @@ For OSX :
 	curl localhost:8888/targets
 	curl -F'file=@"kisana.dsp";filename="kisana.dsp"' localhost:8888/filepost
 	curl -F'file=@"kisana.dsp";filename="kisana.dsp"' localhost:8888/compile/android/android/binary.zip --output kisana.apk
+
+#### Using the remote service
+
+The remote compilation service run on the http://faustservice.grame.fr URL, and can be used like in the following examples:
+
+    curl http://faustservice.grame.fr/targets
+    curl -F'file=@"kisana.dsp";filename="kisana.dsp"' http://faustservice.grame.fr/filepost
+    curl -F'file=@"kisana.dsp";filename="kisana.dsp"' http://faustservice.grame.fr/compile/soul/soul/binary.zip --output kisana.zip
 
