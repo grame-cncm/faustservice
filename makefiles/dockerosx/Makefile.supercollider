@@ -11,7 +11,7 @@ faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
 	dockerOSX faust2supercollider -noprefix $(faustfile) $(OPT)
-	faust2supercollider -noprefix $(faustfile) $(OPT)
+	faust2supercollider -noprefix -sn $(faustfile) $(OPT)
 	zip -r binary.zip *.sc *.scx
 
 src.cpp : $(faustfile)
