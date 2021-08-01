@@ -1,5 +1,5 @@
 ################################################################################
-#							FaustWeb OSX script
+#							Faust Julia script
 #  The behaviour of this Makefile will only be correct if
 #  only one .dsp file exists in the folder
 ################################################################################
@@ -7,8 +7,8 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust -lang c $(faustfile) -o $(faustfile:.dsp=.c)
-	zip -r binary.zip $(faustfile) $(faustfile:.dsp=.c)
+	faust2portaudiojulia $(OPT) $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=.jl)
 
-src.c : $(faustfile)
-	faust -lang c -i -a minimal.c $(faustfile) -o src.c
+src.jl : $(faustfile)
+	faust -lang julia -a portaudio.jl $(faustfile) -o src.jl
