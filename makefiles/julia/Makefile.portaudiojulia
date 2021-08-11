@@ -9,18 +9,7 @@ faustfile ?= $(wildcard *.dsp)
 ARCH_PATH ?= $(shell faust -archdir)
 
 binary.zip : $(faustfile)
-	faust2portaudiojulia $(OPT) $(faustfile)
-	echo "const FAUSTFLOAT = Float32" > out.jl	
-	cat $(ARCH_PATH)/julia/dsp/dsp.jl >> out.jl
-	cat $(ARCH_PATH)/julia/audio/audio.jl >> out.jl
-	cat $(ARCH_PATH)/julia/audio/portaudio.jl >> out.jl
-	cat $(ARCH_PATH)/julia/gui/meta.jl >> out.jl
-	cat $(ARCH_PATH)/julia/gui/UI.jl >> out.jl
-	cat $(ARCH_PATH)/julia/gui/MapUI.jl >> out.jl
-	cat $(ARCH_PATH)/julia/gui/GTKUI.jl >> out.jl
-	cat $(ARCH_PATH)/julia/gui/OSCUI.jl >> out.jl
-	cat $(faustfile:.dsp=.jl) >> out.jl
-	mv out.jl $(faustfile:.dsp=.jl)
+	faust2portaudiojulia -i $(OPT) $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=.jl)
 	
 src.jl : $(faustfile)
