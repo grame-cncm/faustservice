@@ -11,7 +11,7 @@ In order to compile FaustWeb links against the following libraries:
  - **boost** (sudo apt-get install libboost-filesystem-dev  libboost-program-options-dev)
  - **libcrypto** (sudo apt-get install libcrypto++-dev)
  - **libmicrohttpd** (sudo apt-get install libmicrohttpd-dev)
- - **libopenssl** (sudo apt-get install libopenssl)
+ - **libssl** (sudo apt-get install libssl-dev)
 
 Make sure to download the current development trunk of all these libraries and install. Then, the standard:
 
