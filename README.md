@@ -11,6 +11,7 @@ In order to compile FaustWeb links against the following libraries:
  - **boost** (sudo apt-get install libboost-filesystem-dev  libboost-program-options-dev)
  - **libcrypto** (sudo apt-get install libcrypto++-dev)
  - **libmicrohttpd** (sudo apt-get install libmicrohttpd-dev)
+ - **libopenssl** (sudo apt-get install libopenssl)
 
 Make sure to download the current development trunk of all these libraries and install. Then, the standard:
 
@@ -23,7 +24,7 @@ Make sure to download the current development trunk of all these libraries and i
 
 #### From a browser at URL http://localhost:8888/ ####
 
-Select a file *kisana.dsp* and send it. The sent file can be a either a .dsp or an .zip archive containing a .dsp .lib files. Next use the returned <key> for example cf55531c580cc7d3485a5161259f0571d3e6bdef
+Select a file *kisana.dsp* and send it. The sent file can be a either a .dsp or an .zip archive containing a .dsp and .lib files. Next use the returned <key> for example cf55531c580cc7d3485a5161259f0571d3e6bdef
 
 #### General API ####
 
