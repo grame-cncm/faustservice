@@ -169,7 +169,7 @@ bool fw_export_file(const string& url,
     	return fw_export_string(url, base.substr(0, pos), path_to_content(filename), os, architecture, output_type, output_file, error);	
     }
     
-    error = "The extension of the file is incorrect. It should be .dsp or .zip";
+    error = "The extension of the file is incorrect. It should be .dsp";
     return false;
 }
 
