@@ -1,0 +1,14 @@
+################################################################################
+#                                                       FaustWeb LINUX script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
+
+faustfile       ?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2tidalcycles -p 1 $(faustfile:.dsp=.dsp)
+	zip -r binary.zip $(faustfile:.dsp=.files2add) $(faustfile:.dsp=.Helpfile.txt) $(faustfile:.dsp=.so) $(faustfile:.dsp=.sc) $(faustfile:.dsp=.faust2tidalcycles_installer.py)
+
+src.cpp : $(faustfile)
+	faust -i -a supercollider.cpp $(faustfile) -o src.cpp
