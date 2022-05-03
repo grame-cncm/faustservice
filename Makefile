@@ -11,22 +11,34 @@ ifeq ($(shell uname -s), Darwin)
 EXT = -mt
 LDFLAGS = -L/opt/local/lib
 CXXFLAGS = -Wall -Wextra -Wno-unused-local-typedef -O3 -I/opt/local/include
+CLANGVERSION = "-mp-13"
+CXX=clang++$(CLANGVERSION)
+STD=c++11
 else
 EXT = ""
 CXXFLAGS = -Wall -Wextra -O3 -DBOOST_NO_CXX11_SCOPED_ENUMS
+STD=c++11
 endif
 
-faustweb: *.cpp *.hh
-	$(CXX) -std=c++11 $(CXXFLAGS) *.cpp $(LDFLAGS) \
+all : compile_commands.json faustweb
+
+faustweb.json faustweb : *.cpp *.hh
+	$(CXX) -std=$(STD) -MJfaustweb.json $(CXXFLAGS) *.cpp $(LDFLAGS) \
 	-lmicrohttpd -lboost_filesystem$(EXT) -lboost_system$(EXT) -lboost_program_options$(EXT) \
 	-larchive -lcrypto -lm \
 	-o faustweb
-	
+
+compile_commands.json : faustweb.json
+	echo '[' > compile_commands.json
+	cat faustweb.json >> compile_commands.json	
+	echo "{}" >> compile_commands.json
+	echo ']' >> compile_commands.json
+
 clean :
-	rm faustweb
+	rm faustweb compile_commands.json
 
 format :
-	clang-format-mp-5.0 -i -style=file *.cpp *.hh
+	clang-format$(CLANGVERSION) -i -style=file *.cpp *.hh
 
 install_systemd:
 	install faustweb.service /etc/systemd/system/faustweb.service

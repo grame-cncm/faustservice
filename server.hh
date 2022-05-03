@@ -36,8 +36,6 @@
 
 namespace fs = boost::filesystem;
 
-using namespace std;
-
 struct connection_info_struct {
     int                       connectiontype;  // GET or POST
     struct MHD_PostProcessor* postprocessor;   // the POST processor used internally by microhttpd
@@ -69,27 +67,28 @@ class FaustServer {
     FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory,
                 const fs::path& logfile, int maxSessions);
 
-    virtual ~FaustServer(){};
+    virtual ~FaustServer() = default;
+    ;
 
     bool start();
     void stop();
 
-    unsigned int getMaxClients()
+    unsigned int getMaxClients() const
     {
         return fMaxClients;  ///< Max number of clients allowed to connect at a given time.
     }
 
-    fs::path getDirectory()
+    fs::path getDirectory() const
     {
         return fDirectory;  ///< Directory to which the uploaded files are being written.
     }
 
-    fs::path getMakefileDirectory()
+    fs::path getMakefileDirectory() const
     {
         return fMakefileDirectory;  ///< Directory that the makefiles should be copied from.
     }
-    
-    fs::path getLogfile()
+
+    fs::path getLogfile() const
     {
         return fLogfile;  ///< Path to the logfile.
     }

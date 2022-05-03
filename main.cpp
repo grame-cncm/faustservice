@@ -24,6 +24,7 @@
  ************************************************************************/
 
 #include <sys/stat.h>
+#include <ctime>
 #include <iostream>
 
 #include <boost/filesystem.hpp>
@@ -50,9 +51,9 @@ int  gVerbosity   = 0;
 fs::path gCurrentDirectory;   ///< root directory were makefiles and sessions and log are located
 fs::path gSessionsDirectory;  ///< directory where sessions are stored
 fs::path
-         gMakefilesDirectory;  ///< directory containing all the "<os>/Makefile.<architecture>[-32bits|-64bits]" makefiles
-fs::path gLogfile;             ///< faustweb logfile
-string   gRecoverCmd;          ///< system command to launch for recovery after intercepted crash
+    gMakefilesDirectory;  ///< directory containing all the "<os>/Makefile.<architecture>[-32bits|-64bits]" makefiles
+fs::path gLogfile;        ///< faustweb logfile
+string   gRecoverCmd;     ///< system command to launch for recovery after intercepted crash
 char*    gArguments[256];
 
 // Processes command line arguments using boost/parse_options
@@ -187,8 +188,8 @@ int main(int argc, char* argv[], char* env[])
     }
 
     if (gVerbosity >= 0) {
-        std::cerr << "faustweb starting \n"
-                  << "\n"
+        time_t tmNow = time(0);
+        std::cerr << "faustweb starting " << ctime(&tmNow) << "\n"
                   << "         port: " << gPort << "\n"
                   << "    directory: " << gCurrentDirectory << "\n"
                   << "    makefiles: " << gMakefilesDirectory << "\n"

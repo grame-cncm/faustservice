@@ -25,6 +25,7 @@
 
 #include <fcntl.h>
 #include <algorithm>
+#include <ctime>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -61,6 +62,105 @@ extern bool gAnyOrigin;  // when true adds Access-Control-Allow-Origin to http a
 #define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
 
 /*
+ * Generates an SHA-1 key for Faust file or archive.
+ */
+
+static string generate_sha1(connection_info_struct* con_info)
+{
+    fs::path filepath = fs::path(con_info->tmppath) / fs::path(con_info->filename);
+
+    // read file content
+    ifstream myFile(filepath.string().c_str(), ios::in | ios::binary);
+    myFile.seekg(0, ios::end);
+    int length = myFile.tellg();
+    myFile.seekg(0, ios::beg);
+
+    // char content[length];
+    char* content = (char*)malloc(length);
+    if (content == 0) {
+        return "malloc-error";
+    }
+    myFile.read(content, length);
+    myFile.close();
+
+    // compute SHA1 key
+    unsigned char obuf[20];
+    SHA1((const unsigned char*)content, length, obuf);
+
+    // convert SHA1 key into hexadecimal string
+    string sha1key;
+    for (int i = 0; i < 20; i++) {
+        const char* H  = "0123456789ABCDEF";
+        char        c1 = H[(obuf[i] >> 4)];
+        char        c2 = H[(obuf[i] & 15)];
+        sha1key += c1;
+        sha1key += c2;
+    }
+    free(content);
+
+    return sha1key;
+}
+
+/*
+ * True if it is a .dsp or a .lib source file
+ */
+
+static bool isFaustFile(const fs::path& f)
+{
+    fs::path x = f.extension();
+    bool     a = (x == ".dsp") || (x == ".lib");
+    // std::cerr << "isFaustFile(" << f << ") = " << a << std::endl;
+    return a;
+}
+
+/*
+ * Copy all faust source files from src directory to destination directory
+ */
+
+static void copyFaustFiles(const fs::path& src, const fs::path& dst)
+{
+    assert(is_directory(src));
+    assert(is_directory(dst));
+    fs::directory_iterator end_iter;
+    for (fs::directory_iterator f_iter(src); f_iter != end_iter; ++f_iter) {
+        if (isFaustFile(f_iter->path())) {
+            fs::copy_file(f_iter->path(), dst / f_iter->path().filename());
+        }
+    }
+}
+
+/*
+ * Creates an arboreal structure in root with the appropriate makefiles.
+ */
+
+static void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefile_directory)
+{
+    // std::cerr << "ENTER create_file_tree(" << sha1path << ", " << makefile_directory << ")" << std::endl;
+    fs::directory_iterator end_iter;
+    for (fs::directory_iterator os_iter(makefile_directory); os_iter != end_iter; ++os_iter) {
+        if (fs::is_directory(os_iter->path())) {
+            // std::cerr << "scanning OS directory " << os_iter->path() << std::endl;
+            string OSname = os_iter->path().filename().string();
+            // create_directory(sha1path/OSname);
+            for (fs::directory_iterator makefile_iter(os_iter->path()); makefile_iter != end_iter; ++makefile_iter) {
+                string makefileName = makefile_iter->path().filename().string();
+                if (makefileName.substr(0, 9) == "Makefile.") {
+                    string archName = makefileName.substr(9);
+                    if (gVerbosity >= 2)
+                        std::cerr << "scanning makefile " << makefile_iter->path() << ", makefile : " << makefileName
+                                  << ", architecture : " << archName << std::endl;
+                    fs::path dstdir = sha1path / OSname / archName;
+                    if (gVerbosity >= 2) std::cerr << "dstdir = " << dstdir << std::endl;
+                    create_directories(dstdir);
+                    fs::copy_file(makefile_iter->path(), dstdir / "Makefile");
+                    copyFaustFiles(srcdir, dstdir);
+                }
+            }
+        }
+    }
+    // std::cerr << "EXIT create_file_tree()" << std::endl;
+}
+/*
  * Validates that a Faust file or archive is sane and returns 0 for success
  * or 1 for failure. If the evaluation fails, the appropriate error message
  * is set. More info on the con_info structure is in server.hh.
@@ -72,8 +172,9 @@ static int validate_faust(connection_info_struct* con_info)
     fs::create_directory(tmpdir);
     fs::path filename          = fs::path(con_info->filename);
     fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
+    fs::path unzipedDir;
 
-    if (gVerbosity >= 2) std::cerr << "ENTER validate_faust for file : " << old_full_filename << std::endl;
+    if (gVerbosity >= 2) std::cerr << "\nENTER validate_faust for file : " << old_full_filename << std::endl;
 
     // libarchive stuff
     struct archive*       my_archive;
@@ -108,6 +209,7 @@ static int validate_faust(connection_info_struct* con_info)
                 dsp_file = current_file.string();
                 filename = dsp_file;
             }
+            unzipedDir     = fs::path(tmpdir / current_file).parent_path();
             string newpath = fs::path(tmpdir / current_file).string();
             archive_entry_set_pathname(my_entry, newpath.c_str());
             archive_read_extract(my_archive, my_entry, ARCHIVE_EXTRACT_PERM);
@@ -156,7 +258,9 @@ static int validate_faust(connection_info_struct* con_info)
     }
 
     int exitstatus = pclose(pipe);
-    fs::remove_all(tmpdir);
+
+    // if (gVerbosity >= 1) std::cerr << "fs::remove_all(" << tmpdir << ")" << std::endl;
+    // fs::remove_all(tmpdir);
 
     if (exitstatus) {
         if (gVerbosity >= 1)
@@ -165,59 +269,60 @@ static int validate_faust(connection_info_struct* con_info)
         con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
     }
 
-    if (gVerbosity >= 2) std::cerr << "EXIT validate_faust : " << old_full_filename << std::endl;
+    if (gVerbosity >= 2) std::cerr << "EXIT validate_faust is OK: " << old_full_filename << std::endl;
+
+    string sha1 = generate_sha1(con_info);
+
+    // build the sha1 directories here
+    {
+        fs::path sha1path = fs::path(con_info->directory) / fs::path(sha1);
+
+        if (!fs::is_directory(sha1path)) {
+            if (gVerbosity >= 2)
+                std::cerr << "ENTER make_initial_faust_directory(" << con_info << ", " << sha1path << std::endl;
+
+            try {
+                // first time we have this file
+                fs::create_directory(sha1path);
+            } catch (const fs::filesystem_error& e) {
+                std::cerr << "Warning : can't create directory " << sha1path << ":" << e.code().message() << std::endl;
+            }
+            string   filename(con_info->filename);
+            fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
+
+            // libarchive stuff
+            struct archive* my_archive;
+            // struct archive_entry* my_entry;
+
+            my_archive = archive_read_new();
+            archive_read_support_filter_all(my_archive);
+            archive_read_support_format_all(my_archive);
+            int    archive_status = archive_read_open_filename(my_archive, old_full_filename.string().c_str(), 10240);
+            string result         = "";
+
+            if (!fs::is_regular_file(old_full_filename)) {
+                con_info->answerstring = completebuterrorpage;
+                return 1;
+
+            } else if (filename.substr(filename.find_last_of(".") + 1) == "dsp") {
+                create_file_tree(tmpdir, sha1path, fs::path(con_info->makefile_directory));
+
+            } else if (archive_status == ARCHIVE_OK) {
+                create_file_tree(unzipedDir, sha1path, fs::path(con_info->makefile_directory));
+
+            } else {
+                con_info->answerstring = completebutendoftheworld;
+                return 1;
+            }
+
+            if (gVerbosity >= 2)
+                std::cerr << "EXIT make_initial_faust_directory" << con_info << ", " << sha1 << std::endl;
+        }
+        con_info->answerstring = sha1;
+    }
+
+    fs::remove_all(tmpdir);
     return exitstatus;
-}
-
-/*
- * Generates an SHA-1 key for Faust file or archive.
- */
-
-static string generate_sha1(connection_info_struct* con_info)
-{
-    fs::path filepath = fs::path(con_info->tmppath) / fs::path(con_info->filename);
-
-    // read file content
-    ifstream myFile(filepath.string().c_str(), ios::in | ios::binary);
-    myFile.seekg(0, ios::end);
-    int length = myFile.tellg();
-    myFile.seekg(0, ios::beg);
-
-    // char content[length];
-    char* content = (char*)malloc(length);
-    if (content == 0) {
-        return "malloc-error";
-    }
-    myFile.read(content, length);
-    myFile.close();
-
-    // compute SHA1 key
-    unsigned char obuf[20];
-    SHA1((const unsigned char*)content, length, obuf);
-
-    // convert SHA1 key into hexadecimal string
-    string sha1key;
-    for (int i = 0; i < 20; i++) {
-        const char* H  = "0123456789ABCDEF";
-        char        c1 = H[(obuf[i] >> 4)];
-        char        c2 = H[(obuf[i] & 15)];
-        sha1key += c1;
-        sha1key += c2;
-    }
-    free(content);
-    return sha1key;
-}
-
-/*
- * True if it is a .dsp or a .lib source file
- */
-
-static bool isFaustFile(const fs::path& f)
-{
-    fs::path x = f.extension();
-    bool     a = (x == ".dsp") || (x == ".lib");
-    // std::cerr << "isFaustFile(" << f << ") = " << a << std::endl;
-    return a;
 }
 
 /* TO REMOVE ?
@@ -226,55 +331,6 @@ static bool isMakefile(const fs::path& f)
     return f.stem() == "Makefile";
 }
 */
-
-/*
- * Copy all faust source files from src directory to destination directory
- */
-
-static void copyFaustFiles(const fs::path& src, const fs::path& dst)
-{
-    assert(is_directory(src));
-    assert(is_directory(dst));
-    fs::directory_iterator end_iter;
-    for (fs::directory_iterator f_iter(src); f_iter != end_iter; ++f_iter) {
-        if (isFaustFile(f_iter->path())) {
-            // std::cerr << "copying(" << f_iter->path() << ", " << dst/f_iter->path().filename() << ") " << std::endl;
-            fs::copy_file(f_iter->path(), dst / f_iter->path().filename());
-        }
-    }
-}
-
-/*
- * Creates an arboreal structure in root with the appropriate makefiles.
- */
-
-static void create_file_tree(fs::path sha1path, fs::path makefile_directory)
-{
-    // std::cerr << "ENTER create_file_tree(" << sha1path << ", " << makefile_directory << ")" << std::endl;
-    fs::directory_iterator end_iter;
-    for (fs::directory_iterator os_iter(makefile_directory); os_iter != end_iter; ++os_iter) {
-        if (fs::is_directory(os_iter->path())) {
-            // std::cerr << "scanning OS directory " << os_iter->path() << std::endl;
-            string OSname = os_iter->path().filename().string();
-            // create_directory(sha1path/OSname);
-            for (fs::directory_iterator makefile_iter(os_iter->path()); makefile_iter != end_iter; ++makefile_iter) {
-                string makefileName = makefile_iter->path().filename().string();
-                if (makefileName.substr(0, 9) == "Makefile.") {
-                    string archName = makefileName.substr(9);
-                    if (gVerbosity >= 2)
-                        std::cerr << "scanning makefile " << makefile_iter->path() << ", makefile : " << makefileName
-                                  << ", architecture : " << archName << std::endl;
-                    fs::path dstdir = sha1path / OSname / archName;
-                    if (gVerbosity >= 2) std::cerr << "dstdir = " << dstdir << std::endl;
-                    create_directories(dstdir);
-                    fs::copy_file(makefile_iter->path(), dstdir / "Makefile");
-                    copyFaustFiles(sha1path, dstdir);
-                }
-            }
-        }
-    }
-    // std::cerr << "EXIT create_file_tree()" << std::endl;
-}
 
 /*
  * Makes an initial directory whose name is the SHA-1 key passed in for
@@ -299,70 +355,6 @@ static fs::path make(const fs::path& dir, const fs::path& target)
     if (gVerbosity >= 2) std::cerr << "EXIT MAKE " << p << std::endl;
 
     return p;
-}
-
-// TODO: merge with validate function if possible...
-static int make_initial_faust_directory(connection_info_struct* con_info, string sha1)
-{
-    fs::path sha1path = fs::path(con_info->directory) / fs::path(sha1);
-
-    if (!fs::is_directory(sha1path)) {
-        if (gVerbosity >= 2)
-            std::cerr << "ENTER make_initial_faust_directory(" << con_info << ", " << sha1path << std::endl;
-
-        try {
-            // first time we have this file
-            fs::create_directory(sha1path);
-        } catch (const fs::filesystem_error& e) {
-            std::cerr << "Warning : can't create directory " << sha1path << ":" << e.code().message() << std::endl;
-        }
-        string   filename(con_info->filename);
-        fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
-
-        // libarchive stuff
-        struct archive*       my_archive;
-        struct archive_entry* my_entry;
-
-        my_archive = archive_read_new();
-        archive_read_support_filter_all(my_archive);
-        archive_read_support_format_all(my_archive);
-        int    archive_status = archive_read_open_filename(my_archive, old_full_filename.string().c_str(), 10240);
-        string result         = "";
-
-        if (!fs::is_regular_file(old_full_filename)) {
-            con_info->answerstring = completebuterrorpage;
-            return 1;
-        } else if (filename.substr(filename.find_last_of(".") + 1) == "dsp") {
-            fs::copy_file(old_full_filename, sha1path / filename);
-        } else if (archive_status == ARCHIVE_OK) {
-            string dsp_file;
-            while (archive_read_next_header(my_archive, &my_entry) == ARCHIVE_OK) {
-                fs::path current_file = fs::path(archive_entry_pathname(my_entry));
-                string   newpath      = fs::path(sha1path / current_file).string();
-                archive_entry_set_pathname(my_entry, newpath.c_str());
-                archive_read_extract(my_archive, my_entry, ARCHIVE_EXTRACT_PERM);
-            }
-            archive_status = archive_read_free(my_archive);
-            if (archive_status != ARCHIVE_OK) {
-                con_info->answerstring = completebutdecompressionproblem;
-                return 1;
-            }
-        } else {
-            con_info->answerstring = completebutendoftheworld;
-            return 1;
-        }
-
-        // copy makefile.none to handle non-architecture-specific targets like mdoc.zip, etc
-        fs::copy_file(fs::path(con_info->makefile_directory) / "Makefile.none", sha1path / "Makefile");
-
-        // create the architecture-specific folders
-        create_file_tree(sha1path, fs::path(con_info->makefile_directory));
-
-        if (gVerbosity >= 2) std::cerr << "EXIT make_initial_faust_directory" << con_info << ", " << sha1 << std::endl;
-    }
-    con_info->answerstring = sha1;
-    // con_info->answerstring = completepage_head + sha1 + completepage_tail;
-    return 0;
 }
 
 /*
@@ -557,8 +549,9 @@ static void panicCallback(void*, const char* file, unsigned int line, const char
 bool FaustServer::start()
 {
     MHD_set_panic_func(&panicCallback, NULL);
-    fDaemon = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION, fPort, NULL, NULL, (MHD_AccessHandlerCallback)&staticAnswerToConnection, this,
-                               MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL, MHD_OPTION_END);
+    fDaemon = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION, fPort, NULL, NULL,
+                               (MHD_AccessHandlerCallback)&staticAnswerToConnection, this, MHD_OPTION_NOTIFY_COMPLETED,
+                               request_completed, NULL, MHD_OPTION_END);
 
     return fDaemon != NULL;
 }
@@ -727,6 +720,9 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const string& url, const char* upload_data,
                                          size_t* upload_data_size, void** con_cls)
 {
+    time_t tmNow = time(0);
+
+    std::cerr << "New POST connection: " << ctime(&tmNow) << " URL: " << url << std::endl;
     if (gVerbosity >= 2) std::cerr << "ANSWER POST CONNECTION " << url << std::endl;
     if (NULL == *con_cls) {
         if (gVerbosity >= 2) std::cerr << "PRE POST processing" << std::endl;
@@ -743,8 +739,9 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
         con_info->directory          = this->getDirectory().string();
         con_info->makefile_directory = this->getMakefileDirectory().string();
 
-        con_info->fp            = NULL;
-        con_info->postprocessor = MHD_create_post_processor(connection, POSTBUFFERSIZE, (MHD_PostDataIterator)iterate_post, (void*)con_info);
+        con_info->fp = NULL;
+        con_info->postprocessor =
+            MHD_create_post_processor(connection, POSTBUFFERSIZE, (MHD_PostDataIterator)iterate_post, (void*)con_info);
 
         if (NULL == con_info->postprocessor) {
             delete con_info;
@@ -784,8 +781,7 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
             if (validate_faust(con_info) == 0) {
                 // warning validate_faust returns errocode 0 when the faust code is correct !
                 std::vector<std::string> segments;
-                sha1 = generate_sha1(con_info);
-                make_initial_faust_directory(con_info, sha1);
+                sha1 = generate_sha1(con_info);  // TODO: Duplicated computation of the SHA key
                 if (gVerbosity >= 2)
                     if (gVerbosity >= 1)
                         std::cerr << "POST processing, We have valid faust code. Its SHA1 key is = " << sha1
@@ -802,8 +798,9 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
                 }
             } else {
                 std::cerr << "POST processing, We have an INVALID faust code" << std::endl;
-                return send_page(connection, con_info->answerstring.c_str(), con_info->answerstring.size(),
-                                 con_info->answercode, "text/html");
+                std::string errormessage = "Invalid Faust Code";
+                return send_page(connection, errormessage.c_str(), errormessage.size(), con_info->answercode,
+                                 "text/html");
             }
         }
 
