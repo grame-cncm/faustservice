@@ -1,0 +1,14 @@
+################################################################################
+# 
+#			FaustWeb Makefile for wasm polyphonic applications
+# 
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2wasm -worklet -poly $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=.js) $(faustfile:.dsp=.wasm)
+
+src.cpp : $(faustfile)
+	faust -lang wasm-e -i -a webaudio/webaudio-wasm-poly-standalone-wrapper.js $(faustfile) -o src.js
