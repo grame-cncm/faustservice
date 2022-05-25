@@ -7,7 +7,7 @@
 faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
-	faust2w32puredata $(OPT) $(faustfile)
+	faust2w64puredata $(OPT) $(faustfile)
 	cp $(wildcard /usr/lib/pd/extra/faust*.pd /usr/local/lib/pd/extra/faust*.pd /opt/lib/pd/extra/faust*.pd) .
 	zip -r binary.zip $(faustfile:.dsp=~.dll) *.pd
 
