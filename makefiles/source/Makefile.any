@@ -1,0 +1,17 @@
+################################################################################
+#							FaustWeb OSX script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
+
+faustfile ?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	# Generate the JSON to get the 'compile_options' key
+	faust $(faustfile) -json > /dev/null
+	# Extract the 'compile_options' key to give the options to 'faust'
+	faust $$(jq -r '.meta | .[] | select(.compile_options).compile_options' $(faustfile).json) $(faustfile) -o $(faustfile:.dsp=.txt)
+	zip -r binary.zip $(faustfile) $(faustfile:.dsp=.txt)
+
+src.cpp : $(faustfile)
+	faust -i -a minimal.cpp $(faustfile) -o src.cpp
