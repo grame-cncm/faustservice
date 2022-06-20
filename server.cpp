@@ -158,6 +158,11 @@ static void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefi
             }
         }
     }
+
+    // copy makefile.none to handle non-architecture-specific targets like mdoc.zip, etc
+    fs::copy_file(fs::path(makefile_directory) / "Makefile.none", sha1path / "Makefile");
+    copyFaustFiles(srcdir, sha1path);
+
     // std::cerr << "EXIT create_file_tree()" << std::endl;
 }
 /*

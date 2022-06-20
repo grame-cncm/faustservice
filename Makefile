@@ -58,7 +58,7 @@ start:
 	initctl start faustweb
 
 test:
-	./faustweb -v 1 -p 80 -d /tmp/sessions -r $(shell pwd)/faustweb
+	./faustweb -v 3 -p 80 -d /tmp/sessions -r $(shell pwd)/faustweb
 
 
 help:
