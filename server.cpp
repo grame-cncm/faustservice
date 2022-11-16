@@ -204,6 +204,8 @@ static int validate_faust(connection_info_struct* con_info)
         string dsp_file;
         while (archive_read_next_header(my_archive, &my_entry) == ARCHIVE_OK) {
             fs::path current_file = fs::path(archive_entry_pathname(my_entry));
+            if (gVerbosity >= 1) std::cerr << "archive_read_next_header : " << current_file << std::endl;
+
             if (current_file.string().substr(current_file.string().find_last_of(".") + 1) == "dsp") {
                 if (!dsp_file.empty()) {
                     archive_status = archive_read_free(my_archive);
