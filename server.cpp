@@ -625,6 +625,24 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/targets")) {
         return send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK, "application/json");
 
+    } else if (matchURL(url, "/verbosity0")) {
+        gVerbosity = 0;
+        stringstream ss;
+        ss << "Verbosity " << gVerbosity;
+        return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
+
+    } else if (matchURL(url, "/verbosity1")) {
+        gVerbosity = 1;
+        stringstream ss;
+        ss << "Verbosity " << gVerbosity;
+        return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
+
+    } else if (matchURL(url, "/verbosity2")) {
+        gVerbosity = 2;
+        stringstream ss;
+        ss << "Verbosity " << gVerbosity;
+        return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
+
         /*
             } else if (matchURL(url, "/crash1")) {
                 // simulate crash -- to be removed in production
