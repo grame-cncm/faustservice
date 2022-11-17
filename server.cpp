@@ -202,6 +202,8 @@ static int validate_faust(connection_info_struct* con_info)
         fs::copy_file(old_full_filename, tmpdir / filename);
     } else if (archive_status == ARCHIVE_OK) {
         string dsp_file;
+
+        // BEGIN read archived files
         while (archive_read_next_header(my_archive, &my_entry) == ARCHIVE_OK) {
             fs::path current_file = fs::path(archive_entry_pathname(my_entry));
             if (gVerbosity >= 1) std::cerr << "archive_read_next_header : " << current_file << std::endl;
@@ -211,6 +213,8 @@ static int validate_faust(connection_info_struct* con_info)
                     archive_status = archive_read_free(my_archive);
                     fs::remove_all(tmpdir);
                     con_info->answerstring = completebutmorethanoneDSPfile;
+                    if (gVerbosity >= 1)
+                        std::cerr << "ERROR, we have more than one dsp file " << current_file << std::endl;
                     return 1;
                 }
                 dsp_file = current_file.string();
@@ -221,6 +225,8 @@ static int validate_faust(connection_info_struct* con_info)
             archive_entry_set_pathname(my_entry, newpath.c_str());
             archive_read_extract(my_archive, my_entry, ARCHIVE_EXTRACT_PERM);
         }
+        // END read archived files
+
         archive_status = archive_read_free(my_archive);
         if (archive_status != ARCHIVE_OK) {
             fs::remove_all(tmpdir);
