@@ -209,15 +209,14 @@ static int validate_faust(connection_info_struct* con_info)
             if (gVerbosity >= 1) std::cerr << "archive_read_next_header : " << current_file << std::endl;
 
             if (current_file.string().substr(0, 8) == "__MACOSX") {
-                if (gVerbosity >= 1) std::cerr << "Ignore  " << current_file << std::endl;
+                if (gVerbosity >= 1) std::cerr << "Ignore file " << current_file << std::endl;
             } else {
                 if (current_file.string().substr(current_file.string().find_last_of(".") + 1) == "dsp") {
                     if (!dsp_file.empty()) {
                         archive_status = archive_read_free(my_archive);
                         fs::remove_all(tmpdir);
                         con_info->answerstring = completebutmorethanoneDSPfile;
-                        if (gVerbosity >= 1)
-                            std::cerr << "ERROR, we have more than one dsp file " << current_file << std::endl;
+                        std::cerr << "ERROR, we have more than one dsp file " << current_file << std::endl;
                         return 1;
                     }
                     dsp_file = current_file.string();
