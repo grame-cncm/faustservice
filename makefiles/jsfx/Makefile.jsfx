@@ -1,0 +1,16 @@
+################################################################################
+#							Faust Julia script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
+
+faustfile ?= $(wildcard *.dsp)
+
+ARCH_PATH ?= $(shell faust -archdir)
+
+binary.zip : $(faustfile)
+	faust -i -lang jsfx  $(OPT) $(faustfile) -o $(faustfile:.dsp=.jsfx)
+	zip -r binary.zip $(faustfile:.dsp=.jsfx) $(faustfile)
+
+src.jl : $(faustfile)
+	faust -lang jsfx -a minimal.jsfx $(faustfile) -o src.jsfx
