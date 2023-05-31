@@ -1,5 +1,5 @@
 ################################################################################
-#							Faust Julia script
+#                             Faust Julia script
 #  The behaviour of this Makefile will only be correct if
 #  only one .dsp file exists in the folder
 ################################################################################
