@@ -11,5 +11,5 @@ binary.zip : $(faustfile)
 	remoteOSX faust2rnbo $(faustfile) $(libraries) 
 
 src.codebox : $(faustfile)
-	faust -lang codebox $(faustfile) -o src.codebox
+	faust -lang codebox $(faustfile) -double -o src.codebox
 

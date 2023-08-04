@@ -9,7 +9,7 @@ libraries	= $(wildcard *.lib)
 
 binary.zip : $(faustfile)
 	remoteOSX faust2puredata $(faustfile) $(libraries) $(OPT)
-	cp $(wildcard 	/usr/lib/pd/extra/faust*.pd  /usr/local/lib/pd/extra/faust*.pd /opt/lib/pd/extra/faust*.pd) .
+	cp $(wildcard /usr/lib/pd/extra/faust*.pd /usr/local/lib/pd/extra/faust*.pd /opt/lib/pd/extra/faust*.pd) .
 	zip -r binary.zip  *.pd
 
 src.cpp : $(faustfile)
