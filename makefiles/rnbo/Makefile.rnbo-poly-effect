@@ -1,0 +1,16 @@
+################################################################################
+#							Faust RNBO script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+libraries	= $(wildcard *.lib)
+
+binary.zip : $(faustfile)
+	faust2rnbo -midi -nvoices 16 -effect auto $(faustfile) $(libraries) 
+	zip -r binary.zip $(faustfile:.dsp=.maxpat) $(faustfile:.dsp=.rnbopat) $(faustfile:.dsp=_effect.rnbopat)
+
+src.codebox : $(faustfile)
+	faust -lang codebox $(faustfile) -double -o src.codebox
+

@@ -8,7 +8,8 @@ faustfile	?= $(wildcard *.dsp)
 libraries	= $(wildcard *.lib)
 
 binary.zip : $(faustfile)
-	remoteOSX faust2rnbo $(faustfile) $(libraries) 
+	faust2rnbo $(faustfile) $(libraries) 
+	zip -r binary.zip $(faustfile:.dsp=.maxpat)
 
 src.codebox : $(faustfile)
 	faust -lang codebox $(faustfile) -double -o src.codebox
