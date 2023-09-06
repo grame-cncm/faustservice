@@ -12,5 +12,5 @@ binary.zip : $(faustfile)
 	faust -i -lang jsfx  $(OPT) $(faustfile) -o $(faustfile:.dsp=.jsfx)
 	zip -r binary.zip $(faustfile:.dsp=.jsfx) $(faustfile)
 
-src.jl : $(faustfile)
+src.jsfx : $(faustfile)
 	faust -lang jsfx $(faustfile) -o src.jsfx
