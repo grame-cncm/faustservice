@@ -13,4 +13,4 @@ binary.zip : $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=.jsfx) $(faustfile)
 
 src.jl : $(faustfile)
-	faust -lang jsfx -a minimal.jsfx $(faustfile) -o src.jsfx
+	faust -lang jsfx $(faustfile) -o src.jsfx
