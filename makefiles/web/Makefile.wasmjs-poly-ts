@@ -1,0 +1,14 @@
+################################################################################
+# 
+#		FaustWeb Makefile for WebAudio+wasm applications using TS architecture
+# 
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2wasm-ts $(faustfile) $(faustfile)-wasm -poly
+	zip -r binary.zip $(faustfile)-wasm
+
+src.wasm : $(faustfile)
+	faust -lang wasm -i $(faustfile) -o src.wasm
