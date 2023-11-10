@@ -8,7 +8,7 @@ faustfile	?= $(wildcard *.dsp)
 libraries	= $(wildcard *.lib)
 
 binary.zip : $(faustfile)
-	osx faust2max6 -midi -nvoices 16 $(faustfile) $(libraries) $(OPT)
+	osx faust2max6 -midi -nvoices 16 $(faustfile) $(OPT)
 	zip -r binary.zip *
 
 src.cpp : $(faustfile)

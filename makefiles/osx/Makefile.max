@@ -8,7 +8,7 @@ faustfile	?= $(wildcard *.dsp)
 libraries	= $(wildcard *.lib)
 
 binary.zip : $(faustfile)
-	remoteOSX faust2max6 $(faustfile) $(libraries) $(OPT)
+	remoteOSX faust2max6 $(faustfile) $(OPT)
 
 src.cpp : $(faustfile)
 	faust -i -a max-msp/max-msp64.cpp $(faustfile) -o src.cpp

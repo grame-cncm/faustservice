@@ -8,7 +8,7 @@ faustfile	?= $(wildcard *.dsp)
 libraries	= $(wildcard *.lib)
 
 binary.zip : $(faustfile)
-	faust2rnbo -midi -nvoices 16 -effect auto $(faustfile) $(libraries) 
+	faust2rnbo -midi -nvoices 16 -effect auto $(faustfile)
 	zip -r binary.zip $(faustfile:.dsp=.maxpat) $(faustfile:.dsp=.rnbopat) $(faustfile:.dsp=_effect.rnbopat)
 
 src.codebox : $(faustfile)
