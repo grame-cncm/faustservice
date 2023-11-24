@@ -1,0 +1,14 @@
+################################################################################
+# 
+#			FaustWeb Makefile for WAP (Web Audio Plugin)
+# 
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2wam $(faustfile) $(faustfile)-wam  
+	zip -r binary.zip $(faustfile)-wam
+
+src.cpp : $(faustfile)
+	faust -lang wasm -i $(faustfile) -o src.js
