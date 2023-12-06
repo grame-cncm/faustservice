@@ -8,7 +8,8 @@ faustfile	?= $(wildcard *.dsp)
 
 binary.zip : $(faustfile)
 	faust2wam -poly $(faustfile) $(faustfile)-wam  
-	zip -r binary.zip $(faustfile)-wam
+	#zip -r binary.zip $(faustfile)-wam
+	cd $(faustfile)-wam && zip -r binary.zip * && cp binary.zip ..
 
 src.cpp : $(faustfile)
 	faust -lang wasm -i $(faustfile) -o src.js
