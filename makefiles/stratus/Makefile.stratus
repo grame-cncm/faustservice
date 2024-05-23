@@ -1,19 +1,28 @@
 ################################################################################
-#							FaustWeb OSX script
+#							FaustWeb Stratus binary build script
 #  The behaviour of this Makefile will only be correct if
 #  only one .dsp file exists in the folder
 ################################################################################
 
 faustfile	?= $(wildcard *.dsp)
 faustcpp    ?= $(faustfile:.dsp=.cpp)
-faustso     ?= $(faustfile:.dsp=.so)
+faustid     := $(shell sed -n 's/^\s*declare\s\s*stratusId\s\s*"\([0-9a-f]\{8\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{12\}\)";/\1/p' "$(faustfile)")
+faustver    := $(shell sed -n 's/^\s*declare\s\s*version\s\s*"\([^"]*\)";/\1/p' "$(faustfile)")
+faustso     ?= $(if $(faustid),$(faustid).so,$(faustfile:.dsp=.so))
+fausttxt    := $(if $(faustid),$(if $(faustver),$(faustid).txt,),)
 
-binary.zip : $(faustfile)
-	faust -i -a stratus.cpp -scn FaustDSP -light -nvi $(faustfile) -o $(faustcpp)
+binary.zip : $(faustso) $(fausttxt)
+	@zip -r binary.zip $(faustfile) $(faustcpp) $(faustso) $(fausttxt)
+	@rm -rf $(faustcpp) $(faustso) $(fausttxt)
+
+$(faustso) : $(faustcpp)
 	docker run -v .:/tmp chaos-stratus-effect-build \
 	c++ -fPIC -shared -O3 -mfloat-abi=hard -mfpu=neon -ftree-vectorize -ffast-math -fprefetch-loop-arrays -funroll-loops -funsafe-loop-optimizations -fno-finite-math-only \
 	/tmp/$(faustcpp) -o /tmp/$(faustso)
-	zip -r binary.zip $(faustfile) $(faustcpp) $(faustso)
 
-src.cpp : $(faustfile)
-	faust -i -a stratus.cpp -scn FaustDSP -light -nvi $(faustfile) -o src.cpp
+$(faustcpp) : $(faustfile)
+	@echo $(faustso)
+	faust -i -json -a stratus.cpp -scn FaustDSP -light -nvi $(faustfile) -o $(faustcpp)
+
+$(fausttxt): 
+	echo -n $(faustver) > $(fausttxt)
