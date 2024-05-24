@@ -45,6 +45,7 @@ RUN echo "process=+;" > tmp.dsp; \
 EXPOSE 80
 WORKDIR /faustservice
 RUN cp ./bin/dockerOSX /usr/local/bin/; \ 
+    cp ./bin/dockerStratus /usr/local/bin/; \
     rm -rf makefiles/osx; \
     mv makefiles/dockerosx makefiles/osx; \
     rm -rf makefiles/windows64 makefiles/ros makefiles/unity/all makefiles/unity/osx
