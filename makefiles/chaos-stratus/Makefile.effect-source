@@ -1,0 +1,17 @@
+################################################################################
+#							FaustWeb Stratus source compile script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+faustcpp    ?= $(faustfile:.dsp=.cpp)
+
+binary.zip : $(faustcpp)
+	zip -r binary.zip $(faustfile) $(faustcpp)
+
+$(faustcpp) : src.cpp
+	cp src.cpp $(faustcpp)
+
+src.cpp : $(faustfile)
+	faust2stratus -nocppc $(faustfile) -o src.cpp
