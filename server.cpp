@@ -512,6 +512,10 @@ static bool isValidTarget(const fs::path& target, const char*& mimetype)
         mimetype = "application/zip";
         return true;
 
+    } else if (target == "installer.sh") {
+        mimetype = "application/x-shellscript";
+        return true;
+
     } else {
         return false;
     }
@@ -665,6 +669,9 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
                 *p     = 5 / (*p);
                 return page_not_found(connection, "/crash2", 7, "image/x-icon");
         */
+    } else if (matchURL(url, "/*/*/*/installer.sh")) {
+        return makeAndSendResourceFile(connection, url);
+
     } else if (matchURL(url, "/*/*/*/binary.zip")) {
         return makeAndSendResourceFile(connection, url);
 

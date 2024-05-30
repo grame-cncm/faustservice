@@ -70,18 +70,19 @@ int main(int argc, char** argv)
     
     if (type != "binary.zip"
         && type != "binary.apk"
+        && type != "installer.sh"
         && type != "src.cpp") {
-        cout << "-type parameter is incorrect: use binary.zip, binary.apk or src.cpp\n";
+        cout << "-type parameter is incorrect: use binary.zip, binary.apk, installer.sh, or src.cpp\n";
         return 0;
     }
     
     if (is_help1 || is_help2) {
-        cout << "faustwebclient [-service] [-url <...>] [-platform <...>] [-target <...>] [-type <binary.zip, binary.apk, src.cpp>] <file.dsp>\n";
+        cout << "faustwebclient [-service] [-url <...>] [-platform <...>] [-target <...>] [-type <binary.zip, binary.apk, installer.sh, src.cpp>] <file.dsp>\n";
         cout << "Use '-service' to print all available platform/targets on the service URL (default 'http://faustservice.grame.fr')\n";
         cout << "Use '-url' to specify service URL (default 'http://faustservice.grame.fr')\n";
         cout << "Use '-platform' to specify compilation platform\n";
         cout << "Use '-target' to specify compilation target for the chosen platform\n";
-        cout << "Use '-type' to specify type of result file: binary.zip, binary.apk or src.cpp (default 'binary.zip')\n";
+        cout << "Use '-type' to specify type of result file: binary.zip, binary.apk, installer.sh, or src.cpp (default 'binary.zip')\n";
         return 0;
     }
   

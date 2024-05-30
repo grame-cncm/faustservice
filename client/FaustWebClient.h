@@ -48,7 +48,7 @@ bool fw_get_available_targets(const std::string& url, std::map<std::string, std:
  * @param filename - Faust source file
  * @param os - Wanted Operating System
  * @param architecture - Wanted architecture
- * @param output_type - There are 3 types of files : "binary.zip", "binary.apk" and "src.cpp"
+ * @param output_type - There are 4 types of files : "binary.zip", "binary.apk", "installer.sh" and "src.cpp"
  * @param output_file - Location of file to create
  * @param error - In case the export fails, the error is filled
  *
@@ -63,7 +63,7 @@ bool fw_export_file(const std::string& url, const std::string& filename, const s
  * @param pgm - Faust program as a string
  * @param os - Wanted Operating System
  * @param architecture - Wanted architecture
- * @param output_type - There are 3 types of files : "binary.zip", "binary.apk" and "src.cpp"
+ * @param output_type - There are 4 types of files : "binary.zip", "binary.apk", "installer.sh" and "src.cpp"
  * @param output_file - Location of file to create
  * @param error - In case the export fails, the error is filled
  *
@@ -105,7 +105,7 @@ bool fw_get_shakey_from_string(const std::string& url, const std::string& name, 
  * @param os - Wanted Operating System
  * @param architecture - Wanted architecture
  * @param output_file - Location of file to create
- * @param output_type - There are 3 types of files : "binary.zip", "binary.apk" and "src.cpp"
+ * @param output_type - There are 4 types of files : "binary.zip", "binary.apk", "installer.sh" and "src.cpp"
  * @param error - In case the export fails, the error is filled
  *
  * @return true if no error was encountered
