@@ -16,6 +16,13 @@ FROM grame/faustready-ubuntu-1604:004
 
 RUN echo "CHANGE THIS NUMBER TO FORCE REGENERATION : 013"
 
+#
+# Makeself is a utility for building self-extracting/installing archives that
+# need no extra support on the machine on which they are run. This is very useful
+# for building installers that don't really need to be unzipped before they are
+# executed - ala the Chaos Audio Stratus pedal installer.
+#
+RUN apt install makeself
 
 # faustservice first as it changes less often
 RUN git clone -n https://github.com/grame-cncm/faustservice.git; \
