@@ -115,6 +115,7 @@ class FaustServer {
                                 size_t* upload_data_size, void** con_cls);
 
     int makeAndSendResourceFile(struct MHD_Connection* connection, const string& raw_url);
+    std::string getMakefileArtifactName(const fs::path&);
 };
 
 #endif

@@ -31,6 +31,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <regex>
 
 // libmicrohttpd
 #include <microhttpd.h>
@@ -693,6 +694,35 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     }
 }
 
+//
+// Get the /precompile downloadable artifact name from the makefile
+//
+// The first line of the makefile is interrogated - if it is of the form
+//
+//    #FaustBinaryTarget: <artifact name>
+//
+// Then we use that. In all other cases we return "binary.zip", the original
+// hard-coded value.
+//
+// Note that the artifact name still has to be a supported value - it can't be
+// just anything
+//
+static const std::regex makefile_target_regex(R"(^#FaustBinaryTarget:\s*([^\s]+)\s*$)");
+std::string FaustServer::getMakefileArtifactName(const fs::path& make_file_path) {
+    fs::ifstream file(make_file_path);
+    if (file.is_open()) {
+        std::string first_line;
+        std::getline(file, first_line);
+        file.close();
+
+        std::smatch matches;
+        if (std::regex_search(first_line, matches, makefile_target_regex)) {
+            return matches.str(1);
+        }
+    }
+    return "binary.zip";
+}
+
 //------------------------------------------------------------------
 // Handle a GET command by "making" the appropriate resource file
 // and returning it
@@ -724,7 +754,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     // Check if we are doing only a pre-compilation (without actually downloading the compiled file)
     if (target == "precompile") {
         precompile = true;
-        target     = "binary.zip";
+        target     = getMakefileArtifactName(makefile);
     }
 
     // Analyze possible cases of errors
