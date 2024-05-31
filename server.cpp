@@ -409,7 +409,7 @@ int FaustServer::get_params(void* cls, enum MHD_ValueKind, const char* key, cons
  */
 
 int FaustServer::send_page(struct MHD_Connection* connection, const char* page, int length, int status_code,
-                           const char* type = 0)
+                           const char* type = 0, const char* location = 0)
 {
     struct MHD_Response* response = MHD_create_response_from_buffer(length, (void*)page, MHD_RESPMEM_MUST_COPY);
 
@@ -417,7 +417,10 @@ int FaustServer::send_page(struct MHD_Connection* connection, const char* page, 
         return MHD_NO;
 
     } else {
-        MHD_add_response_header(response, "Content-Type", type ? type : "text/plain");
+        MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, type ? type : "text/plain"); 
+        if (location) {
+            MHD_add_response_header(response, MHD_HTTP_HEADER_LOCATION, location); 
+        }
         if (gAnyOrigin) MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, "*");
         int ret = MHD_queue_response(connection, status_code, response);
         MHD_destroy_response(response);
@@ -734,6 +737,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     fs::path       fulldir  = this->getDirectory() / url.parent_path();
     fs::path       target   = url.filename();
     fs::path       makefile = fulldir / "Makefile";
+    fs::path       location;
     const char*    mimetype;
     bool           precompile = false;
 
@@ -755,6 +759,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     if (target == "precompile") {
         precompile = true;
         target     = getMakefileArtifactName(makefile);
+        location   = url.parent_path() / target;
     }
 
     // Analyze possible cases of errors
@@ -780,7 +785,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
         if (!precompile) {
             return send_file(connection, filename, mimetype);
         } else {
-            return send_page(connection, "DONE", 4, MHD_HTTP_OK, "text/html");
+            return send_page(connection, "DONE", 4, MHD_HTTP_OK, "text/html", location.c_str());
         }
     }
 }
