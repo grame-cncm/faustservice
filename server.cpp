@@ -419,7 +419,8 @@ int FaustServer::send_page(struct MHD_Connection* connection, const char* page, 
     } else {
         MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, type ? type : "text/plain"); 
         if (location) {
-            MHD_add_response_header(response, MHD_HTTP_HEADER_LOCATION, location); 
+            MHD_add_response_header(response, MHD_HTTP_HEADER_LOCATION, location);
+            MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS, MHD_HTTP_HEADER_LOCATION);
         }
         if (gAnyOrigin) MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, "*");
         int ret = MHD_queue_response(connection, status_code, response);
