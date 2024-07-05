@@ -34,6 +34,10 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 
+#ifndef MHD_HTTP_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS
+#define MHD_HTTP_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS "Access-Control-Expose-Headers"
+#endif
+
 namespace fs = boost::filesystem;
 
 struct connection_info_struct {

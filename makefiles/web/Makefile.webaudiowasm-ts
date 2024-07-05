@@ -4,11 +4,13 @@
 # 
 ################################################################################
 
-faustfile	?= $(wildcard *.dsp)
+faustfile ?= $(wildcard *.dsp)
+out ?= $(basename $(faustfile))
 
 binary.zip : $(faustfile)
-	faust2wasm-ts $(faustfile) $(faustfile)-wasm -standalone  
-	zip -r binary.zip $(faustfile)-wasm
+
+	faust2wasm-ts $(faustfile) $(out) -standalone  
+	zip -r binary.zip $(out)
 
 src.wasm : $(faustfile)
 	faust -lang wasm -i $(faustfile) -o src.wasm
