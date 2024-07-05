@@ -1,4 +1,3 @@
-#FaustBinaryTarget: installer.sh
 ################################################################################
 #           FaustWeb Stratus effect installer script
 #  The behaviour of this Makefile will only be correct if
@@ -7,17 +6,13 @@
 
 faustfile	?= $(wildcard *.dsp)
 faustarch   := $(shell faust -archdir)
-effectname  := $(faustfile:.dsp=)
 effectcpp   ?= $(faustfile:.dsp=.cpp)
 effectso    ?= $(faustfile:.dsp=.so)
 installer   := install.sh
 zipcontent  := $(faustfile) $(effectcpp) $(installer) _pedal-tools.sh README.txt
 
-installer.sh : $(zipcontent)
-	$(eval effectid := $(shell sed -n 's/.*declare(\s*"stratusId"\s*,\s*"\([0-9a-f]\{8\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{12\}\)"\s*);.*/\1/p' $(effectcpp)))
-	$(eval effectid ?= "Unknown")
-	@rm -f installer.sh
-	makeself . installer.sh "Chaos Audio Effect Installer - $(effectname) - id: $(effectid)" ./install.sh
+binary.zip : $(zipcontent)
+	zip -r binary.zip $(zipcontent)
 
 $(effectcpp) : src.cpp
 	cp src.cpp $(effectcpp)
