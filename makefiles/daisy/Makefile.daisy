@@ -1,0 +1,14 @@
+################################################################################
+#							Faust Daisy script
+#  The behaviour of this Makefile will only be correct if
+#  only one .dsp file exists in the folder
+################################################################################
+
+faustfile	?= $(wildcard *.dsp)
+
+binary.zip : $(faustfile)
+	faust2daisy -source $(OPT) $(faustfile)
+	zip -r binary.zip $(faustfile:.dsp=)
+
+src.cpp : $(faustfile)
+	faust -i -a daisy/ex_faust.cpp $(faustfile) -o src.cpp
