@@ -277,6 +277,9 @@ static int validate_faust(connection_info_struct* con_info)
             std::cerr << "EXIT validate_faust with failure : completebutcorrupt_head  : " << old_full_filename
                       << std::endl;
         con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+        // YANN
+        fs::remove_all(tmpdir);
+        return exitstatus;
     }
 
     if (gVerbosity >= 2) std::cerr << "EXIT validate_faust is OK: " << old_full_filename << std::endl;
