@@ -387,19 +387,27 @@ int FaustServer::send_page(struct MHD_Connection* connection, const char* page, 
 
     if (response == 0) {
         return MHD_NO;
-
-    } else {
-        MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, type ? type : "text/plain");
-        if (location) {
-            MHD_add_response_header(response, MHD_HTTP_HEADER_LOCATION, location);
-            MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS, MHD_HTTP_HEADER_LOCATION);
-        }
-        if (gAnyOrigin) MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, "*");
-        int ret = MHD_queue_response(connection, status_code, response);
-        MHD_destroy_response(response);
-
-        return ret;
     }
+    // Add security headers
+    MHD_add_response_header(response, "Content-Security-Policy",
+                            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; frame-ancestors "
+                            "'none'; form-action 'self';");
+    MHD_add_response_header(response, "X-Frame-Options", "DENY");
+    MHD_add_response_header(response, "X-Content-Type-Options", "nosniff");
+
+    MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, type ? type : "text/plain");
+    if (location) {
+        MHD_add_response_header(response, MHD_HTTP_HEADER_LOCATION, location);
+        MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS, MHD_HTTP_HEADER_LOCATION);
+    }
+    if (gAnyOrigin) {
+        MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+        MHD_add_response_header(response, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    }
+    int ret = MHD_queue_response(connection, status_code, response);
+    MHD_destroy_response(response);
+
+    return ret;
 }
 
 /**
