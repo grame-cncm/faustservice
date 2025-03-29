@@ -489,11 +489,11 @@ static bool isValidTarget(const fs::path& target, const char*& mimetype)
     } else if (target == "installer.sh") {
         mimetype = "application/x-shellscript";
         return true;
-        
+
     } else if (target == "index.html") {
         mimetype = "text/html";
         return true;
- 
+
     } else {
         return false;
     }
@@ -587,6 +587,19 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
         if (0 == strcmp(method, "GET")) {
             return server->dispatchGETConnections(connection, URL);
         } else if (0 == strcmp(method, "POST")) {
+            if (gVerbosity >= 2) {
+                struct connection_info_struct* con_info = (connection_info_struct*)*con_cls;
+                if (con_info) {
+                    std::cerr << "Content of con_cls:" << std::endl;
+                    std::cerr << "  Directory: " << '"' << con_info->directory << '"' << std::endl;
+                    std::cerr << "  Makefile Directory: " << '"' << con_info->makefile_directory << '"' << std::endl;
+                    std::cerr << "  Filename: " << '"' << con_info->filename << '"' << std::endl;
+                    std::cerr << "  TmpPath: " << '"' << con_info->tmppath << '"' << std::endl;
+                    // Add more fields as needed
+                } else {
+                    std::cerr << "con_cls is NULL" << std::endl;
+                }
+            }
             return server->dispatchPOSTConnections(connection, URL, upload_data, upload_data_size, con_cls);
         } else {
             return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
@@ -607,7 +620,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     // MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
     if (gVerbosity >= 2) std::cerr << "ANSWER GET CONNECTION " << url << std::endl;
 
-    if (matchExtension(url, ".php") || url.length() > 100/*matchExtension(url, ".js")*/) {
+    if (matchExtension(url, ".php") || url.length() > 100 /*matchExtension(url, ".js")*/) {
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
 
     } else if (matchURL(url, "/")) {
@@ -669,7 +682,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
 
     } else {
-        if (gVerbosity >= 1) std::cerr << "WARNING: We should have a rule to match this URL " << url << std::endl;
+        if (gVerbosity >= 1) std::cerr << "WARNING: INVALID URL " << url << std::endl;
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
     }
 }
@@ -721,7 +734,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 
     if (gVerbosity >= 2) std::cerr << "\nUSING SESSION " << U[1] << "\n\n";
     fSessionCache.refer(U[1]);
-    
+
     if (gVerbosity >= 2) std::cerr << "fulldir : " << fulldir << std::endl;
     if (gVerbosity >= 2) std::cerr << "makefile : " << makefile << std::endl;
 
@@ -735,19 +748,19 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
         }
         return send_file(connection, fullfile, "image/svg+xml");
     }
-    
+
     // Map of file extension and corresponding mimetypes
     static std::map<std::string, std::string> mimeTypes;
-    
+
     // Insert key-value pairs
-    mimeTypes[".js"] = "application/javascript";
-    mimeTypes[".css"] = "text/css";
+    mimeTypes[".js"]   = "application/javascript";
+    mimeTypes[".css"]  = "text/css";
     mimeTypes[".wasm"] = "application/wasm";
     mimeTypes[".json"] = "application/json";
-    mimeTypes[".png"] = "image/png";
+    mimeTypes[".png"]  = "image/png";
     mimeTypes[".flac"] = "audio/flac";
-    mimeTypes[".wav"] = "audio/wav";
-    
+    mimeTypes[".wav"]  = "audio/wav";
+
     string ext = url.extension().string();
 
     // Check for files in mimeTypes map
@@ -894,6 +907,18 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
  * documentation.
  */
 
+// avoid deferencing invalid char* pointers when printing debg messages
+static const char* secure_string(const char* str)
+{
+    if (str == NULL) {
+        return "NULL";
+    } else if (str[0] == 0) {
+        return "EMPTY";
+    } else {
+        return str;
+    }
+}
+
 int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const char* key, const char* filename,
                               const char* content_type, const char* /*transfer_encoding*/, const char* data,
                               uint64_t /*off*/, size_t size)
@@ -901,6 +926,22 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
     struct connection_info_struct* con_info = (connection_info_struct*)coninfo_cls;
     FILE*                          fp;
 
+    // check all char* pointers are valid
+    bool valid = key != NULL && key[0] != 0 && strlen(key) < 100 && filename != NULL && filename[0] != 0 &&
+                 strlen(filename) < 100 && content_type != NULL && content_type[0] != 0 && strlen(content_type) < 100 &&
+                 data != NULL;
+
+    if (!valid) {
+        // we dont' have a valid post
+        std::cerr << "ERROR: some null or empty data in iterate_post" << std::endl;
+        std::cerr << "ERROR iterate_post ("
+                  << "kind : " << kind << ", key : " << secure_string(key) << ", filename: " << secure_string(filename)
+                  << ", content type: " << secure_string(content_type) << ", data pointer: " << (void*)data
+                  << ", size: " << size << ")" << std::endl;
+        return MHD_NO;  // We return
+    }
+
+    // We have a valid post
     if (gVerbosity >= 2) {
         std::cerr << "ENTER iterate_post ("
                   << "kind : " << kind << ", key : " << key << ", filename: " << filename << ", content type: "
