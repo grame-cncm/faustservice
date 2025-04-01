@@ -114,16 +114,29 @@ static bool isFaustFile(const fs::path& f)
 }
 
 /*
- * Copy all faust source files from src directory to destination directory
+ * True if it is a .wav or .flac audio file
  */
 
-static void copyFaustFiles(const fs::path& src, const fs::path& dst)
+static bool isAudioFile(const fs::path& f)
+{
+    fs::path x = f.extension();
+    bool     a = (x == ".wav") || (x == ".flac");
+    return a;
+}
+
+/*
+ * Copy all Faust source files and additional resources (libraries and audio files) from src directory to destination directory
+ */
+
+static void copyFaustOrAudioFiles(const fs::path& src, const fs::path& dst)
 {
     assert(is_directory(src));
     assert(is_directory(dst));
     fs::directory_iterator end_iter;
     for (fs::directory_iterator f_iter(src); f_iter != end_iter; ++f_iter) {
         if (isFaustFile(f_iter->path())) {
+            fs::copy_file(f_iter->path(), dst / f_iter->path().filename());
+        } else if (isAudioFile(f_iter->path())) {
             fs::copy_file(f_iter->path(), dst / f_iter->path().filename());
         }
     }
@@ -152,7 +165,7 @@ static void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefi
                     if (gVerbosity >= 2) std::cerr << "dstdir = " << dstdir << std::endl;
                     create_directories(dstdir);
                     fs::copy_file(makefile_iter->path(), dstdir / "Makefile");
-                    copyFaustFiles(srcdir, dstdir);
+                    copyFaustOrAudioFiles(srcdir, dstdir);
                 }
             }
         }
@@ -160,7 +173,7 @@ static void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefi
 
     // copy makefile.none to handle non-architecture-specific targets like mdoc.zip, etc
     fs::copy_file(fs::path(makefile_directory) / "Makefile.none", sha1path / "Makefile");
-    copyFaustFiles(srcdir, sha1path);
+    copyFaustOrAudioFiles(srcdir, sha1path);
 }
 /*
  * Validates that a Faust file or archive is sane and returns 0 for success
