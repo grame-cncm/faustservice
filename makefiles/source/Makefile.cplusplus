@@ -12,3 +12,6 @@ binary.zip : $(faustfile)
 
 src.cpp : $(faustfile)
 	faust -i -a minimal.cpp $(faustfile) -o src.cpp
+
+baresrc.cpp : $(faustfile)
+	faust $(faustfile) -o baresrc.cpp
