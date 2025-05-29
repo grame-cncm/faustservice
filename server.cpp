@@ -125,7 +125,8 @@ static bool isAudioFile(const fs::path& f)
 }
 
 /*
- * Copy all Faust source files and additional resources (libraries and audio files) from src directory to destination directory
+ * Copy all Faust source files and additional resources (libraries and audio files) from src directory to destination
+ * directory
  */
 
 static void copyFaustOrAudioFiles(const fs::path& src, const fs::path& dst)
@@ -499,6 +500,10 @@ static bool isValidTarget(const fs::path& target, const char*& mimetype)
         return true;
 
     } else if (target == "src.cpp") {
+        mimetype = "text/x-c";
+        return true;
+
+    } else if (target == "baresrc.cpp") {
         mimetype = "text/x-c";
         return true;
 
