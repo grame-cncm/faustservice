@@ -125,6 +125,10 @@ class FaustServer {
     int dispatchGETConnections(struct MHD_Connection* connection, const string& url);
     int dispatchPOSTConnections(struct MHD_Connection* connection, const string& url, const char* upload_data,
                                 size_t* upload_data_size, void** con_cls);
+    
+    // MCP (Model Context Protocol) support - minimal implementation
+    int dispatchMCPRequest(struct MHD_Connection* connection, const char* upload_data,
+                          size_t* upload_data_size, void** con_cls);
 
     int makeAndSendResourceFile(struct MHD_Connection* connection, const string& raw_url);
     std::string getMakefileArtifactName(const fs::path&);

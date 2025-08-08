@@ -182,6 +182,77 @@ static void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefi
 }
 
 /*
+ * Simple JSON utilities for MCP - no external dependencies
+ */
+static string extractJSONString(const string& json, const string& field) {
+    // Find "field": "value" or "field": value
+    size_t pos = json.find("\"" + field + "\"");
+    if (pos == string::npos) return "";
+    
+    pos = json.find(":", pos);
+    if (pos == string::npos) return "";
+    pos++;
+    
+    // Skip whitespace
+    while (pos < json.length() && (json[pos] == ' ' || json[pos] == '\t' || json[pos] == '\n')) pos++;
+    
+    if (pos >= json.length()) return "";
+    
+    // Check if value is a string (starts with ")
+    if (json[pos] == '"') {
+        pos++;
+        size_t end = json.find('"', pos);
+        if (end != string::npos) {
+            return json.substr(pos, end - pos);
+        }
+    } else {
+        // Value is number or object - find end (comma, } or ])
+        size_t end = json.find_first_of(",}]", pos);
+        if (end != string::npos) {
+            string value = json.substr(pos, end - pos);
+            // Trim whitespace
+            while (!value.empty() && (value.back() == ' ' || value.back() == '\t' || value.back() == '\n')) {
+                value.pop_back();
+            }
+            return value;
+        }
+    }
+    
+    return "";
+}
+
+static string extractJSONObject(const string& json, const string& field) {
+    // Find "field": { ... }
+    size_t pos = json.find("\"" + field + "\"");
+    if (pos == string::npos) return "";
+    
+    pos = json.find(":", pos);
+    if (pos == string::npos) return "";
+    pos++;
+    
+    // Skip whitespace
+    while (pos < json.length() && (json[pos] == ' ' || json[pos] == '\t' || json[pos] == '\n')) pos++;
+    
+    if (pos >= json.length() || json[pos] != '{') return "";
+    
+    // Find matching closing brace
+    int braceCount = 0;
+    size_t start = pos;
+    while (pos < json.length()) {
+        if (json[pos] == '{') braceCount++;
+        else if (json[pos] == '}') {
+            braceCount--;
+            if (braceCount == 0) {
+                return json.substr(start, pos - start + 1);
+            }
+        }
+        pos++;
+    }
+    
+    return "";
+}
+
+/*
  * Extract DSP file from archive and validate it has only one DSP file
  * Returns the DSP filename or empty string on error
  */
@@ -465,6 +536,9 @@ static int page_not_found(struct MHD_Connection* connection, const char* page, i
     return ret;
 }
 
+// Global MCP dummy marker for connection tracking
+static int g_mcp_dummy = 0;
+
 /*
  * Callback called every time a GET or POST request is completed.
  * Note that this is NOT necessarily called once the entirety of
@@ -475,6 +549,12 @@ static int page_not_found(struct MHD_Connection* connection, const char* page, i
 void FaustServer::request_completed(void*, struct MHD_Connection*, void** con_cls, enum MHD_RequestTerminationCode)
 {
     if (gVerbosity >= 2) std::cerr << "FaustServer::request_completed()" << endl;
+
+    // Check if this is our MCP dummy marker (global variable)
+    if (*con_cls == &g_mcp_dummy) {
+        *con_cls = NULL;
+        return;  // Don't try to delete static dummy
+    }
 
     struct connection_info_struct* con_info = (connection_info_struct*)*con_cls;
     *con_cls                                = NULL;
@@ -637,6 +717,11 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
         if (0 == strcmp(method, "GET")) {
             return server->dispatchGETConnections(connection, URL);
         } else if (0 == strcmp(method, "POST")) {
+            // Check if this is an MCP request
+            if (matchURL(URL, "/mcp")) {
+                return server->dispatchMCPRequest(connection, upload_data, upload_data_size, con_cls);
+            }
+            
             if (gVerbosity >= 2) {
                 struct connection_info_struct* con_info = (connection_info_struct*)*con_cls;
                 if (con_info) {
@@ -858,6 +943,233 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 
 //------------------------------------------------------------------
 // dispatchPOSTConnections(), handle POST of a Faust source file
+
+/*
+ * Convert JSON targets to a simple text string format
+ * Input: {"platform1": ["arch1", "arch2"], "platform2": ["arch3"], ...}
+ * Output: "platform platform1: architectures arch1, arch2; platform platform2: arch3; ..."
+ */
+static string JSONTargets2string(const string& jsonTargets) {
+    string result;
+    string currentPlatform;
+    string currentValue;
+    bool inString = false;
+    bool inKey = false;
+    bool inArray = false;
+    bool firstPlatform = true;
+    bool firstArch = true;
+    bool escape = false;
+    
+    for (size_t i = 0; i < jsonTargets.size(); i++) {
+        char c = jsonTargets[i];
+        
+        if (escape) {
+            currentValue += c;
+            escape = false;
+            continue;
+        }
+        
+        if (c == '\\') {
+            escape = true;
+            continue;
+        }
+        
+        if (c == '"') {
+            if (!inString) {
+                inString = true;
+                currentValue.clear();
+                if (!inArray && currentPlatform.empty()) {
+                    inKey = true;  // Starting to read platform name
+                }
+            } else {
+                inString = false;
+                if (inKey) {
+                    // Just finished reading platform name
+                    currentPlatform = currentValue;
+                    inKey = false;
+                } else if (inArray) {
+                    // Just finished reading an architecture
+                    if (!firstArch) result += ", ";
+                    result += currentValue;
+                    firstArch = false;
+                }
+            }
+        } else if (inString) {
+            currentValue += c;
+        } else if (c == ':' && !currentPlatform.empty() && !inArray) {
+            // Platform name followed by colon, prepare for array
+            if (!firstPlatform) result += "; ";
+            result += "platform " + currentPlatform + ": architectures ";
+            firstPlatform = false;
+            firstArch = true;
+        } else if (c == '[') {
+            inArray = true;
+        } else if (c == ']') {
+            inArray = false;
+            currentPlatform.clear();  // Reset for next platform
+        }
+    }
+    
+    return result;
+}
+
+/*
+ * Sanitize JSON string by removing newlines, carriage returns, and other control characters
+ * Ensures JSON is on a single line for proper MCP communication
+ */
+static string sanitizeJSON(const string& json) {
+    string result;
+    result.reserve(json.size());
+    
+    bool in_string = false;
+    bool escape_next = false;
+    
+    for (size_t i = 0; i < json.size(); i++) {
+        char c = json[i];
+        
+        // Track if we're inside a JSON string
+        if (!escape_next && c == '"') {
+            in_string = !in_string;
+        }
+        
+        // Handle escape sequences
+        if (escape_next) {
+            escape_next = false;
+            result += c;
+            continue;
+        }
+        
+        if (c == '\\' && in_string) {
+            escape_next = true;
+            result += c;
+            continue;
+        }
+        
+        // Remove control characters outside of strings
+        if (!in_string) {
+            // Skip newlines, tabs, carriage returns, and extra spaces
+            if (c == '\n' || c == '\r' || c == '\t') {
+                continue;
+            }
+            // Collapse multiple spaces to single space
+            if (c == ' ' && !result.empty() && result.back() == ' ') {
+                continue;
+            }
+        }
+        
+        result += c;
+    }
+    
+    return result;
+}
+
+/*
+ * MCP (Model Context Protocol) handler - simplified implementation
+ * Handles JSON-RPC requests for the MCP protocol
+ */
+int FaustServer::dispatchMCPRequest(struct MHD_Connection* connection, const char* upload_data,
+                                    size_t* upload_data_size, void** con_cls)
+{
+    // Simple static buffer to accumulate POST data
+    static string accumulated_data;
+    
+    // For first call, initialize
+    if (NULL == *con_cls) {
+        accumulated_data.clear();
+        // Use the global dummy marker
+        *con_cls = &g_mcp_dummy;
+        return MHD_YES;
+    }
+    
+    // Accumulate data if we have some
+    if (*upload_data_size != 0) {
+        accumulated_data.append(upload_data, *upload_data_size);
+        *upload_data_size = 0;  // Mark as consumed
+        return MHD_YES;  // Wait for more data
+    }
+    
+    // No more data - process the complete request
+    if (!accumulated_data.empty()) {
+        if (gVerbosity >= 2) {
+            std::cerr << "MCP Complete Request: " << accumulated_data << std::endl;
+        }
+        
+        // Extract JSON-RPC fields
+        string method = extractJSONString(accumulated_data, "method");
+        string id = extractJSONString(accumulated_data, "id");
+        string params = extractJSONObject(accumulated_data, "params");
+        
+        if (gVerbosity >= 2) {
+            std::cerr << "MCP Method: " << method << ", ID: " << id << std::endl;
+        }
+        
+        // Check if this is a notification (no ID or notifications/* methods)
+        bool is_notification = id.empty() || method.find("notifications/") == 0 || method.find("$/") == 0;
+        
+        if (is_notification) {
+            // For notifications, send empty 204 No Content response
+            accumulated_data.clear();
+            struct MHD_Response* response = MHD_create_response_from_buffer(0, (void*)"", MHD_RESPMEM_PERSISTENT);
+            int ret = MHD_queue_response(connection, MHD_HTTP_NO_CONTENT, response);
+            MHD_destroy_response(response);
+            return ret;
+        }
+        
+        stringstream response;
+        response << "{\"jsonrpc\":\"2.0\",\"id\":" << id << ",";
+        
+        // Handle different MCP methods
+        if (method == "initialize") {
+            response << "\"result\":{";
+            response << "\"protocolVersion\":\"2025-06-18\",";
+            response << "\"capabilities\":{\"tools\":{}},";
+            response << "\"serverInfo\":{\"name\":\"FaustWeb MCP\",\"version\":\"1.0.0\"}";
+            response << "}}";
+            
+        } else if (method == "tools/list") {
+            response << "\"result\":{\"tools\":[";
+            response << "{\"name\":\"list_targets\",";
+            response << "\"description\":\"List all available Faust compilation targets grouped by platform\",";
+            response << "\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
+            response << "]}}";
+            
+        } else if (method == "tools/call") {
+            string toolName = extractJSONString(params, "name");
+            
+            if (toolName == "list_targets") {
+                // Convert JSON targets to simple text format
+                string targetsText = JSONTargets2string(fTargets);
+                
+                response << "\"result\":{";
+                response << "\"content\":[{";
+                response << "\"type\":\"text\",";
+                response << "\"text\":\"" << targetsText << "\"";
+                response << "}]}}";
+            } else {
+                response << "\"error\":{\"code\":-32602,\"message\":\"Unknown tool: " << toolName << "\"}}";
+            }
+            
+        } else {
+            // Method not found
+            response << "\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}";
+        }
+        
+        string json_response = sanitizeJSON(response.str());
+        
+        if (gVerbosity >= 2) {
+            std::cerr << "MCP Response: " << json_response << std::endl;
+        }
+        
+        // Send response and clear buffer for next request
+        accumulated_data.clear();
+        return send_page(connection, json_response.c_str(), json_response.size(), 
+                        MHD_HTTP_OK, "application/json", NULL);
+    }
+    
+    // Empty request - should not happen
+    return send_page(connection, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32700,\"message\":\"Parse error\"}}", 
+                    71, MHD_HTTP_OK, "application/json", NULL);
+}
 
 int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const string& url, const char* upload_data,
                                          size_t* upload_data_size, void** con_cls)
