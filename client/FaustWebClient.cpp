@@ -59,19 +59,20 @@ static string path_to_content(const string& path)
 {
     ifstream file(path.c_str(), ifstream::binary);
     
-    file.seekg (0, file.end);
-    int size = file.tellg();
-    file.seekg (0, file.beg);
+    if (!file) {
+        return "";  // Return empty string if file cannot be opened
+    }
     
-    // And allocate buffer to that a single line can be read...
-    char* buffer = new char[size + 1];
-    file.read(buffer, size);
+    // Get file size
+    file.seekg(0, file.end);
+    size_t size = file.tellg();
+    file.seekg(0, file.beg);
     
-    // Terminate the string
-    buffer[size] = 0;
-    string result = buffer;
+    // Read directly into a string (RAII - no manual memory management)
+    string result(size, '\0');
+    file.read(&result[0], size);
+    
     file.close();
-    delete [] buffer;
     return result;
 }
 
