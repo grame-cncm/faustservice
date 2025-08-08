@@ -180,6 +180,83 @@ static void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefi
     fs::copy_file(fs::path(makefile_directory) / "Makefile.none", sha1path / "Makefile");
     copyFaustOrAudioFiles(srcdir, sha1path);
 }
+
+/*
+ * Extract DSP file from archive and validate it has only one DSP file
+ * Returns the DSP filename or empty string on error
+ */
+static string extract_dsp_from_archive(struct archive* my_archive, const fs::path& tmpdir, 
+                                      fs::path& unzipedDir, connection_info_struct* con_info)
+{
+    struct archive_entry* my_entry;
+    string dsp_file;
+    
+    while (archive_read_next_header(my_archive, &my_entry) == ARCHIVE_OK) {
+        fs::path current_file = fs::path(archive_entry_pathname(my_entry));
+        if (gVerbosity >= 1) std::cerr << "archive_read_next_header : " << current_file << std::endl;
+        
+        // Skip macOS metadata files
+        if (current_file.string().substr(0, 8) == "__MACOSX") {
+            if (gVerbosity >= 1) std::cerr << "Ignore file " << current_file << std::endl;
+            continue;
+        }
+        
+        // Check for DSP files
+        if (current_file.string().substr(current_file.string().find_last_of(".") + 1) == "dsp") {
+            if (!dsp_file.empty()) {
+                fs::remove_all(tmpdir);
+                con_info->answerstring = completebutmorethanoneDSPfile;
+                std::cerr << "ERROR, we have more than one dsp file " << current_file << std::endl;
+                return "";
+            }
+            dsp_file = current_file.string();
+        }
+        
+        // Extract file
+        unzipedDir = fs::path(tmpdir / current_file).parent_path();
+        string newpath = fs::path(tmpdir / current_file).string();
+        archive_entry_set_pathname(my_entry, newpath.c_str());
+        archive_read_extract(my_archive, my_entry, ARCHIVE_EXTRACT_PERM);
+    }
+    
+    return dsp_file;
+}
+
+/*
+ * Compile Faust DSP file and check for errors
+ * Returns 0 on success, non-zero on failure
+ */
+static int compile_faust_file(const fs::path& filepath, connection_info_struct* con_info)
+{
+    if (gVerbosity >= 1) std::cerr << "TRY TO COMPILE validate_faust : " << filepath.string() << std::endl;
+    
+    string result = "";
+    FILE* pipe = popen(("faust -a plot.cpp " + filepath.string() + " 2>&1").c_str(), "r");
+    if (!pipe) {
+        con_info->answerstring = completebutnopipe;
+        return 1;
+    }
+    
+    // Read compiler output
+    char buffer[256];
+    while (!feof(pipe)) {
+        if (fgets(buffer, 128, pipe) != NULL) {
+            result += buffer;
+        }
+    }
+    
+    int exitstatus = pclose(pipe);
+    
+    if (exitstatus) {
+        if (gVerbosity >= 1)
+            std::cerr << "EXIT validate_faust with failure : completebutcorrupt_head  : " << filepath << std::endl;
+        con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
+        return exitstatus;
+    }
+    
+    return 0;
+}
+
 /*
  * Validates that a Faust file or archive is sane and returns 0 for success
  * or 1 for failure. If the evaluation fails, the appropriate error message
@@ -188,6 +265,7 @@ static void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefi
 
 static int validate_faust(connection_info_struct* con_info)
 {
+    // Setup temporary directory
     fs::path tmpdir = fs::temp_directory_path() / fs::unique_path("%%%%-%%%%-%%%%-%%%%");
     fs::create_directory(tmpdir);
     fs::path filename          = fs::path(con_info->filename);
@@ -196,164 +274,105 @@ static int validate_faust(connection_info_struct* con_info)
 
     if (gVerbosity >= 2) std::cerr << "\nENTER validate_faust for file : " << old_full_filename << std::endl;
 
-    // libarchive stuff
-    struct archive*       my_archive;
-    struct archive_entry* my_entry;
-
-    my_archive = archive_read_new();
-    archive_read_support_filter_all(my_archive);
-    archive_read_support_format_all(my_archive);
-    int archive_status = archive_read_open_filename(my_archive, old_full_filename.string().c_str(), 10240);
-
-    // prepare for the tar
-
+    // Step 1: Process uploaded file (extract archive or copy DSP)
     if (!fs::is_regular_file(old_full_filename)) {
         fs::remove_all(tmpdir);
         con_info->answerstring = completebuterrorpage;
         if (gVerbosity >= 1)
             std::cerr << "EXIT validate_faust with failure : not regular file : " << old_full_filename << std::endl;
         return 1;
-    } else if (old_full_filename.string().substr(old_full_filename.string().find_last_of(".") + 1) == "dsp") {
+    }
+    
+    // Check if it's a DSP file or archive
+    if (old_full_filename.string().substr(old_full_filename.string().find_last_of(".") + 1) == "dsp") {
+        // Simple DSP file - just copy it
         fs::copy_file(old_full_filename, tmpdir / filename);
-    } else if (archive_status == ARCHIVE_OK) {
-        string dsp_file;
-
-        // BEGIN read archived files
-        while (archive_read_next_header(my_archive, &my_entry) == ARCHIVE_OK) {
-            fs::path current_file = fs::path(archive_entry_pathname(my_entry));
-            if (gVerbosity >= 1) std::cerr << "archive_read_next_header : " << current_file << std::endl;
-
-            if (current_file.string().substr(0, 8) == "__MACOSX") {
-                if (gVerbosity >= 1) std::cerr << "Ignore file " << current_file << std::endl;
-            } else {
-                if (current_file.string().substr(current_file.string().find_last_of(".") + 1) == "dsp") {
-                    if (!dsp_file.empty()) {
-                        archive_status = archive_read_free(my_archive);
-                        fs::remove_all(tmpdir);
-                        con_info->answerstring = completebutmorethanoneDSPfile;
-                        std::cerr << "ERROR, we have more than one dsp file " << current_file << std::endl;
-                        return 1;
-                    }
-                    dsp_file = current_file.string();
-                    filename = dsp_file;
-                }
-                unzipedDir     = fs::path(tmpdir / current_file).parent_path();
-                string newpath = fs::path(tmpdir / current_file).string();
-                archive_entry_set_pathname(my_entry, newpath.c_str());
-                archive_read_extract(my_archive, my_entry, ARCHIVE_EXTRACT_PERM);
-            }
-        }
-        // END read archived files
-
-        archive_status = archive_read_free(my_archive);
+    } else {
+        // Archive file - extract and find DSP
+        struct archive* my_archive = archive_read_new();
+        archive_read_support_filter_all(my_archive);
+        archive_read_support_format_all(my_archive);
+        int archive_status = archive_read_open_filename(my_archive, old_full_filename.string().c_str(), 10240);
+        
         if (archive_status != ARCHIVE_OK) {
+            archive_read_free(my_archive);
             fs::remove_all(tmpdir);
-            con_info->answerstring = completebutdecompressionproblem;
+            con_info->answerstring = completebutendoftheworld;
             if (gVerbosity >= 1)
-                std::cerr << "EXIT validate_faust with failure : Archive not OK case 1 : " << old_full_filename
-                          << std::endl;
+                std::cerr << "EXIT validate_faust with failure : Archive not OK : " << old_full_filename << std::endl;
             return 1;
         }
-    } else {
-        fs::remove_all(tmpdir);
-        con_info->answerstring = completebutendoftheworld;
-        if (gVerbosity >= 1)
-            std::cerr << "EXIT validate_faust with failure : Archive not OK case 2 : " << old_full_filename
-                      << std::endl;
-        return 1;
+        
+        string dsp_file = extract_dsp_from_archive(my_archive, tmpdir, unzipedDir, con_info);
+        
+        archive_status = archive_read_free(my_archive);
+        if (archive_status != ARCHIVE_OK || dsp_file.empty()) {
+            fs::remove_all(tmpdir);
+            if (dsp_file.empty() && con_info->answerstring.empty()) {
+                con_info->answerstring = completebutnoDSPfile;
+            } else if (con_info->answerstring.empty()) {
+                con_info->answerstring = completebutdecompressionproblem;
+            }
+            return 1;
+        }
+        
+        filename = dsp_file;
     }
-
-    // in case a dsp file wasn't found
-    if (filename.string() == "") {
+    
+    // Step 2: Validate DSP filename
+    if (filename.string().empty()) {
         fs::remove_all(tmpdir);
         con_info->answerstring = completebutnoDSPfile;
         if (gVerbosity >= 1)
             std::cerr << "EXIT validate_faust with failure : empty filename : " << old_full_filename << std::endl;
         return 1;
     }
-
-    if (gVerbosity >= 1) std::cerr << "TRY TO COMPILE validate_faust : " << (tmpdir / filename).string() << std::endl;
-    string result = "";
-    FILE*  pipe   = popen(("faust -a plot.cpp " + (tmpdir / filename).string() + " 2>&1").c_str(), "r");
-    if (!pipe) {
-        con_info->answerstring = completebutnopipe;
-    } else {
-        // Bleed off the pipe
-        char buffer[256];
-        while (!feof(pipe)) {
-            if (fgets(buffer, 128, pipe) != NULL) {
-                // std::cerr << "READ PIPE validate_faust : " << buffer<< std::endl;
-                result += buffer;
-            }
-        }
-    }
-
-    int exitstatus = pclose(pipe);
-
-    if (exitstatus) {
-        if (gVerbosity >= 1)
-            std::cerr << "EXIT validate_faust with failure : completebutcorrupt_head  : " << old_full_filename
-                      << std::endl;
-        con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
-        // YANN
+    
+    // Step 3: Compile the DSP file
+    int compile_result = compile_faust_file(tmpdir / filename, con_info);
+    if (compile_result != 0) {
         fs::remove_all(tmpdir);
-        return exitstatus;
+        return compile_result;
     }
 
     if (gVerbosity >= 2) std::cerr << "EXIT validate_faust is OK: " << old_full_filename << std::endl;
 
+    // Step 4: Generate SHA1 and create directory structure
     string sha1 = generate_sha1(con_info);
+    fs::path sha1path = fs::path(con_info->directory) / fs::path(sha1);
 
-    // build the sha1 directories here
-    {
-        fs::path sha1path = fs::path(con_info->directory) / fs::path(sha1);
+    if (!fs::is_directory(sha1path)) {
+        if (gVerbosity >= 2)
+            std::cerr << "ENTER make_initial_faust_directory(" << con_info << ", " << sha1path << std::endl;
 
-        if (!fs::is_directory(sha1path)) {
-            if (gVerbosity >= 2)
-                std::cerr << "ENTER make_initial_faust_directory(" << con_info << ", " << sha1path << std::endl;
-
-            try {
-                // first time we have this file
-                fs::create_directory(sha1path);
-            } catch (const fs::filesystem_error& e) {
-                std::cerr << "Warning : can't create directory " << sha1path << ":" << e.code().message() << std::endl;
-            }
-            string   filename(con_info->filename);
-            fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
-
-            // libarchive stuff
-            struct archive* my_archive;
-            // struct archive_entry* my_entry;
-
-            my_archive = archive_read_new();
-            archive_read_support_filter_all(my_archive);
-            archive_read_support_format_all(my_archive);
-            int    archive_status = archive_read_open_filename(my_archive, old_full_filename.string().c_str(), 10240);
-            string result         = "";
-
-            if (!fs::is_regular_file(old_full_filename)) {
-                con_info->answerstring = completebuterrorpage;
-                return 1;
-
-            } else if (filename.substr(filename.find_last_of(".") + 1) == "dsp") {
-                create_file_tree(tmpdir, sha1path, fs::path(con_info->makefile_directory));
-
-            } else if (archive_status == ARCHIVE_OK) {
-                create_file_tree(unzipedDir, sha1path, fs::path(con_info->makefile_directory));
-
-            } else {
-                con_info->answerstring = completebutendoftheworld;
-                return 1;
-            }
-
-            if (gVerbosity >= 2)
-                std::cerr << "EXIT make_initial_faust_directory" << con_info << ", " << sha1 << std::endl;
+        try {
+            fs::create_directory(sha1path);
+        } catch (const fs::filesystem_error& e) {
+            std::cerr << "Warning : can't create directory " << sha1path << ":" << e.code().message() << std::endl;
+            fs::remove_all(tmpdir);
+            con_info->answerstring = completebuterrorpage;
+            return 1;
         }
-        con_info->answerstring = sha1;
+        
+        // Determine source directory for file tree
+        fs::path source_dir = tmpdir;
+        
+        // Re-check file type to determine source directory
+        string filename_str(con_info->filename);
+        if (filename_str.substr(filename_str.find_last_of(".") + 1) != "dsp" && !unzipedDir.empty()) {
+            // Archive was extracted, use unzipped directory
+            source_dir = unzipedDir;
+        }
+        
+        create_file_tree(source_dir, sha1path, fs::path(con_info->makefile_directory));
+        
+        if (gVerbosity >= 2)
+            std::cerr << "EXIT make_initial_faust_directory" << con_info << ", " << sha1 << std::endl;
     }
-
+    
+    con_info->answerstring = sha1;
     fs::remove_all(tmpdir);
-    return exitstatus;
+    return 0;
 }
 
 /*
