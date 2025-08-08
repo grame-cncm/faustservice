@@ -72,21 +72,26 @@ static string generate_sha1(connection_info_struct* con_info)
 
     // read file content
     ifstream myFile(filepath.string().c_str(), ios::in | ios::binary);
+    if (!myFile) {
+        return "file-open-error";
+    }
+    
     myFile.seekg(0, ios::end);
-    int length = myFile.tellg();
+    size_t length = myFile.tellg();
     myFile.seekg(0, ios::beg);
 
-    // char content[length];
-    char* content = (char*)malloc(length);
-    if (content == 0) {
-        return "malloc-error";
-    }
-    myFile.read(content, length);
+    // Use std::vector for automatic memory management (RAII)
+    std::vector<char> content(length);
+    myFile.read(content.data(), length);
     myFile.close();
+    
+    if (!myFile) {
+        return "file-read-error";
+    }
 
     // compute SHA1 key
     unsigned char obuf[20];
-    SHA1((const unsigned char*)content, length, obuf);
+    SHA1(reinterpret_cast<const unsigned char*>(content.data()), length, obuf);
 
     // convert SHA1 key into hexadecimal string
     string sha1key;
@@ -97,7 +102,6 @@ static string generate_sha1(connection_info_struct* con_info)
         sha1key += tolower(c1);
         sha1key += tolower(c2);
     }
-    free(content);
 
     return sha1key;
 }
