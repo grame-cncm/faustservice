@@ -466,10 +466,8 @@ void FaustServer::request_completed(void*, struct MHD_Connection*, void** con_cl
                 MHD_destroy_post_processor(con_info->postprocessor);
                 nr_of_uploading_clients--;
             }
-            if (con_info->fp != 0) {
-                fclose(con_info->fp);
-                con_info->fp = 0;
-            }
+            // fp is automatically closed by unique_ptr destructor
+            // No need to manually close anymore!
         }
 
         delete con_info;
@@ -864,7 +862,7 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
         con_info->directory          = getDirectory().string();
         con_info->makefile_directory = getMakefileDirectory().string();
 
-        con_info->fp = NULL;
+        con_info->fp.reset();  // Initialize unique_ptr to nullptr
         con_info->postprocessor =
             MHD_create_post_processor(connection, POSTBUFFERSIZE, (MHD_PostDataIterator)iterate_post, (void*)con_info);
 
@@ -898,8 +896,7 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
             // so that it can be opened by the methods below
             if (con_info->fp) {
                 if (gVerbosity >= 2) std::cerr << "POST processing, we can close the file !" << std::endl;
-                fclose(con_info->fp);
-                con_info->fp = 0;
+                con_info->fp.reset();  // Close file using RAII
             }
 
             string sha1;
@@ -998,7 +995,7 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
         return MHD_NO;
     }
 
-    if (con_info->fp == 0) {
+    if (!con_info->fp) {  // Check if unique_ptr is empty
         if (NULL != (fp = fopen(full_path.c_str(), "rb"))) {
             fclose(fp);
 
@@ -1008,15 +1005,15 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
             return MHD_NO;
         }
 
-        con_info->fp = fopen(full_path.c_str(), "ab");
-        if (con_info->fp == 0) {
+        con_info->fp.reset(fopen(full_path.c_str(), "ab"));  // RAII: unique_ptr takes ownership
+        if (!con_info->fp) {
             if (gVerbosity >= 2) std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
             return MHD_NO;
         }
     }
 
     if (size > 0) {
-        if (!fwrite(data, size, sizeof(char), con_info->fp)) {
+        if (!fwrite(data, size, sizeof(char), con_info->fp.get())) {  // Use .get() to access raw pointer
             if (gVerbosity >= 2) std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
             return MHD_NO;
         }

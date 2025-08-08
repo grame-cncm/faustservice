@@ -31,6 +31,7 @@
 #include "utilities.hh"
 
 // Boost libraries
+#include <memory>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 
@@ -40,10 +41,17 @@
 
 namespace fs = boost::filesystem;
 
+// Custom deleter for FILE* to use with unique_ptr
+struct FileDeleter {
+    void operator()(FILE* fp) const {
+        if (fp) fclose(fp);
+    }
+};
+
 struct connection_info_struct {
     int                       connectiontype;  // GET or POST
     struct MHD_PostProcessor* postprocessor;   // the POST processor used internally by microhttpd
-    FILE*                     fp;              // a pointer to the file to which the data is being written
+    std::unique_ptr<FILE, FileDeleter> fp;     // RAII file pointer - automatically closed
     string                    tmppath;         // the path in which the provisional file exists
     string                    filename;        // the name of the file
     string                    answerstring;    // the answer sent to the user after upload
