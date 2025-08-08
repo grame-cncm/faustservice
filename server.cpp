@@ -1162,8 +1162,11 @@ int FaustServer::dispatchMCPRequest(struct MHD_Connection* connection, const cha
         
         // Send response and clear buffer for next request
         accumulated_data.clear();
-        return send_page(connection, json_response.c_str(), json_response.size(), 
-                        MHD_HTTP_OK, "application/json", NULL);
+        // For MCP cloud servers, use application/x-ndjson for streaming responses
+        // Each JSON response is followed by a newline
+        string ndjson_response = json_response + "\n";
+        return send_page(connection, ndjson_response.c_str(), ndjson_response.size(), 
+                        MHD_HTTP_OK, "application/x-ndjson", NULL);
     }
     
     // Empty request - should not happen

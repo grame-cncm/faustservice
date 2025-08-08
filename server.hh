@@ -95,6 +95,11 @@ class FaustServer {
         return fDirectory;  ///< Directory to which the uploaded files are being written.
     }
 
+    string getTargets() const
+    {
+        return fTargets;  ///< Get the JSON targets string.
+    }
+
     fs::path getMakefileDirectory() const
     {
         return fMakefileDirectory;  ///< Directory that the makefiles should be copied from.
