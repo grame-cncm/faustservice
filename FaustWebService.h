@@ -11,8 +11,10 @@
 #include "json.hpp"
 #include <string>
 #include <memory>
+#include <boost/filesystem.hpp>
 
 using json = nlohmann::json;
+namespace fs = boost::filesystem;
 
 // Forward declaration
 class FaustServer;
@@ -39,9 +41,12 @@ public:
 class CompileDSPTool : public MCPTool {
 private:
     FaustServer* fServer;
+    fs::path fSessionsDir;
+    fs::path fMakefilesDir;
     
 public:
-    CompileDSPTool(FaustServer* server) : fServer(server) {}
+    CompileDSPTool(FaustServer* server, const fs::path& sessionsDir, const fs::path& makefilesDir) 
+        : fServer(server), fSessionsDir(sessionsDir), fMakefilesDir(makefilesDir) {}
     
     std::string execute(const json& arguments) override;
     std::string getDescription() const override {
@@ -112,6 +117,8 @@ private:
     MCPServer* fMCPServer;
     FaustServer* fFaustServer;
     std::string fTargets;
+    fs::path fSessionsDir;
+    fs::path fMakefilesDir;
     
 public:
     /**
@@ -119,9 +126,13 @@ public:
      * @param mcpServer The MCP server to register tools with
      * @param faustServer The Faust server for compilation services
      * @param targets JSON string with available targets
+     * @param sessionsDir Directory for compilation sessions
+     * @param makefilesDir Directory containing makefiles
      */
-    FaustWebService(MCPServer* mcpServer, FaustServer* faustServer, const std::string& targets)
-        : fMCPServer(mcpServer), fFaustServer(faustServer), fTargets(targets) {}
+    FaustWebService(MCPServer* mcpServer, FaustServer* faustServer, const std::string& targets,
+                   const fs::path& sessionsDir, const fs::path& makefilesDir)
+        : fMCPServer(mcpServer), fFaustServer(faustServer), fTargets(targets),
+          fSessionsDir(sessionsDir), fMakefilesDir(makefilesDir) {}
     
     /**
      * Initialize and register all Faust tools with the MCP server

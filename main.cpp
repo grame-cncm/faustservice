@@ -329,7 +329,8 @@ int main(int argc, char* argv[], char* env[])
         MCPServer mcpServer(std::cin, std::cout, *logStream, "FaustWeb", "1.0.0");
 
         // Create FaustWebService and register tools
-        FaustWebService faustService(&mcpServer, &server, server.getTargets());
+        FaustWebService faustService(&mcpServer, &server, server.getTargets(), 
+                                    gSessionsDirectory, gMakefilesDirectory);
         faustService.initialize();
 
         // Run the MCP server (blocking)
