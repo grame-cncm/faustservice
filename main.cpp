@@ -27,10 +27,8 @@
 #include <ctime>
 #include <iostream>
 
-#include <boost/filesystem.hpp>
-#include <boost/program_options/options_description.hpp>
-#include <boost/program_options/parsers.hpp>
-#include <boost/program_options/variables_map.hpp>
+#include <filesystem>
+#include "CLI11.hpp"
 
 #include <signal.h>
 #include <unistd.h>
@@ -39,8 +37,7 @@
 #include "server.hh"
 #include "utilities.hh"
 
-namespace fs = boost::filesystem;
-namespace po = boost::program_options;
+namespace fs = std::filesystem;
 
 int  gPort        = 8888;
 int  gMaxClients  = 2;
@@ -53,62 +50,43 @@ fs::path gSessionsDirectory;  ///< directory where sessions are stored
 fs::path
     gMakefilesDirectory;  ///< directory containing all the "<os>/Makefile.<architecture>[-32bits|-64bits]" makefiles
 fs::path gLogfile;        ///< faustweb logfile
-string   gRecoverCmd;     ///< system command to launch for recovery after intercepted crash
+std::string   gRecoverCmd;     ///< system command to launch for recovery after intercepted crash
 char*    gArguments[256];
 
-// Processes command line arguments using boost/parse_options
+// Processes command line arguments using CLI11
 static void process_cmdline(int argc, char* argv[])
 {
-    po::options_description desc("faustweb program options");
-    desc.add_options()("sessions-dir,d", po::value<string>(), "directory in which sessions files will be written");
-    desc.add_options()("help,h", "produce this help message");
-    desc.add_options()("any-origin,a", "Adds any origin when answering requests");
-    desc.add_options()("max-clients,m", po::value<int>(), "maximum number of clients allowed to concurrently upload");
-    desc.add_options()("port,p", po::value<int>(), "the listening port");
-    desc.add_options()("max-sessions,n", po::value<int>(), "maximum number of cached sessions");
-    desc.add_options()("verbose,v", po::value<int>(), "0: normal; 1: verbose; 2: very verbose");
-    desc.add_options()("recover-cmd,r", po::value<std::string>(),
-                       "program (usually self) to launch after crash recovery");
-
-    po::variables_map vm;
-    po::store(po::parse_command_line(argc, argv, desc), vm);
-    po::notify(vm);
-
-    if (vm.count("help")) {
-        cout << desc << endl;
-        exit(0);
+    CLI::App app{"faustweb program options"};
+    
+    std::string sessions_dir;
+    std::string logfile_str;
+    
+    app.add_option("-d,--sessions-dir", sessions_dir, "directory in which sessions files will be written");
+    app.add_flag("-a,--any-origin", gAnyOrigin, "Adds any origin when answering requests");
+    app.add_option("-m,--max-clients", gMaxClients, "maximum number of clients allowed to concurrently upload")
+        ->default_val(2);
+    app.add_option("-p,--port", gPort, "the listening port")
+        ->default_val(8888);
+    app.add_option("-n,--max-sessions", gMaxSessions, "maximum number of cached sessions")
+        ->default_val(50);
+    app.add_option("-v,--verbose", gVerbosity, "0: normal; 1: verbose; 2: very verbose")
+        ->default_val(0)
+        ->check(CLI::Range(0, 2));
+    app.add_option("-r,--recover-cmd", gRecoverCmd, "program (usually self) to launch after crash recovery");
+    app.add_option("--logfile", logfile_str, "log file path");
+    
+    try {
+        app.parse(argc, argv);
+    } catch (const CLI::ParseError &e) {
+        exit(app.exit(e));
     }
-
-    if (vm.count("port")) {
-        gPort = vm["port"].as<int>();
+    
+    // Set paths from strings if provided
+    if (!sessions_dir.empty()) {
+        gSessionsDirectory = sessions_dir;
     }
-
-    if (vm.count("max-clients")) {
-        gMaxClients = vm["max-clients"].as<int>();
-    }
-
-    if (vm.count("max-sessions")) {
-        gMaxSessions = vm["max-sessions"].as<int>();
-    }
-
-    if (vm.count("logfile")) {
-        gLogfile = vm["logfile"].as<string>();
-    }
-
-    if (vm.count("allow-any-origin")) {
-        gAnyOrigin = true;
-    }
-
-    if (vm.count("sessions-dir")) {
-        gSessionsDirectory = vm["sessions-dir"].as<string>();
-    }
-
-    if (vm.count("verbose")) {
-        gVerbosity = vm["verbose"].as<int>();
-    }
-
-    if (vm.count("recover-cmd")) {
-        gRecoverCmd = vm["recover-cmd"].as<string>();
+    if (!logfile_str.empty()) {
+        gLogfile = logfile_str;
     }
 }
 
@@ -123,12 +101,13 @@ static size_t computeSessionSize()
     size_t size = 0;
 
     try {
-        fs::recursive_directory_iterator it(gSessionsDirectory);
-        for (; it != fs::recursive_directory_iterator(); ++it) {
-            if (!fs::is_directory(*it)) size += fs::file_size(*it);
+        for (const auto& entry : fs::recursive_directory_iterator(gSessionsDirectory)) {
+            if (!fs::is_directory(entry)) {
+                size += fs::file_size(entry);
+            }
         }
         return size;
-    } catch (const boost::filesystem::filesystem_error& e) {
+    } catch (const std::filesystem::filesystem_error& e) {
         return 0;
     }
 }
@@ -141,8 +120,8 @@ static size_t computeSessionSize()
 
 static void _sigaction(int signal, siginfo_t*, void*)
 {
-    cerr << "\n\n";
-    cerr << "SIGNAL #" << signal << " CATCHED!" << endl;
+    std::cerr << "\n\n";
+    std::cerr << "SIGNAL #" << signal << " CATCHED!" << std::endl;
     if (gRecoverCmd.size() > 0) {
         std::cerr << "EXEC RECOVERING CMD: " << gRecoverCmd << endl;
         execv(gRecoverCmd.c_str(), gArguments);
@@ -183,7 +162,7 @@ int main(int argc, char* argv[], char* env[])
     try {
         process_cmdline(argc, argv);
     } catch (...) {
-        cerr << "Unknown parameter" << endl;
+        std::cerr << "Unknown parameter" << std::endl;
         exit(1);
     }
 

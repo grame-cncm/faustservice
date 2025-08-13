@@ -3,54 +3,54 @@
 
 #include <string>
 
-using namespace std;
+// Avoid using namespace std for better code clarity
 
-extern string askpage_head;
+extern std::string askpage_head;
 
-extern string askpage_tail;
+extern std::string askpage_tail;
 
-extern string cannotcompile;
+extern std::string cannotcompile;
 
-extern string nosha1present;
+extern std::string nosha1present;
 
-extern string invalidosorarchitecture;
+extern std::string invalidosorarchitecture;
 
-extern string invalidinstruction;
+extern std::string invalidinstruction;
 
-extern string busypage;
+extern std::string busypage;
 
-extern string completebuterrorpage;
+extern std::string completebuterrorpage;
 
-extern string completebutmorethanoneDSPfile;
+extern std::string completebutmorethanoneDSPfile;
 
-extern string completebutnoDSPfile;
+extern std::string completebutnoDSPfile;
 
-extern string completebutdecompressionproblem;
+extern std::string completebutdecompressionproblem;
 
-extern string completebutendoftheworld;
+extern std::string completebutendoftheworld;
 
-extern string completebutnopipe;
+extern std::string completebutnopipe;
 
-extern string completebutnohash;
+extern std::string completebutnohash;
 
-extern string completebutcorrupt_head;
+extern std::string completebutcorrupt_head;
 
-extern string completebutcorrupt_tail;
+extern std::string completebutcorrupt_tail;
 
-extern string completebutalreadythere_head;
+extern std::string completebutalreadythere_head;
 
-extern string completebutalreadythere_tail;
+extern std::string completebutalreadythere_tail;
 
-extern string completepage_head;
+extern std::string completepage_head;
 
-extern string completepage_tail;
+extern std::string completepage_tail;
 
-extern string errorpage;
+extern std::string errorpage;
 
-extern string servererrorpage;
+extern std::string servererrorpage;
 
-extern string fileexistspage;
+extern std::string fileexistspage;
 
-extern string debugstub;
+extern std::string debugstub;
 
 #endif

@@ -12,7 +12,7 @@ LRUSessionsCache::LRUSessionsCache(const fs::path& aSessionsDir, int aMaxSize)
                 refer(session.path().filename());
             }
         }
-    } catch (const boost::filesystem::filesystem_error& e) {
+    } catch (const std::filesystem::filesystem_error& e) {
         if (gVerbosity >= 2)
             std::cerr << "Warning : sessions directory " << fSessionsDir << " doesn't exist yet " << e.code().message()
                       << std::endl;
@@ -49,7 +49,7 @@ void LRUSessionsCache::dispose(const fs::path& s)
     if (gVerbosity >= 2) std::cerr << "DISPOSE OF " << s << std::endl;
     try {
         fs::remove_all(fSessionsDir / s);
-    } catch (const boost::filesystem::filesystem_error& e) {
+    } catch (const std::filesystem::filesystem_error& e) {
         std::cerr << "ERROR REMOVING CACHE ENTRY " << s << " : " << e.code().message() << std::endl;
     }
 }

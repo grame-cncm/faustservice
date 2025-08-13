@@ -25,9 +25,11 @@
 
 #include <fcntl.h>
 #include <algorithm>
+#include <cassert>
 #include <ctime>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <regex>
 #include <sstream>
 #include <string>
@@ -51,7 +53,7 @@
 // to use command line tools
 #include <stdlib.h>
 
-using namespace std;
+// Avoid using namespace std for better code clarity
 
 extern int gVerbosity;
 /*
@@ -66,12 +68,12 @@ extern bool gAnyOrigin;  // when true adds Access-Control-Allow-Origin to http a
  * Generates an SHA-1 key for Faust file or archive.
  */
 
-static string generate_sha1(connection_info_struct* con_info)
+static std::string generate_sha1(connection_info_struct* con_info)
 {
     fs::path filepath = fs::path(con_info->tmppath) / fs::path(con_info->filename);
 
     // read file content
-    ifstream myFile(filepath.string().c_str(), ios::in | ios::binary);
+    std::ifstream myFile(filepath.string().c_str(), ios::in | ios::binary);
     myFile.seekg(0, ios::end);
     int length = myFile.tellg();
     myFile.seekg(0, ios::beg);
@@ -89,7 +91,7 @@ static string generate_sha1(connection_info_struct* con_info)
     SHA1((const unsigned char*)content, length, obuf);
 
     // convert SHA1 key into hexadecimal string
-    string sha1key;
+    std::string sha1key;
     for (int i = 0; i < 20; i++) {
         const char* H  = "0123456789ABCDEF";
         char        c1 = H[(obuf[i] >> 4)];
@@ -133,12 +135,11 @@ static void copyFaustOrAudioFiles(const fs::path& src, const fs::path& dst)
 {
     assert(is_directory(src));
     assert(is_directory(dst));
-    fs::directory_iterator end_iter;
-    for (fs::directory_iterator f_iter(src); f_iter != end_iter; ++f_iter) {
-        if (isFaustFile(f_iter->path())) {
-            fs::copy_file(f_iter->path(), dst / f_iter->path().filename());
-        } else if (isAudioFile(f_iter->path())) {
-            fs::copy_file(f_iter->path(), dst / f_iter->path().filename());
+    for (const auto& entry : fs::directory_iterator(src)) {
+        if (isFaustFile(entry.path())) {
+            fs::copy_file(entry.path(), dst / entry.path().filename());
+        } else if (isAudioFile(entry.path())) {
+            fs::copy_file(entry.path(), dst / entry.path().filename());
         }
     }
 }
@@ -150,22 +151,21 @@ static void copyFaustOrAudioFiles(const fs::path& src, const fs::path& dst)
 static void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefile_directory)
 {
     // std::cerr << "ENTER create_file_tree(" << sha1path << ", " << makefile_directory << ")" << std::endl;
-    fs::directory_iterator end_iter;
-    for (fs::directory_iterator os_iter(makefile_directory); os_iter != end_iter; ++os_iter) {
-        if (fs::is_directory(os_iter->path())) {
-            string OSname = os_iter->path().filename().string();
+    for (const auto& os_entry : fs::directory_iterator(makefile_directory)) {
+        if (fs::is_directory(os_entry.path())) {
+            auto OSname = os_entry.path().filename().string();
             // create_directory(sha1path/OSname);
-            for (fs::directory_iterator makefile_iter(os_iter->path()); makefile_iter != end_iter; ++makefile_iter) {
-                string makefileName = makefile_iter->path().filename().string();
+            for (const auto& makefile_entry : fs::directory_iterator(os_entry.path())) {
+                auto makefileName = makefile_entry.path().filename().string();
                 if (makefileName.substr(0, 9) == "Makefile.") {
-                    string archName = makefileName.substr(9);
+                    auto archName = makefileName.substr(9);
                     if (gVerbosity >= 2)
-                        std::cerr << "scanning makefile " << makefile_iter->path() << ", makefile : " << makefileName
+                        std::cerr << "scanning makefile " << makefile_entry.path() << ", makefile : " << makefileName
                                   << ", architecture : " << archName << std::endl;
-                    fs::path dstdir = sha1path / OSname / archName;
+                    auto dstdir = sha1path / OSname / archName;
                     if (gVerbosity >= 2) std::cerr << "dstdir = " << dstdir << std::endl;
                     create_directories(dstdir);
-                    fs::copy_file(makefile_iter->path(), dstdir / "Makefile");
+                    fs::copy_file(makefile_entry.path(), dstdir / "Makefile");
                     copyFaustOrAudioFiles(srcdir, dstdir);
                 }
             }
@@ -184,7 +184,12 @@ static void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefi
 
 static int validate_faust(connection_info_struct* con_info)
 {
-    fs::path tmpdir = fs::temp_directory_path() / fs::unique_path("%%%%-%%%%-%%%%-%%%%");
+    // Generate unique path using random number
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(10000, 99999);
+    auto unique_name = "tmp_" + std::to_string(dis(gen)) + "_" + std::to_string(dis(gen));
+    fs::path tmpdir = fs::temp_directory_path() / unique_name;
     fs::create_directory(tmpdir);
     fs::path filename          = fs::path(con_info->filename);
     fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
@@ -212,7 +217,7 @@ static int validate_faust(connection_info_struct* con_info)
     } else if (old_full_filename.string().substr(old_full_filename.string().find_last_of(".") + 1) == "dsp") {
         fs::copy_file(old_full_filename, tmpdir / filename);
     } else if (archive_status == ARCHIVE_OK) {
-        string dsp_file;
+        std::string dsp_file;
 
         // BEGIN read archived files
         while (archive_read_next_header(my_archive, &my_entry) == ARCHIVE_OK) {
@@ -234,7 +239,7 @@ static int validate_faust(connection_info_struct* con_info)
                     filename = dsp_file;
                 }
                 unzipedDir     = fs::path(tmpdir / current_file).parent_path();
-                string newpath = fs::path(tmpdir / current_file).string();
+                std::string newpath = fs::path(tmpdir / current_file).string();
                 archive_entry_set_pathname(my_entry, newpath.c_str());
                 archive_read_extract(my_archive, my_entry, ARCHIVE_EXTRACT_PERM);
             }
@@ -269,7 +274,7 @@ static int validate_faust(connection_info_struct* con_info)
     }
 
     if (gVerbosity >= 1) std::cerr << "TRY TO COMPILE validate_faust : " << (tmpdir / filename).string() << std::endl;
-    string result = "";
+    std::string result = "";
     FILE*  pipe   = popen(("faust -a plot.cpp " + (tmpdir / filename).string() + " 2>&1").c_str(), "r");
     if (!pipe) {
         con_info->answerstring = completebutnopipe;
@@ -298,7 +303,7 @@ static int validate_faust(connection_info_struct* con_info)
 
     if (gVerbosity >= 2) std::cerr << "EXIT validate_faust is OK: " << old_full_filename << std::endl;
 
-    string sha1 = generate_sha1(con_info);
+    std::string sha1 = generate_sha1(con_info);
 
     // build the sha1 directories here
     {
@@ -314,7 +319,7 @@ static int validate_faust(connection_info_struct* con_info)
             } catch (const fs::filesystem_error& e) {
                 std::cerr << "Warning : can't create directory " << sha1path << ":" << e.code().message() << std::endl;
             }
-            string   filename(con_info->filename);
+            std::string   filename(con_info->filename);
             fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
 
             // libarchive stuff
@@ -325,7 +330,7 @@ static int validate_faust(connection_info_struct* con_info)
             archive_read_support_filter_all(my_archive);
             archive_read_support_format_all(my_archive);
             int    archive_status = archive_read_open_filename(my_archive, old_full_filename.string().c_str(), 10240);
-            string result         = "";
+            std::string result         = "";
 
             if (!fs::is_regular_file(old_full_filename)) {
                 con_info->answerstring = completebuterrorpage;
@@ -605,7 +610,7 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
 {
     if (gVerbosity >= 1)
         std::cerr << "\n==> ANSWER CONNECTION (" << rawurl << ", " << method << ", " << version << ")" << std::endl;
-    string URL = simplifyURL(rawurl);
+    std::string URL = simplifyURL(rawurl);
 
     FaustServer* server = (FaustServer*)cls;
     if (server == 0) {
@@ -643,7 +648,7 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
 // Actual callback method called every time a GET or POST request is received.
 // by the server.
 
-int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const string& url)
+int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const std::string& url)
 {
     // TArgs args;
     // MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
@@ -653,7 +658,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
 
     } else if (matchURL(url, "/")) {
-        stringstream ss;
+        std::stringstream ss;
         ss << askpage_head << nr_of_uploading_clients << askpage_tail;
         return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
 
@@ -662,19 +667,19 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 
     } else if (matchURL(url, "/verbosity0")) {
         gVerbosity = 0;
-        stringstream ss;
+        std::stringstream ss;
         ss << "Verbosity " << gVerbosity;
         return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
 
     } else if (matchURL(url, "/verbosity1")) {
         gVerbosity = 1;
-        stringstream ss;
+        std::stringstream ss;
         ss << "Verbosity " << gVerbosity;
         return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
 
     } else if (matchURL(url, "/verbosity2")) {
         gVerbosity = 2;
-        stringstream ss;
+        std::stringstream ss;
         ss << "Verbosity " << gVerbosity;
         return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
 
@@ -732,7 +737,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 static const std::regex makefile_target_regex(R"(^#FaustBinaryTarget:\s*([^\s]+)\s*$)");
 std::string             FaustServer::getMakefileArtifactName(const fs::path& make_file_path)
 {
-    fs::ifstream file(make_file_path);
+    std::ifstream file(make_file_path);
     if (file.is_open()) {
         std::string first_line;
         std::getline(file, first_line);
@@ -750,9 +755,9 @@ std::string             FaustServer::getMakefileArtifactName(const fs::path& mak
 // Handle a GET command by "making" the appropriate resource file
 // and returning it
 
-int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, const string& raw_url)
+int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, const std::string& raw_url)
 {
-    vector<string> U        = decomposeURL(raw_url);
+    std::vector<std::string> U        = decomposeURL(raw_url);
     fs::path       url      = fs::path(raw_url);
     fs::path       fulldir  = getDirectory() / url.parent_path();
     fs::path       target   = url.filename();
@@ -771,7 +776,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     if (url.extension() == ".svg") {
         if (gVerbosity >= 2) std::cerr << "Processing SVG file request" << std::endl;
         fs::path fullfile = fulldir / target;
-        if (!boost::filesystem::exists(fullfile)) {
+        if (!fs::exists(fullfile)) {
             if (gVerbosity >= 2) std::cerr << "Diagram not created yet" << std::endl;
             make(fullfile.parent_path().parent_path(), fs::path("diagram"));
         }
@@ -790,13 +795,13 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     mimeTypes[".flac"] = "audio/flac";
     mimeTypes[".wav"]  = "audio/wav";
 
-    string ext = url.extension().string();
+    std::string ext = url.extension().string();
 
     // Check for files in mimeTypes map
     if (mimeTypes.count(ext) > 0) {
         if (gVerbosity >= 2) std::cerr << "Processing " << mimeTypes[ext] << " request" << std::endl;
         fs::path fullfile = fulldir / target;
-        if (!boost::filesystem::exists(fullfile)) {
+        if (!fs::exists(fullfile)) {
             if (gVerbosity >= 2) std::cerr << mimeTypes[ext] << " doesn't exist!" << std::endl;
         }
         return send_file(connection, fullfile, mimeTypes[ext].c_str());
@@ -838,7 +843,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 //------------------------------------------------------------------
 // dispatchPOSTConnections(), handle POST of a Faust source file
 
-int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const string& url, const char* upload_data,
+int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const std::string& url, const char* upload_data,
                                          size_t* upload_data_size, void** con_cls)
 {
     time_t tmNow = time(0);
@@ -898,7 +903,7 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
                 con_info->fp = 0;
             }
 
-            string sha1;
+            std::string sha1;
             if (validate_faust(con_info) == 0) {
                 // warning validate_faust returns errocode 0 when the faust code is correct !
                 std::vector<std::string> segments;
@@ -908,7 +913,7 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
                         std::cerr << "POST processing, we have valid faust code. Its SHA1 key is = " << sha1
                                   << std::endl;
                 if (matchURL(url, "/compile/*/*/*", segments)) {
-                    string newurl("/");
+                    std::string newurl("/");
                     newurl += sha1 + "/" + segments[2] + "/" + segments[3] + "/" + segments[4];
                     if (gVerbosity >= 2)
                         std::cerr << "DIRECT COMPILATION: we are trying a direct compilation at " << newurl << endl;
@@ -980,11 +985,16 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
     }
     if (con_info->tmppath.empty()) {
         con_info->filename = filename;
-        con_info->tmppath  = (fs::temp_directory_path() / fs::unique_path("%%%%-%%%%-%%%%-%%%%")).string();
+        // Generate unique path using random number
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(10000, 99999);
+        auto unique_name = "tmp_" + std::to_string(dis(gen)) + "_" + std::to_string(dis(gen));
+        con_info->tmppath  = (fs::temp_directory_path() / unique_name).string();
         fs::create_directory(con_info->tmppath);
     }
 
-    string full_path = (fs::path(con_info->tmppath) / fs::path(con_info->filename)).string();
+    std::string full_path = (fs::path(con_info->tmppath) / fs::path(con_info->filename)).string();
 
     con_info->answerstring = servererrorpage;
     con_info->answercode   = MHD_HTTP_INTERNAL_SERVER_ERROR;
@@ -1042,25 +1052,24 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
     ss << '{';
     char sep1 = ' ';
 
-    fs::directory_iterator end_iter;
-    for (fs::directory_iterator os_iter(makefile_directory); os_iter != end_iter; ++os_iter) {
-        if (fs::is_directory(os_iter->path())) {
-            string OSname = os_iter->path().filename().string();
+    for (const auto& os_entry : fs::directory_iterator(makefile_directory)) {
+        if (fs::is_directory(os_entry.path())) {
+            auto OSname = os_entry.path().filename().string();
 
             // collect a vector of target names
-            vector<string> V;
-            for (fs::directory_iterator makefile_iter(os_iter->path()); makefile_iter != end_iter; ++makefile_iter) {
-                string makefileName = makefile_iter->path().filename().string();
+            std::vector<std::string> V;
+            for (const auto& makefile_entry : fs::directory_iterator(os_entry.path())) {
+                auto makefileName = makefile_entry.path().filename().string();
                 if (makefileName.substr(0, 9) == "Makefile.") {
                     V.push_back(makefileName.substr(9));
                 }
             }
 
             // If it is a folder with makefiles inside, print it
-            if (V.size() > 0) {
+            if (!V.empty()) {
                 std::sort(V.begin(), V.end());
                 ss << sep1 << std::endl << '"' << OSname << '"' << ": [";
-                for (unsigned int i = 0; i < V.size(); i++) {
+                for (size_t i = 0; i < V.size(); i++) {
                     if (i > 0) ss << ',';
                     ss << '"' << V[i] << '"';
                 }

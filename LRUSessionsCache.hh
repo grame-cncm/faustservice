@@ -1,9 +1,9 @@
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <iostream>
 #include <list>
 #include <map>
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 // LRUSessionsCache : a system that limits the number of cached sessions
 class LRUSessionsCache {

@@ -30,15 +30,15 @@
 #include "microhttpd.h"
 #include "utilities.hh"
 
-// Boost libraries
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
+// Standard filesystem library (C++17)
+#include <filesystem>
+#include <fstream>
 
 #ifndef MHD_HTTP_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS
 #define MHD_HTTP_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS "Access-Control-Expose-Headers"
 #endif
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 struct connection_info_struct {
     int                       connectiontype;  // GET or POST

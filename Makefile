@@ -13,18 +13,18 @@ LDFLAGS = -L/opt/local/lib
 CXXFLAGS = -Wall -Wextra -Wno-unused-local-typedef -O3 -I/opt/local/include
 CLANGVERSION =
 CXX=clang++$(CLANGVERSION)
-STD=c++11
+STD=c++20
 else
 EXT = ""
-CXXFLAGS = -Wall -Wextra -O3 -DBOOST_NO_CXX11_SCOPED_ENUMS
-STD=c++11
+CXXFLAGS = -Wall -Wextra -O3
+STD=c++20
 endif
 
 all : faustweb
 
 faustweb : *.cpp *.hh
 	$(CXX) -std=$(STD) $(CXXFLAGS) *.cpp $(LDFLAGS) \
-	-lmicrohttpd -lboost_filesystem$(EXT) -lboost_system$(EXT) -lboost_program_options$(EXT) \
+	-lmicrohttpd \
 	-larchive -lcrypto -lm \
 	-o faustweb
 
