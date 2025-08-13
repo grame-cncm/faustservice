@@ -9,6 +9,7 @@ libraries	= $(wildcard *.lib)
 
 binary.zip : $(faustfile)
 	remoteOSX faust2caqt $(faustfile) $(libraries) $(OPT)
+	zip -r binary.zip  *.app
 
 src.cpp : $(faustfile)
 	faust -i -a ca-qt.cpp $(faustfile) -o src.cpp
