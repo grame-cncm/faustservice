@@ -759,7 +759,12 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 {
     std::vector<std::string> U        = decomposeURL(raw_url);
     fs::path       url      = fs::path(raw_url);
-    fs::path       fulldir  = getDirectory() / url.parent_path();
+    // Remove leading slash to make it relative for std::filesystem
+    auto url_parent = url.parent_path();
+    if (url_parent.is_absolute()) {
+        url_parent = url_parent.relative_path();
+    }
+    fs::path       fulldir  = getDirectory() / url_parent;
     fs::path       target   = url.filename();
     fs::path       makefile = fulldir / "Makefile";
     fs::path       location;
