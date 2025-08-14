@@ -114,9 +114,10 @@ class FaustServer {
                                          const char* method, const char* version, const char* upload_data,
                                          size_t* upload_data_size, void** con_cls);
 
-    int dispatchGETConnections(struct MHD_Connection* connection, const string& url);
-    int dispatchPOSTConnections(struct MHD_Connection* connection, const string& url, const char* upload_data,
+    int dispatchGETConnections(struct MHD_Connection* connection, const std::string& url);
+    int dispatchPOSTConnections(struct MHD_Connection* connection, const std::string& url, const char* upload_data,
                                 size_t* upload_data_size, void** con_cls);
+    int serveAppInterface(struct MHD_Connection* connection);
 
     int makeAndSendResourceFile(struct MHD_Connection* connection, const string& raw_url);
     std::string getMakefileArtifactName(const fs::path&);

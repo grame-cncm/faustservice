@@ -148,33 +148,82 @@ static void copyFaustOrAudioFiles(const fs::path& src, const fs::path& dst)
  * Creates an arboreal structure in root with the appropriate makefiles.
  */
 
-static void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefile_directory)
+// Create a specific target directory on demand
+static bool create_target_directory(fs::path srcdir, fs::path sha1path, fs::path makefile_directory, 
+                                   const std::string& platform, const std::string& architecture)
 {
-    // std::cerr << "ENTER create_file_tree(" << sha1path << ", " << makefile_directory << ")" << std::endl;
-    for (const auto& os_entry : fs::directory_iterator(makefile_directory)) {
-        if (fs::is_directory(os_entry.path())) {
-            auto OSname = os_entry.path().filename().string();
-            // create_directory(sha1path/OSname);
-            for (const auto& makefile_entry : fs::directory_iterator(os_entry.path())) {
-                auto makefileName = makefile_entry.path().filename().string();
-                if (makefileName.substr(0, 9) == "Makefile.") {
-                    auto archName = makefileName.substr(9);
-                    if (gVerbosity >= 2)
-                        std::cerr << "scanning makefile " << makefile_entry.path() << ", makefile : " << makefileName
-                                  << ", architecture : " << archName << std::endl;
-                    auto dstdir = sha1path / OSname / archName;
-                    if (gVerbosity >= 2) std::cerr << "dstdir = " << dstdir << std::endl;
-                    create_directories(dstdir);
-                    fs::copy_file(makefile_entry.path(), dstdir / "Makefile");
-                    copyFaustOrAudioFiles(srcdir, dstdir);
-                }
-            }
+    if (gVerbosity >= 2) {
+        std::cerr << "ENTER create_target_directory(" << sha1path << ", platform=" << platform 
+                  << ", arch=" << architecture << ")" << std::endl;
+    }
+    
+    // First, ensure the base Makefile.none is copied for non-architecture-specific targets
+    // Only if it doesn't already exist
+    fs::path base_makefile = fs::path(makefile_directory) / "Makefile.none";
+    fs::path target_base_makefile = sha1path / "Makefile";
+    if (fs::exists(base_makefile) && !fs::exists(target_base_makefile)) {
+        fs::copy_file(base_makefile, target_base_makefile);
+        copyFaustOrAudioFiles(srcdir, sha1path);
+    }
+    
+    // Look for the specific makefile
+    fs::path platform_dir = makefile_directory / platform;
+    if (!fs::exists(platform_dir) || !fs::is_directory(platform_dir)) {
+        if (gVerbosity >= 1) {
+            std::cerr << "Platform directory not found: " << platform_dir << std::endl;
         }
+        return false;
+    }
+    
+    fs::path makefile_path = platform_dir / ("Makefile." + architecture);
+    if (!fs::exists(makefile_path)) {
+        if (gVerbosity >= 1) {
+            std::cerr << "Makefile not found: " << makefile_path << std::endl;
+        }
+        return false;
+    }
+    
+    // Create the target directory
+    fs::path target_dir = sha1path / platform / architecture;
+    try {
+        fs::create_directories(target_dir);
+        fs::copy_file(makefile_path, target_dir / "Makefile", fs::copy_options::overwrite_existing);
+        copyFaustOrAudioFiles(srcdir, target_dir);
+        
+        if (gVerbosity >= 2) {
+            std::cerr << "Created target directory: " << target_dir << std::endl;
+        }
+        return true;
+    } catch (const fs::filesystem_error& e) {
+        std::cerr << "Error creating target directory " << target_dir << ": " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// Create only basic session structure (no platform-specific directories)
+static void create_basic_session(fs::path srcdir, fs::path sha1path, fs::path makefile_directory)
+{
+    if (gVerbosity >= 2) {
+        std::cerr << "ENTER create_basic_session(" << sha1path << ", " << makefile_directory << ")" << std::endl;
     }
 
-    // copy makefile.none to handle non-architecture-specific targets like mdoc.zip, etc
-    fs::copy_file(fs::path(makefile_directory) / "Makefile.none", sha1path / "Makefile");
-    copyFaustOrAudioFiles(srcdir, sha1path);
+    // Only copy makefile.none to handle non-architecture-specific targets like mdoc.zip, etc
+    fs::path base_makefile = fs::path(makefile_directory) / "Makefile.none";
+    if (fs::exists(base_makefile)) {
+        fs::copy_file(base_makefile, sha1path / "Makefile", fs::copy_options::overwrite_existing);
+        copyFaustOrAudioFiles(srcdir, sha1path);
+    }
+    
+    if (gVerbosity >= 2) {
+        std::cerr << "Created basic session structure in: " << sha1path << std::endl;
+    }
+}
+
+// Legacy function - kept for compatibility but now calls create_basic_session
+static void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefile_directory)
+{
+    // Changed to only create basic structure instead of all directories
+    create_basic_session(srcdir, sha1path, makefile_directory);
 }
 /*
  * Validates that a Faust file or archive is sane and returns 0 for success
@@ -409,7 +458,7 @@ int FaustServer::send_page(struct MHD_Connection* connection, const char* page, 
     }
     // Add security headers
     MHD_add_response_header(response, "Content-Security-Policy",
-                            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; frame-ancestors "
+                            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; frame-ancestors "
                             "'none'; form-action 'self';");
     MHD_add_response_header(response, "X-Frame-Options", "DENY");
     MHD_add_response_header(response, "X-Content-Type-Options", "nosniff");
@@ -665,6 +714,25 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/targets")) {
         return send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK, "application/json");
 
+    } else if (matchURL(url, "/version")) {
+        // Get Faust version by running faust --version
+        std::string version_cmd = "faust --version 2>&1 | head -1 | grep -o '[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+'";
+        FILE* pipe = popen(version_cmd.c_str(), "r");
+        std::string version = "2.81.2"; // fallback
+        if (pipe) {
+            char buffer[128];
+            if (fgets(buffer, sizeof(buffer), pipe)) {
+                version = std::string(buffer);
+                // Remove trailing newline
+                version.erase(std::remove(version.begin(), version.end(), '\n'), version.end());
+            }
+            pclose(pipe);
+        }
+        return send_page(connection, version.c_str(), version.size(), MHD_HTTP_OK, "text/plain");
+
+    } else if (matchURL(url, "/app")) {
+        return serveAppInterface(connection);
+
     } else if (matchURL(url, "/verbosity0")) {
         gVerbosity = 0;
         std::stringstream ss;
@@ -776,6 +844,32 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 
     if (gVerbosity >= 2) std::cerr << "fulldir : " << fulldir << std::endl;
     if (gVerbosity >= 2) std::cerr << "makefile : " << makefile << std::endl;
+
+    // Check if we need to create the target directory on demand
+    // URL format: /{sha1}/{platform}/{architecture}/{target}
+    if (U.size() >= 4 && !fs::exists(makefile)) {
+        std::string platform = U[2];
+        std::string architecture = U[3];
+        fs::path session_dir = getDirectory() / U[1];
+        
+        if (gVerbosity >= 2) {
+            std::cerr << "Target directory doesn't exist, creating on demand: " 
+                      << "platform=" << platform << ", arch=" << architecture << std::endl;
+        }
+        
+        // Find the source directory - it might be the session root or a subdirectory
+        fs::path source_dir = session_dir;
+        if (fs::exists(session_dir / "source")) {
+            source_dir = session_dir / "source";
+        }
+        
+        // Create the target directory on demand
+        if (!create_target_directory(source_dir, session_dir, fMakefileDirectory, platform, architecture)) {
+            if (gVerbosity >= 1) {
+                std::cerr << "Failed to create target directory for " << platform << "/" << architecture << std::endl;
+            }
+        }
+    }
 
     // Check for svg block-diagram requests first
     if (url.extension() == ".svg") {
@@ -1085,4 +1179,35 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
     }
     ss << std::endl << "}";
     fTargets = ss.str();
+}
+
+//------------------------------------------------------------------
+// Serve the app interface HTML page
+
+int FaustServer::serveAppInterface(struct MHD_Connection* connection)
+{
+    // Read the app.html file
+    fs::path app_file_path = fs::current_path() / "app.html";
+    
+    if (!fs::exists(app_file_path)) {
+        return send_page(connection, "App interface not found", 23, MHD_HTTP_NOT_FOUND, "text/html");
+    }
+    
+    try {
+        std::ifstream file(app_file_path);
+        if (!file.is_open()) {
+            return send_page(connection, "Cannot read app interface", 25, MHD_HTTP_INTERNAL_SERVER_ERROR, "text/html");
+        }
+        
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
+        
+        return send_page(connection, content.c_str(), content.size(), MHD_HTTP_OK, "text/html");
+        
+    } catch (const std::exception& e) {
+        if (gVerbosity >= 1) {
+            std::cerr << "Error serving app interface: " << e.what() << std::endl;
+        }
+        return send_page(connection, "Error loading app interface", 27, MHD_HTTP_INTERNAL_SERVER_ERROR, "text/html");
+    }
 }

@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faust Compiler Service</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+            color: #2c3e50;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2.8em;
+            margin-bottom: 8px;
+            font-weight: 300;
+            color: #2c3e50;
+        }
+
+        header p {
+            font-size: 1.1em;
+            color: #7f8c8d;
+            margin: 0;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .platform-select, .arch-select {
+            padding: 12px 16px;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 160px;
+        }
+
+        .platform-select:focus, .arch-select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .platform-select:disabled, .arch-select:disabled {
+            background: #f8f9fa;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #219a52;
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .upload-zone {
+            border: 2px dashed #bdc3c7;
+            border-radius: 12px;
+            padding: 40px;
+            transition: all 0.3s ease;
+            background: white;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .upload-zone.has-content {
+            padding: 0;
+        }
+
+        .upload-zone:hover {
+            border-color: #3498db;
+            background: #f8fafb;
+        }
+
+        .upload-zone.dragover {
+            border-color: #27ae60;
+            background: #f7fff8;
+            border-style: solid;
+        }
+
+        .upload-zone.has-file {
+            border-color: #27ae60;
+            background: #f7fff8;
+        }
+
+        .upload-content {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .file-content {
+            flex: 1;
+            background: white;
+            display: flex;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            overflow: hidden;
+            border-radius: 12px;
+        }
+
+        .line-numbers {
+            background: #f8f9fa;
+            color: #999;
+            padding: 20px 10px 20px 20px;
+            text-align: right;
+            user-select: none;
+            white-space: pre;
+            border-right: 1px solid #e1e5e9;
+            min-width: 60px;
+            box-sizing: border-box;
+            overflow-y: hidden;
+        }
+
+        .code-content {
+            flex: 1;
+            padding: 20px;
+            white-space: pre-wrap;
+            overflow-y: auto;
+            user-select: text;
+        }
+
+        /* Faust syntax highlighting */
+        .faust-keyword { color: #0066cc; font-weight: bold; }
+        .faust-number { color: #cc6600; }
+        .faust-string { color: #008800; }
+        .faust-comment { color: #888888; font-style: italic; }
+        .faust-operator { color: #666666; font-weight: bold; }
+        .faust-function { color: #9900cc; }
+
+        .file-content.show {
+            display: flex;
+        }
+
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 24px;
+            color: #bdc3c7;
+            transition: color 0.3s ease;
+        }
+
+        .upload-zone:hover .upload-icon {
+            color: #3498db;
+        }
+
+        .upload-text {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .upload-hint {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+
+        @media (max-width: 768px) {
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+            
+            .platform-select, .arch-select, .btn {
+                min-width: auto;
+                width: 100%;
+            }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #file-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 id="title">Faust Compiler</h1>
+        </header>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <button class="btn btn-primary" id="compile-btn" disabled>Compile</button>
+            <select id="platform-select" class="platform-select">
+                <option value="">Loading platforms...</option>
+            </select>
+            <select id="arch-select" class="arch-select" disabled>
+                <option value="">Select platform first</option>
+            </select>
+            <button class="btn btn-success" id="download-btn" disabled>Download</button>
+        </div>
+
+        <!-- Drop Zone -->
+        <div class="upload-zone" id="upload-zone">
+            <div class="upload-content" id="upload-content">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">Drop your .dsp file here</div>
+                <div class="upload-hint">Supports .dsp files and archives (.zip, .tar.gz)</div>
+            </div>
+            <div class="file-content" id="file-content">
+                <div class="line-numbers" id="line-numbers"></div>
+                <div class="code-content" id="code-content"></div>
+            </div>
+        </div>
+        <input type="file" id="file-input" accept=".dsp,.zip,.tar.gz,.tar.bz2" style="display: none;">
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let selectedTarget = null;
+        let availableTargets = null;
+
+        // Elements
+        const titleElement = document.getElementById('title');
+        const uploadZone = document.getElementById('upload-zone');
+        const fileInput = document.getElementById('file-input');
+        const platformSelect = document.getElementById('platform-select');
+        const archSelect = document.getElementById('arch-select');
+        const compileBtn = document.getElementById('compile-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const uploadContent = document.getElementById('upload-content');
+        const fileContent = document.getElementById('file-content');
+        const lineNumbers = document.getElementById('line-numbers');
+        const codeContent = document.getElementById('code-content');
+
+        // Upload zone events (only drag and drop, no click)
+        uploadZone.addEventListener('dragover', handleDragOver);
+        uploadZone.addEventListener('dragleave', handleDragLeave);
+        uploadZone.addEventListener('drop', handleDrop);
+        
+        // Platform/architecture selection events
+        platformSelect.addEventListener('change', handlePlatformChange);
+        archSelect.addEventListener('change', handleArchChange);
+        
+        // Load targets and version when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('DOM loaded via event, loading targets and version...');
+                loadTargets();
+                loadVersion();
+            });
+        } else {
+            console.log('DOM already loaded, loading targets and version immediately...');
+            loadTargets();
+            loadVersion();
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+
+        function handleFile(file) {
+            selectedFile = file;
+            updateCompileButton();
+            
+            // Show file content if it's a DSP file
+            if (file.name.endsWith('.dsp')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    displayCodeWithLineNumbers(e.target.result);
+                };
+                reader.readAsText(file);
+            }
+            
+            checkAutoCompile();
+        }
+
+        function displayCodeWithLineNumbers(code) {
+            const lines = code.split('\n');
+            const totalLines = lines.length;
+            
+            // Generate line numbers
+            let lineNumbersHtml = '';
+            for (let i = 1; i <= totalLines; i++) {
+                lineNumbersHtml += i + '\n';
+            }
+            
+            // Hide upload content and show file content
+            uploadContent.style.display = 'none';
+            uploadZone.classList.add('has-content');
+            
+            // Set line numbers and highlighted code
+            lineNumbers.textContent = lineNumbersHtml;
+            codeContent.innerHTML = highlightFaustCode(code);
+            fileContent.classList.add('show');
+            
+            // Synchronize scroll between line numbers and code content
+            codeContent.addEventListener('scroll', function() {
+                lineNumbers.scrollTop = codeContent.scrollTop;
+            });
+        }
+
+
+        async function loadTargets() {
+            try {
+                console.log('loadTargets() called');
+                console.log('platformSelect element:', platformSelect);
+                
+                if (!platformSelect) {
+                    console.error('platformSelect element not found!');
+                    return;
+                }
+                
+                console.log('Fetching targets from /targets...');
+                const response = await fetch('/targets');
+                console.log('Response received:', response.status, response.ok);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const responseText = await response.text();
+                console.log('Response text length:', responseText.length);
+                console.log('Response preview:', responseText.substring(0, 200));
+                
+                availableTargets = JSON.parse(responseText);
+                console.log('Parsed targets:', Object.keys(availableTargets));
+                
+                populatePlatformSelect();
+                console.log('Platform select populated successfully');
+                
+            } catch (error) {
+                console.error('Error in loadTargets:', error);
+                if (platformSelect) {
+                    platformSelect.innerHTML = '<option value="">Error loading platforms</option>';
+                }
+                showStatus(`Error loading targets: ${error.message}`, 'error');
+            }
+        }
+        
+        function populatePlatformSelect() {
+            console.log('populatePlatformSelect() called');
+            console.log('availableTargets:', availableTargets);
+            
+            if (!availableTargets) {
+                console.error('No availableTargets data');
+                return;
+            }
+            
+            // Clear existing options
+            platformSelect.innerHTML = '<option value="">Select a platform...</option>';
+            console.log('Cleared platform select');
+            
+            // Platform names without emojis
+            const platformNames = {
+                'osx': 'macOS',
+                'linux': 'Linux', 
+                'web': 'Web',
+                'ios': 'iOS',
+                'android': 'Android',
+                'unity': 'Unity',
+                'juce': 'JUCE',
+                'windows64': 'Windows 64-bit',
+                'windows32': 'Windows 32-bit',
+                'vcvrack': 'VCV Rack',
+                'bela': 'Bela',
+                'source': 'Source Code',
+                'misc': 'Misc',
+                'jsfx': 'JSFX',
+                'rnbo': 'RNBO',
+                'ros': 'ROS'
+            };
+            
+            // Sort platforms for better UX (popular ones first)
+            const popularPlatforms = ['osx', 'linux', 'web', 'ios', 'android', 'unity', 'juce'];
+            const otherPlatforms = Object.keys(availableTargets).filter(p => !popularPlatforms.includes(p)).sort();
+            const sortedPlatforms = [...popularPlatforms.filter(p => availableTargets[p]), ...otherPlatforms];
+            
+            console.log('Sorted platforms:', sortedPlatforms);
+            
+            let optionsAdded = 0;
+            sortedPlatforms.forEach(platform => {
+                if (availableTargets[platform] && availableTargets[platform].length > 0) {
+                    const option = document.createElement('option');
+                    option.value = platform;
+                    option.textContent = platformNames[platform] || platform;
+                    platformSelect.appendChild(option);
+                    optionsAdded++;
+                    console.log(`Added platform: ${platform} (${platformNames[platform] || platform})`);
+                }
+            });
+            
+            console.log(`Total options added: ${optionsAdded}`);
+        }
+        
+        function handlePlatformChange() {
+            const selectedPlatform = platformSelect.value;
+            
+            // Clear architecture select
+            archSelect.innerHTML = '<option value="">Select architecture...</option>';
+            archSelect.disabled = !selectedPlatform;
+            
+            if (selectedPlatform && availableTargets[selectedPlatform]) {
+                // Populate architecture options
+                availableTargets[selectedPlatform].forEach(arch => {
+                    const option = document.createElement('option');
+                    option.value = arch;
+                    option.textContent = arch;
+                    archSelect.appendChild(option);
+                });
+                archSelect.disabled = false;
+            }
+            
+            updateCompileButton();
+            checkAutoCompile();
+        }
+        
+        function handleArchChange() {
+            updateCompileButton();
+            checkAutoCompile();
+        }
+        
+        function updateCompileButton() {
+            const hasFile = selectedFile !== null;
+            const hasPlatform = platformSelect.value !== '';
+            const hasArch = archSelect.value !== '';
+            
+            compileBtn.disabled = !(hasFile && hasPlatform && hasArch);
+            
+            if (hasPlatform && hasArch) {
+                selectedTarget = {
+                    platform: platformSelect.value,
+                    arch: archSelect.value
+                };
+            } else {
+                selectedTarget = null;
+            }
+        }
+
+        function checkAutoCompile() {
+            const hasFile = selectedFile !== null;
+            const hasPlatform = platformSelect.value !== '';
+            const hasArch = archSelect.value !== '';
+            
+            if (hasFile && hasPlatform && hasArch && !compileBtn.disabled) {
+                compile();
+            }
+        }
+
+        async function loadVersion() {
+            try {
+                const response = await fetch('/version');
+                if (response.ok) {
+                    const version = await response.text();
+                    titleElement.textContent = `Faust Compiler ${version.trim()}`;
+                }
+            } catch (error) {
+                console.log('Could not load version, keeping default title');
+            }
+        }
+
+        function highlightFaustCode(code) {
+            // Escape HTML first
+            let highlighted = code.replace(/&/g, '&amp;')
+                                 .replace(/</g, '&lt;')
+                                 .replace(/>/g, '&gt;');
+            
+            // Faust keywords and functions
+            const keywords = [
+                'import', 'declare', 'with', 'letrec', 'case', 'waveform',
+                'soundfile', 'library', 'component', 'environment', 'process'
+            ];
+            
+            const functions = [
+                'sin', 'cos', 'tan', 'exp', 'log', 'sqrt', 'abs', 'min', 'max',
+                'button', 'checkbox', 'vslider', 'hslider', 'nentry',
+                'vgroup', 'hgroup', 'tgroup', 'delay', 'mem'
+            ];
+            
+            // Split into lines to handle highlighting line by line
+            const lines = highlighted.split('\n');
+            
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i];
+                
+                // Skip if line is already highlighted (contains <span>)
+                if (line.includes('<span')) continue;
+                
+                // Highlight comments first (they take priority)
+                if (line.includes('//')) {
+                    const commentIndex = line.indexOf('//');
+                    const beforeComment = line.substring(0, commentIndex);
+                    const comment = line.substring(commentIndex);
+                    line = beforeComment + '<span class="faust-comment">' + comment + '</span>';
+                }
+                
+                // Only highlight other elements if not in a comment
+                if (!line.includes('class="faust-comment"')) {
+                    // Highlight strings
+                    line = line.replace(/"[^"]*"/g, '<span class="faust-string">$&</span>');
+                    
+                    // Highlight numbers (simple pattern)
+                    line = line.replace(/\b\d+(\.\d+)?\b/g, '<span class="faust-number">$&</span>');
+                    
+                    // Highlight keywords
+                    keywords.forEach(keyword => {
+                        const regex = new RegExp(`\\b${keyword}\\b`, 'g');
+                        line = line.replace(regex, `<span class="faust-keyword">${keyword}</span>`);
+                    });
+                    
+                    // Highlight functions
+                    functions.forEach(func => {
+                        const regex = new RegExp(`\\b${func}\\b`, 'g');
+                        line = line.replace(regex, `<span class="faust-function">${func}</span>`);
+                    });
+                }
+                
+                lines[i] = line;
+            }
+            
+            return lines.join('\n');
+        }
+
+        let compiledBlob = null;
+
+        compileBtn.addEventListener('click', () => {
+            compile();
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (compiledBlob && selectedFile && selectedTarget) {
+                const url = URL.createObjectURL(compiledBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${selectedFile.name.replace('.dsp', '')}_${selectedTarget.platform}_${selectedTarget.arch}.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+        });
+
+        async function compile() {
+            if (!selectedFile || !selectedTarget) return;
+            
+            try {
+                compileBtn.disabled = true;
+                downloadBtn.disabled = true;
+                downloadBtn.textContent = 'Compiling...';
+                
+                // Use direct compilation API
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+                
+                const url = `/compile/${selectedTarget.platform}/${selectedTarget.arch}/binary.zip`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    compiledBlob = await response.blob();
+                    downloadBtn.disabled = false;
+                    downloadBtn.textContent = 'Download';
+                } else {
+                    throw new Error('Compilation failed');
+                }
+            } catch (error) {
+                compiledBlob = null;
+                downloadBtn.disabled = true;
+                downloadBtn.textContent = 'Error';
+                setTimeout(() => {
+                    downloadBtn.textContent = 'Download';
+                }, 2000);
+            } finally {
+                updateCompileButton();
+            }
+        }
+    </script>
+</body>
+</html>
