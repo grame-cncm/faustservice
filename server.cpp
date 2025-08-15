@@ -106,6 +106,7 @@ static std::string generate_sha1(connection_info_struct* con_info)
     return sha1key;
 }
 
+
 /*
  * True if it is a .dsp or a .lib source file
  */
@@ -266,7 +267,7 @@ static int validate_faust(connection_info_struct* con_info)
     fs::path filename      = fs::path(con_info->filename);
     fs::path uploaded_file = fs::path(con_info->tmppath) / filename;
 
-    if (gVerbosity >= 2) std::cerr << "\nENTER validate_faust for file: " << uploaded_file << std::endl;
+    if (gVerbosity >= 1) std::cerr << "\nENTER validate_faust for file: " << uploaded_file << std::endl;
 
     // Generate SHA1 for session directory
     std::string sha1            = generate_sha1(con_info);
@@ -827,7 +828,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 
     } else if (matchURL(url, "/*/diagram/*") && matchExtension(url, ".svg")) {
         return makeAndSendResourceFile(connection, url);
-    
+
     } else if (matchURL(url, "/*/generated.cpp")) {
         // Serve the generated C++ file from validate_faust
         std::vector<std::string> U = decomposeURL(url);
@@ -839,7 +840,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         }
         std::string error_msg = "File not found";
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
-        
+
     } else if (matchURL(url, "/*/errors.log")) {
         // Serve the compilation errors log file from validate_faust
         std::vector<std::string> U = decomposeURL(url);
@@ -851,7 +852,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         }
         std::string error_msg = "No errors.log file found";
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
-        
+
     } else if (matchURL(url, "/*/svg/*") && matchExtension(url, ".svg")) {
         // Serve SVG files from the svg/ directory created by validate_faust
         std::vector<std::string> U = decomposeURL(url);

@@ -1233,6 +1233,9 @@
                     const svgContent = await response.text();
                     svgContainer.innerHTML = svgContent;
                     svgViewer.style.display = 'flex';
+                    
+                    // Add click interceptors for SVG links
+                    addSvgLinkInterceptors();
                 } else {
                     // If process.svg doesn't exist, show a message
                     svgContainer.innerHTML = `
@@ -1247,6 +1250,130 @@
             } catch (error) {
                 showViewError('Error loading SVG diagrams: ' + error.message);
             }
+        }
+
+        /**
+         * Load a specific SVG diagram from the svg directory
+         * @param {string} svgFilename - The name of the SVG file to load (e.g., "harpe-0x1421ddfc0.svg")
+         */
+        async function loadSpecificSvg(svgFilename) {
+            if (!currentSha1) return;
+            
+            try {
+                const response = await fetch(`/${currentSha1}/svg/${svgFilename}`);
+                if (response.ok) {
+                    const svgContent = await response.text();
+                    svgContainer.innerHTML = svgContent;
+                    
+                    // Add click interceptors for the newly loaded SVG
+                    addSvgLinkInterceptors();
+                } else {
+                    showViewError(`Error loading SVG diagram: ${svgFilename} not found`);
+                }
+            } catch (error) {
+                showViewError('Error loading SVG diagram: ' + error.message);
+            }
+        }
+
+        /**
+         * Add click event interceptors to all links within SVG elements
+         * This prevents SVG links from navigating away from the app interface
+         */
+        function addSvgLinkInterceptors() {
+            console.log('Adding SVG link interceptors to container:', svgContainer);
+            
+            // Remove any existing click listeners to avoid duplicates
+            svgContainer.removeEventListener('click', svgClickHandler);
+            
+            // Add the click handler
+            svgContainer.addEventListener('click', svgClickHandler, true); // Use capture phase
+            
+            // Also try to directly intercept links after a short delay to ensure SVG is fully loaded
+            setTimeout(() => {
+                const directLinks = svgContainer.querySelectorAll('a[href], a[*|href]');
+                console.log('Found direct SVG links:', directLinks.length);
+                
+                directLinks.forEach((link, index) => {
+                    console.log(`Link ${index}:`, link.getAttribute('href') || link.getAttribute('xlink:href'));
+                    
+                    // Remove existing listeners
+                    link.removeEventListener('click', preventSvgNavigation);
+                    
+                    // Add new listener
+                    link.addEventListener('click', preventSvgNavigation, true);
+                });
+            }, 100);
+        }
+        
+        // Separate function for the click handler to avoid memory leaks
+        function svgClickHandler(e) {
+            console.log('SVG container clicked:', e.target);
+            
+            // Find the closest <a> element (could be the clicked element or a parent)
+            let target = e.target;
+            let linkElement = null;
+            
+            // Walk up the DOM tree to find an <a> element with href
+            while (target && target !== svgContainer) {
+                console.log('Checking element:', target.tagName, target.getAttribute && target.getAttribute('href'));
+                
+                if (target.tagName && target.tagName.toLowerCase() === 'a' && 
+                    (target.getAttribute('href') || target.getAttribute('xlink:href'))) {
+                    linkElement = target;
+                    break;
+                }
+                target = target.parentElement;
+            }
+            
+            // Also check if the clicked element itself is within an <a> tag
+            if (!linkElement) {
+                linkElement = e.target.closest('a[href], a[*|href]');
+            }
+            
+            if (linkElement) {
+                e.preventDefault(); // Prevent default navigation
+                e.stopPropagation(); // Stop event bubbling
+                e.stopImmediatePropagation(); // Stop other handlers
+                
+                const href = linkElement.getAttribute('href') || linkElement.getAttribute('xlink:href');
+                console.log('SVG link detected, href:', href);
+                
+                // Extract SVG filename from URL
+                // Expected formats: 
+                // - http://localhost:8888/filename.svg
+                // - ./filename.svg
+                // - filename.svg
+                const svgMatch = href.match(/(?:.*\/)?([^\/]+\.svg)$/);
+                if (svgMatch) {
+                    const svgFilename = svgMatch[1];
+                    console.log('SVG link clicked, loading:', svgFilename);
+                    loadSpecificSvg(svgFilename);
+                } else {
+                    console.warn('Unrecognized SVG link format:', href);
+                }
+                
+                return false; // Prevent any further processing
+            }
+        }
+        
+        // Function to prevent SVG navigation for direct link listeners
+        function preventSvgNavigation(e) {
+            console.log('Direct SVG link clicked:', e.target);
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            const href = e.target.getAttribute('href') || e.target.getAttribute('xlink:href');
+            console.log('Direct link href:', href);
+            
+            const svgMatch = href.match(/(?:.*\/)?([^\/]+\.svg)$/);
+            if (svgMatch) {
+                const svgFilename = svgMatch[1];
+                console.log('Loading SVG from direct link:', svgFilename);
+                loadSpecificSvg(svgFilename);
+            }
+            
+            return false;
         }
 
 
