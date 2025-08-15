@@ -315,6 +315,43 @@
             margin-top: 8px;
             font-style: italic;
         }
+
+        /* Global drag and drop overlay */
+        .global-drag-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(52, 152, 219, 0.1);
+            border: 3px dashed #3498db;
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(2px);
+        }
+
+        .global-drag-overlay.show {
+            display: flex;
+        }
+
+        .global-drag-message {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            text-align: center;
+            font-size: 18px;
+            color: #3498db;
+            font-weight: 500;
+        }
+
+        .global-drag-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #3498db;
+        }
     </style>
 </head>
 <body>
@@ -339,7 +376,6 @@
                 <option value="dsp">DSP Code</option>
                 <option value="cpp">Generated C++</option>
                 <option value="svg">Block Diagrams</option>
-                <option value="errors">Compilation Errors</option>
             </select>
         </div>
 
@@ -347,7 +383,6 @@
         <div class="error-message" id="error-message">
             <div class="error-title">Compilation Error</div>
             <div id="error-content"></div>
-            <div class="error-hint">Fix your Faust code or drop a new file to continue.</div>
         </div>
 
         <!-- Drop Zone -->
@@ -368,6 +403,15 @@
         <input type="file" id="file-input" accept=".dsp,.zip,.tar.gz,.tar.bz2" style="display: none;">
     </div>
 
+    <!-- Global Drag and Drop Overlay -->
+    <div class="global-drag-overlay" id="global-drag-overlay">
+        <div class="global-drag-message">
+            <div class="global-drag-icon">📁</div>
+            <div>Drop your Faust file anywhere!</div>
+            <div style="font-size: 14px; margin-top: 8px; color: #666;">Supports .dsp files and archives</div>
+        </div>
+    </div>
+
     <script>
         /**
          * VIEW PERSISTENCE AND ERROR HANDLING SPECIFICATION
@@ -379,32 +423,32 @@
          * Special handling applies when compilation errors occur.
          * 
          * VIEW MODES:
-         * The view selector has 4 modes:
-         * 1. DSP Code - Always enabled
+         * The view selector has 3 modes:
+         * 1. DSP Code - Always enabled, shows errors at top when compilation fails
          * 2. Generated C++ - Enabled only when compilation succeeds
          * 3. Block Diagrams - Enabled only when compilation succeeds
-         * 4. Compilation Errors - Enabled only when compilation fails
          * 
          * ERROR HANDLING BEHAVIOR:
          * 
          * When compilation SUCCEEDS:
-         * - First 3 modes (DSP, C++, SVG) are enabled
-         * - "Compilation Errors" mode is visible but disabled (grayed out)
-         * - This clearly indicates there are no errors
+         * - All 3 modes (DSP, C++, SVG) are enabled
+         * - DSP view shows only the source code
          * - View persistence works as specified below
          * 
          * When compilation FAILS:
-         * - Only "DSP Code" and "Compilation Errors" modes are enabled
+         * - Only "DSP Code" mode is enabled and automatically selected
          * - "Generated C++" and "Block Diagrams" are disabled (grayed out)
-         * - View automatically switches to "Compilation Errors" to show the error
-         * - Error displayed in red text on pink background
+         * - DSP view shows compilation errors at the top in red/pink background
+         * - Followed immediately by the faulty DSP source code
          * - After fixing (dropping valid file), returns to persistent view
          * 
          * BEHAVIOR PER VIEW:
          * 
          * 1. DSP View:
          *    - Always available
-         *    - Displays the DSP source code
+         *    - When NO errors: displays only the DSP source code
+         *    - When HAS errors: displays error message at top + DSP source code below
+         *    - Error message is shown in red text on pink background
          *    - No special scroll handling (always starts at the top)
          * 
          * 2. C++ View (with smart scroll management):
@@ -423,26 +467,21 @@
          *    - Automatically displays the new SVG diagram after compilation
          *    - Loads the process.svg file from the newly compiled code
          * 
-         * 4. Compilation Errors View:
-         *    - Only available when compilation fails
-         *    - Shows compilation errors in red text on pink background
-         *    - Automatically selected when errors occur
-         * 
          * EXECUTION FLOW:
          * 1. Capture current state before drop (view + scroll position if C++)
          * 2. Upload new file and obtain SHA1
-         * 3. Check compilation status:
-         *    - If success: restore previous view (persistence)
-         *    - If failure: switch to "Compilation Errors" view
+         * 3. Check errors.log file content:
+         *    - If empty: compilation success, restore previous view (persistence)
+         *    - If contains text: compilation failure, switch to DSP view with errors
          * 4. Update view selector options based on compilation status
          * 5. If C++ view and success: apply scroll restoration logic
          * 
          * KEY VARIABLES:
-         * - currentView: currently active view ('dsp', 'cpp', 'svg', 'errors')
+         * - currentView: currently active view ('dsp', 'cpp', 'svg')
          * - hasCompilationError: boolean indicating if current file has errors
          * - previousScrollInfo: captured scroll information for C++ view
          * - originalDspCode: original DSP code stored to allow returning to DSP view
-         * - compilationErrors: stores the error messages from failed compilation
+         * - compilationErrors: stores the error messages from failed compilation (from errors.log)
          */
         
         let selectedFile = null;
@@ -478,6 +517,14 @@
         uploadZone.addEventListener('dragleave', handleDragLeave);
         uploadZone.addEventListener('drop', handleDrop);
         
+        // Global drag and drop events for better UX (drop anywhere in window)
+        let dragCounter = 0; // Counter to handle drag enter/leave correctly
+        
+        document.addEventListener('dragenter', handleGlobalDragEnter);
+        document.addEventListener('dragover', handleGlobalDragOver);
+        document.addEventListener('dragleave', handleGlobalDragLeave);
+        document.addEventListener('drop', handleGlobalDrop);
+        
         // Platform/architecture selection events
         platformSelect.addEventListener('change', handlePlatformChange);
         archSelect.addEventListener('change', handleArchChange);
@@ -498,6 +545,48 @@
             loadVersion();
         }
 
+        // Get the global drag overlay element
+        const globalDragOverlay = document.getElementById('global-drag-overlay');
+
+        // Global drag and drop handlers for better UX
+        function handleGlobalDragEnter(e) {
+            e.preventDefault();
+            dragCounter++;
+            
+            // Only show overlay if dragging files (not text, images, etc.)
+            if (e.dataTransfer.types.includes('Files')) {
+                globalDragOverlay.classList.add('show');
+            }
+        }
+
+        function handleGlobalDragOver(e) {
+            e.preventDefault();
+            // Must call preventDefault to allow drop
+        }
+
+        function handleGlobalDragLeave(e) {
+            e.preventDefault();
+            dragCounter--;
+            
+            // Only hide overlay when completely leaving the window
+            if (dragCounter === 0) {
+                globalDragOverlay.classList.remove('show');
+            }
+        }
+
+        function handleGlobalDrop(e) {
+            e.preventDefault();
+            dragCounter = 0;
+            globalDragOverlay.classList.remove('show');
+            
+            // Handle the dropped files
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        // Original upload zone handlers (kept for specific styling)
         function handleDragOver(e) {
             e.preventDefault();
             uploadZone.classList.add('dragover');
@@ -958,8 +1047,8 @@
 
         /**
          * Update view selector options based on compilation status
-         * - When no errors: DSP, C++, SVG enabled; Errors disabled
-         * - When errors exist: DSP, Errors enabled; C++, SVG disabled
+         * - When no errors: DSP, C++, SVG all enabled
+         * - When errors exist: Only DSP enabled; C++, SVG disabled
          */
         function updateViewSelectorOptions() {
             const options = viewSelect.querySelectorAll('option');
@@ -974,10 +1063,6 @@
                     case 'svg':
                         // C++ and SVG views only enabled when no compilation errors
                         option.disabled = hasCompilationError;
-                        break;
-                    case 'errors':
-                        // Errors view only enabled when compilation errors exist
-                        option.disabled = !hasCompilationError;
                         break;
                 }
             });
@@ -1111,9 +1196,6 @@
                 case 'svg':
                     loadSvgDiagrams();
                     break;
-                case 'errors':
-                    loadErrorsLog();
-                    break;
             }
         }
 
@@ -1141,6 +1223,9 @@
         async function loadSvgDiagrams() {
             if (!currentSha1) return;
             
+            // Hide file content when displaying SVG
+            fileContent.style.display = 'none';
+            
             try {
                 // Try to load the main process.svg file
                 const response = await fetch(`/${currentSha1}/svg/process.svg`);
@@ -1164,64 +1249,11 @@
             }
         }
 
-        /**
-         * Load compilation errors from errors.log file
-         * This function reads the errors.log file for the current SHA1
-         */
-        async function loadErrorsLog() {
-            if (!currentSha1) return;
-            
-            try {
-                const response = await fetch(`/${currentSha1}/errors.log`);
-                if (response.ok) {
-                    const errorContent = await response.text();
-                    if (errorContent.trim()) {
-                        compilationErrors = errorContent;
-                        displayCompilationErrors();
-                    } else {
-                        // Empty errors.log means no errors
-                        svgContainer.innerHTML = `
-                            <div style="text-align: center; padding: 40px; color: #666;">
-                                <p>No compilation errors found</p>
-                            </div>
-                        `;
-                        svgViewer.style.display = 'flex';
-                    }
-                } else {
-                    showViewError('Could not load compilation errors');
-                }
-            } catch (error) {
-                showViewError('Error loading compilation errors: ' + error.message);
-            }
-        }
-
-        /**
-         * Display compilation errors in a dedicated view
-         * Shows errors in red text on pink background as specified
-         */
-        function displayCompilationErrors() {
-            if (!compilationErrors) {
-                // Shouldn't happen, but handle gracefully
-                svgContainer.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #666;">
-                        <p>No compilation errors to display</p>
-                    </div>
-                `;
-            } else {
-                // Display errors in red on pink background
-                svgContainer.innerHTML = `
-                    <div style="background: #ffe6e6; border: 1px solid #ffcccc; border-radius: 8px; padding: 20px; margin: 20px;">
-                        <h3 style="color: #cc0000; margin-top: 0;">Compilation Errors</h3>
-                        <pre style="color: #cc0000; white-space: pre-wrap; word-break: break-word; font-family: monospace; font-size: 14px; line-height: 1.6;">
-${compilationErrors}
-                        </pre>
-                    </div>
-                `;
-            }
-            svgViewer.style.display = 'flex';
-        }
 
         function showViewError(message) {
+            // Hide file content when showing view error
+            fileContent.style.display = 'none';
+            
             svgContainer.innerHTML = `
                 <div style="text-align: center; padding: 40px; color: #cc0000; background: #ffe6e6; border-radius: 8px; margin: 20px;">
                     <p>${message}</p>
@@ -1244,7 +1276,10 @@ ${compilationErrors}
             uploadContent.style.display = 'none';
             uploadZone.classList.add('has-content');
             
-            // Set line numbers and highlighted code
+            // Hide SVG viewer when displaying code
+            svgViewer.style.display = 'none';
+            
+            // Set line numbers and highlighted code (no error message inside)
             lineNumbers.textContent = lineNumbersHtml;
             if (language === 'cpp') {
                 codeContent.innerHTML = highlightCppCode(code);
@@ -1385,21 +1420,24 @@ ${compilationErrors}
                                 hasCompilationError = true;
                                 compilationErrors = errorsContent;
                                 
-                                // Update view selector options (enable errors, disable C++/SVG)
+                                // Update view selector options (disable C++/SVG)
                                 updateViewSelectorOptions();
                                 
                                 // Show view selector now that we have SHA1
                                 viewSelect.style.display = 'inline-block';
                                 
-                                // Automatically switch to error view
-                                currentView = 'errors';
-                                viewSelect.value = 'errors';
+                                // Automatically switch to DSP view to show errors
+                                currentView = 'dsp';
+                                viewSelect.value = 'dsp';
                                 
-                                // Load and display the errors
-                                switchView('errors');
+                                // Display the DSP code with errors at the top
+                                if (originalDspCode) {
+                                    displayCodeWithLineNumbers(originalDspCode, 'faust');
+                                }
+                                fileContent.style.display = 'flex';
                                 
-                                // Also show in the traditional error area
-                                showError('Compilation errors detected. Check the Compilation Errors view.');
+                                // Show the actual error content in the traditional error area
+                                showError(errorsContent);
                                 
                                 return; // Exit early for error case
                             } else {
@@ -1444,18 +1482,12 @@ ${compilationErrors}
                      * 4. With intelligently preserved scroll position
                      * 
                      * Note: If already in DSP view, we stay there (no change)
-                     * If previous view was 'errors', switch to 'dsp' as a safe default
                      */
-                    if (previousView !== 'dsp' && previousView !== 'errors') {
+                    if (previousView !== 'dsp') {
                         currentView = previousView;
                         viewSelect.value = previousView;
                         // Switch to the previous view (C++ or SVG)
                         switchView(previousView);
-                    } else if (previousView === 'errors') {
-                        // If we were viewing errors, switch to DSP view
-                        currentView = 'dsp';
-                        viewSelect.value = 'dsp';
-                        switchView('dsp');
                     }
                 } else {
                     // Upload failed - show server error
