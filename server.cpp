@@ -222,6 +222,92 @@ static void create_basic_session(fs::path srcdir, fs::path sha1path, fs::path ma
     }
 }
 
+/*
+ * Creates a ZIP file containing all SVG files from a directory
+ */
+static bool create_svg_zip(const fs::path& svg_dir, const fs::path& zip_path)
+{
+    if (gVerbosity >= 2) {
+        std::cerr << "Creating SVG ZIP: " << svg_dir << " -> " << zip_path << std::endl;
+    }
+    
+    struct archive* archive = archive_write_new();
+    if (!archive) {
+        std::cerr << "Error: Could not create archive" << std::endl;
+        return false;
+    }
+    
+    // Set ZIP format
+    archive_write_set_format_zip(archive);
+    archive_write_add_filter_none(archive);
+    
+    // Open the output file
+    if (archive_write_open_filename(archive, zip_path.string().c_str()) != ARCHIVE_OK) {
+        std::cerr << "Error: Could not open ZIP file: " << archive_error_string(archive) << std::endl;
+        archive_write_free(archive);
+        return false;
+    }
+    
+    try {
+        // Iterate through all SVG files in the directory
+        for (const auto& entry : fs::directory_iterator(svg_dir)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".svg") {
+                fs::path svg_file = entry.path();
+                std::string filename = svg_file.filename().string();
+                
+                // Read the SVG file
+                std::ifstream file(svg_file, std::ios::binary);
+                if (!file) {
+                    std::cerr << "Warning: Could not read SVG file: " << svg_file << std::endl;
+                    continue;
+                }
+                
+                // Get file size
+                file.seekg(0, std::ios::end);
+                size_t file_size = file.tellg();
+                file.seekg(0, std::ios::beg);
+                
+                // Read file content
+                std::vector<char> content(file_size);
+                file.read(content.data(), file_size);
+                file.close();
+                
+                // Create archive entry
+                struct archive_entry* entry_hdr = archive_entry_new();
+                archive_entry_set_pathname(entry_hdr, filename.c_str());
+                archive_entry_set_size(entry_hdr, file_size);
+                archive_entry_set_filetype(entry_hdr, AE_IFREG);
+                archive_entry_set_perm(entry_hdr, 0644);
+                
+                // Write header and data
+                if (archive_write_header(archive, entry_hdr) == ARCHIVE_OK) {
+                    archive_write_data(archive, content.data(), file_size);
+                }
+                
+                archive_entry_free(entry_hdr);
+                
+                if (gVerbosity >= 2) {
+                    std::cerr << "Added to ZIP: " << filename << " (" << file_size << " bytes)" << std::endl;
+                }
+            }
+        }
+    } catch (const fs::filesystem_error& e) {
+        std::cerr << "Error accessing SVG directory: " << e.what() << std::endl;
+        archive_write_free(archive);
+        return false;
+    }
+    
+    // Close the archive
+    archive_write_close(archive);
+    archive_write_free(archive);
+    
+    if (gVerbosity >= 2) {
+        std::cerr << "SVG ZIP created successfully: " << zip_path << std::endl;
+    }
+    
+    return true;
+}
+
 // Legacy function - kept for compatibility but now calls create_basic_session
 void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefile_directory)
 {
@@ -442,6 +528,19 @@ static int validate_faust(connection_info_struct* con_info)
         } catch (const fs::filesystem_error& e) {
             if (gVerbosity >= 1) {
                 std::cerr << "Warning: Could not create metadata file: " << e.code().message() << std::endl;
+            }
+        }
+
+        // Save original filename for drag-and-drop functionality
+        try {
+            fs::path filename_path = session_path / "filename.txt";
+            std::ofstream filename_file(filename_path);
+            filename_file << con_info->filename << std::endl;
+            filename_file.close();
+            if (gVerbosity >= 2) std::cerr << "Saved original filename: " << con_info->filename << std::endl;
+        } catch (const fs::filesystem_error& e) {
+            if (gVerbosity >= 1) {
+                std::cerr << "Warning: Could not save filename: " << e.code().message() << std::endl;
             }
         }
 
@@ -851,6 +950,44 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             }
         }
         std::string error_msg = "No errors.log file found";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+
+    } else if (matchURL(url, "/*/filename")) {
+        // Serve the original filename for drag-and-drop functionality
+        std::vector<std::string> U = decomposeURL(url);
+        if (U.size() >= 2) {
+            fs::path filepath = fDirectory / U[1] / "filename.txt";
+            if (fs::exists(filepath)) {
+                return send_file(connection, filepath, "text/plain");
+            }
+        }
+        std::string error_msg = "No filename information found";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+
+    } else if (matchURL(url, "/*/svg.zip")) {
+        // Create and serve a ZIP file containing all SVG diagrams
+        std::vector<std::string> U = decomposeURL(url);
+        if (U.size() >= 2) {
+            fs::path svg_dir = fDirectory / U[1] / "svg";
+            if (fs::exists(svg_dir) && fs::is_directory(svg_dir)) {
+                // Create temporary ZIP file
+                fs::path temp_zip = fDirectory / U[1] / "temp_svg.zip";
+                
+                if (create_svg_zip(svg_dir, temp_zip)) {
+                    // Send the ZIP file and then delete it
+                    int result = send_file(connection, temp_zip, "application/zip");
+                    try {
+                        fs::remove(temp_zip);
+                    } catch (const fs::filesystem_error& e) {
+                        if (gVerbosity >= 1) {
+                            std::cerr << "Warning: Could not remove temp ZIP: " << e.code().message() << std::endl;
+                        }
+                    }
+                    return result;
+                }
+            }
+        }
+        std::string error_msg = "No SVG diagrams found or could not create ZIP";
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
 
     } else if (matchURL(url, "/*/svg/*") && matchExtension(url, ".svg")) {
