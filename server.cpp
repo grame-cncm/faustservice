@@ -382,8 +382,8 @@ static int validate_faust(connection_info_struct* con_info)
                 std::cerr << "Faust compilation failed with code " << return_code << std::endl;
                 std::cerr << "Output: " << compilation_output << std::endl;
             }
-            con_info->answerstring = completebutcorrupt_head + compilation_output + completebutcorrupt_tail;
-            return 1;
+            // Continue processing even with compilation errors - errors.log will contain the details
+            // Client will check errors.log to determine if there were compilation errors
         }
 
         // Move generated SVG files to dedicated svg/ directory
@@ -838,6 +838,18 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             }
         }
         std::string error_msg = "File not found";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        
+    } else if (matchURL(url, "/*/errors.log")) {
+        // Serve the compilation errors log file from validate_faust
+        std::vector<std::string> U = decomposeURL(url);
+        if (U.size() >= 2) {
+            fs::path filepath = fDirectory / U[1] / "errors.log";
+            if (fs::exists(filepath)) {
+                return send_file(connection, filepath, "text/plain");
+            }
+        }
+        std::string error_msg = "No errors.log file found";
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
         
     } else if (matchURL(url, "/*/svg/*") && matchExtension(url, ".svg")) {
