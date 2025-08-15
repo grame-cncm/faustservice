@@ -606,6 +606,244 @@
             }
         }
 
+        // ========================================
+        // DRAG-AND-DROP SORTANT (Export functionality)
+        // ========================================
+
+        /**
+         * Enable drag-and-drop export for content areas based on current view
+         */
+        function enableDragExport() {
+            if (!currentSha1) return;
+            
+            // Remove existing drag handlers
+            fileContent.removeEventListener('dragstart', handleCodeDragStart);
+            fileContent.removeEventListener('dragend', handleDragEnd);
+            svgContainer.removeEventListener('dragstart', handleSvgDragStart);
+            svgContainer.removeEventListener('dragend', handleDragEnd);
+            
+            // Reset draggable state
+            fileContent.draggable = false;
+            svgContainer.draggable = false;
+            
+            // Add appropriate drag handler based on current view
+            switch(currentView) {
+                case 'dsp':
+                    fileContent.draggable = true;
+                    fileContent.addEventListener('dragstart', handleCodeDragStart);
+                    fileContent.addEventListener('dragend', handleDragEnd);
+                    break;
+                case 'cpp':
+                    fileContent.draggable = true;
+                    fileContent.addEventListener('dragstart', handleCodeDragStart);
+                    fileContent.addEventListener('dragend', handleDragEnd);
+                    break;
+                case 'svg':
+                    svgContainer.draggable = true;
+                    svgContainer.addEventListener('dragstart', handleSvgDragStart);
+                    svgContainer.addEventListener('dragend', handleDragEnd);
+                    break;
+            }
+        }
+
+        // Variable to store drag data for fallback download
+        let lastDragData = null;
+
+        /**
+         * Handle drag end - trigger download if drag was unsuccessful
+         */
+        function handleDragEnd(e) {
+            // Small delay to see if the drag was successful
+            setTimeout(() => {
+                if (lastDragData && e.dataTransfer.dropEffect === 'none') {
+                    console.log('Drag failed, triggering download as fallback');
+                    
+                    if (lastDragData.isBlob) {
+                        // For blob data (SVG ZIP)
+                        triggerDownload(lastDragData, lastDragData.filename, lastDragData.mimeType);
+                    } else {
+                        // For text content (DSP/C++)
+                        triggerDownload(lastDragData.content, lastDragData.filename, lastDragData.mimeType);
+                    }
+                }
+                lastDragData = null; // Reset
+            }, 100);
+        }
+
+        /**
+         * Alternative download approach when drag-and-drop fails
+         */
+        function triggerDownload(data, filename, mimeType) {
+            let blob;
+            
+            if (data && data.isBlob) {
+                // Data is an object with a blob (for ZIP files)
+                blob = data.blob;
+            } else {
+                // Data is text content (for DSP/C++ files)
+                blob = new Blob([data], { type: mimeType });
+            }
+            
+            const url = URL.createObjectURL(blob);
+            
+            // Create temporary download link
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.style.display = 'none';
+            
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Clean up
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            
+            console.log(`Downloaded: ${filename}`);
+        }
+
+        /**
+         * Handle drag start for code content (DSP or C++)
+         */
+        async function handleCodeDragStart(e) {
+            if (!currentSha1) {
+                e.preventDefault();
+                return;
+            }
+            
+            try {
+                let filename, content, mimeType;
+                
+                if (currentView === 'dsp') {
+                    // Export DSP source code with original filename
+                    const filenameResponse = await fetch(`/${currentSha1}/filename`);
+                    if (filenameResponse.ok) {
+                        filename = (await filenameResponse.text()).trim();
+                    } else {
+                        filename = 'source.dsp';
+                    }
+                    content = originalDspCode || '';
+                    mimeType = 'text/plain';
+                } else if (currentView === 'cpp') {
+                    // Export generated C++ code
+                    const cppResponse = await fetch(`/${currentSha1}/generated.cpp`);
+                    if (cppResponse.ok) {
+                        content = await cppResponse.text();
+                        
+                        // Get original filename and change extension to .cpp
+                        const filenameResponse = await fetch(`/${currentSha1}/filename`);
+                        if (filenameResponse.ok) {
+                            const originalName = (await filenameResponse.text()).trim();
+                            const baseName = originalName.replace(/\.[^/.]+$/, ""); // Remove extension
+                            filename = baseName + '.cpp';
+                        } else {
+                            filename = 'generated.cpp';
+                        }
+                        mimeType = 'text/x-c++src';
+                    } else {
+                        throw new Error('Could not fetch C++ code');
+                    }
+                }
+                
+                // Create data transfer with multiple formats for better compatibility
+                const blob = new Blob([content], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                
+                // Set multiple data transfer formats for maximum compatibility
+                e.dataTransfer.setData('DownloadURL', `${mimeType}:${filename}:${url}`);
+                e.dataTransfer.setData('text/uri-list', url);
+                e.dataTransfer.setData('text/plain', content); // Fallback: raw content
+                e.dataTransfer.setData('application/octet-stream', url);
+                
+                // Try to set a custom filename (not widely supported but worth trying)
+                try {
+                    e.dataTransfer.setData('application/x-filename', filename);
+                } catch (err) {
+                    // Ignore if not supported
+                }
+                
+                e.dataTransfer.effectAllowed = 'copyMove';
+                
+                // Store drag data for potential fallback download
+                lastDragData = { content, filename, mimeType };
+                
+                console.log(`Dragging ${currentView} file: ${filename} (${content.length} chars)`);
+                
+                // Clean up URL after drag operation
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                
+            } catch (error) {
+                console.error('Error preparing drag data:', error);
+                e.preventDefault();
+            }
+        }
+
+        /**
+         * Handle drag start for SVG content
+         */
+        async function handleSvgDragStart(e) {
+            if (!currentSha1) {
+                e.preventDefault();
+                return;
+            }
+            
+            try {
+                // Check how many SVG files exist
+                const svgFilesResponse = await fetch(`/${currentSha1}/svg/`);
+                let filename, url, mimeType;
+                
+                // For now, always create a ZIP since detecting single vs multiple SVGs
+                // from the client side is complex. The ZIP approach is more reliable.
+                const zipResponse = await fetch(`/${currentSha1}/svg.zip`);
+                if (zipResponse.ok) {
+                    const blob = await zipResponse.blob();
+                    url = URL.createObjectURL(blob);
+                    
+                    // Get original filename and create ZIP name
+                    const filenameResponse = await fetch(`/${currentSha1}/filename`);
+                    if (filenameResponse.ok) {
+                        const originalName = (await filenameResponse.text()).trim();
+                        const baseName = originalName.replace(/\.[^/.]+$/, ""); // Remove extension
+                        filename = baseName + '_diagrams.zip';
+                    } else {
+                        filename = 'diagrams.zip';
+                    }
+                    mimeType = 'application/zip';
+                } else {
+                    throw new Error('Could not fetch SVG ZIP');
+                }
+                
+                // Set multiple data transfer formats for better compatibility
+                e.dataTransfer.setData('DownloadURL', `${mimeType}:${filename}:${url}`);
+                e.dataTransfer.setData('text/uri-list', url);
+                e.dataTransfer.setData('application/octet-stream', url);
+                
+                // Try to set a custom filename
+                try {
+                    e.dataTransfer.setData('application/x-filename', filename);
+                } catch (err) {
+                    // Ignore if not supported
+                }
+                
+                e.dataTransfer.effectAllowed = 'copyMove';
+                
+                // Store blob data for potential fallback download
+                lastDragData = { blob, filename, mimeType, isBlob: true };
+                
+                console.log(`Dragging SVG ZIP: ${filename}`);
+                
+                // Clean up URL after drag operation
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                
+            } catch (error) {
+                console.error('Error preparing SVG drag data:', error);
+                e.preventDefault();
+            }
+        }
+
+        // ========================================
+
 
         function handleFile(file) {
             selectedFile = file;
@@ -1197,6 +1435,9 @@
                     loadSvgDiagrams();
                     break;
             }
+            
+            // Enable drag-and-drop export for the new view
+            enableDragExport();
         }
 
         async function loadGeneratedCpp() {
@@ -1557,6 +1798,9 @@
                                 currentView = 'dsp';
                                 viewSelect.value = 'dsp';
                                 
+                                // Enable drag-and-drop export
+                                enableDragExport();
+                                
                                 // Display the DSP code with errors at the top
                                 if (originalDspCode) {
                                     displayCodeWithLineNumbers(originalDspCode, 'faust');
@@ -1593,6 +1837,9 @@
                     
                     // Show view selector now that we have SHA1
                     viewSelect.style.display = 'inline-block';
+                    
+                    // Enable drag-and-drop export
+                    enableDragExport();
                     
                     /**
                      * PREVIOUS VIEW RESTORATION
