@@ -4,4 +4,11 @@ faustweb
 faustwebclient
 faustwebtest
 build-Makefile.*
+*.d
+*.o
+test_*
+tests/HIDE/*
+.claude
+TRACE*
+bidon
 
