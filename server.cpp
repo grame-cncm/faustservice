@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <cassert>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -54,6 +55,7 @@
 #include <stdlib.h>
 
 // Avoid using namespace std for better code clarity
+namespace fs = std::filesystem;
 
 extern int gVerbosity;
 /*
@@ -73,10 +75,10 @@ static std::string generate_sha1(connection_info_struct* con_info)
     fs::path filepath = fs::path(con_info->tmppath) / fs::path(con_info->filename);
 
     // read file content
-    std::ifstream myFile(filepath.string().c_str(), ios::in | ios::binary);
-    myFile.seekg(0, ios::end);
+    std::ifstream myFile(filepath.string().c_str(), std::ios::in | std::ios::binary);
+    myFile.seekg(0, std::ios::end);
     int length = myFile.tellg();
-    myFile.seekg(0, ios::beg);
+    myFile.seekg(0, std::ios::beg);
 
     // char content[length];
     char* content = (char*)malloc(length);
@@ -149,23 +151,23 @@ static void copyFaustOrAudioFiles(const fs::path& src, const fs::path& dst)
  */
 
 // Create a specific target directory on demand
-static bool create_target_directory(fs::path srcdir, fs::path sha1path, fs::path makefile_directory, 
-                                   const std::string& platform, const std::string& architecture)
+static bool create_target_directory(fs::path srcdir, fs::path sha1path, fs::path makefile_directory,
+                                    const std::string& platform, const std::string& architecture)
 {
     if (gVerbosity >= 2) {
-        std::cerr << "ENTER create_target_directory(" << sha1path << ", platform=" << platform 
+        std::cerr << "ENTER create_target_directory(" << sha1path << ", platform=" << platform
                   << ", arch=" << architecture << ")" << std::endl;
     }
-    
+
     // First, ensure the base Makefile.none is copied for non-architecture-specific targets
     // Only if it doesn't already exist
-    fs::path base_makefile = fs::path(makefile_directory) / "Makefile.none";
+    fs::path base_makefile        = fs::path(makefile_directory) / "Makefile.none";
     fs::path target_base_makefile = sha1path / "Makefile";
     if (fs::exists(base_makefile) && !fs::exists(target_base_makefile)) {
         fs::copy_file(base_makefile, target_base_makefile);
         copyFaustOrAudioFiles(srcdir, sha1path);
     }
-    
+
     // Look for the specific makefile
     fs::path platform_dir = makefile_directory / platform;
     if (!fs::exists(platform_dir) || !fs::is_directory(platform_dir)) {
@@ -174,7 +176,7 @@ static bool create_target_directory(fs::path srcdir, fs::path sha1path, fs::path
         }
         return false;
     }
-    
+
     fs::path makefile_path = platform_dir / ("Makefile." + architecture);
     if (!fs::exists(makefile_path)) {
         if (gVerbosity >= 1) {
@@ -182,14 +184,14 @@ static bool create_target_directory(fs::path srcdir, fs::path sha1path, fs::path
         }
         return false;
     }
-    
+
     // Create the target directory
     fs::path target_dir = sha1path / platform / architecture;
     try {
         fs::create_directories(target_dir);
         fs::copy_file(makefile_path, target_dir / "Makefile", fs::copy_options::overwrite_existing);
         copyFaustOrAudioFiles(srcdir, target_dir);
-        
+
         if (gVerbosity >= 2) {
             std::cerr << "Created target directory: " << target_dir << std::endl;
         }
@@ -213,197 +215,245 @@ static void create_basic_session(fs::path srcdir, fs::path sha1path, fs::path ma
         fs::copy_file(base_makefile, sha1path / "Makefile", fs::copy_options::overwrite_existing);
         copyFaustOrAudioFiles(srcdir, sha1path);
     }
-    
+
     if (gVerbosity >= 2) {
         std::cerr << "Created basic session structure in: " << sha1path << std::endl;
     }
 }
 
 // Legacy function - kept for compatibility but now calls create_basic_session
-static void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefile_directory)
+void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefile_directory)
 {
     // Changed to only create basic structure instead of all directories
     create_basic_session(srcdir, sha1path, makefile_directory);
 }
+
 /*
  * Validates that a Faust file or archive is sane and returns 0 for success
  * or 1 for failure. If the evaluation fails, the appropriate error message
  * is set. More info on the con_info structure is in server.hh.
+ * Create the session directory <sha>/ with the following structure:
+ * sessions/<sha>/
+ *   sourcecode/
+ *     <filename>.dsp
+ *     ...other content if from zip
+ *   user_code.dsp      (a copy of sourcecode/<filename>.dsp)
+ *   generated.cpp      (the generated C++ code)
+ *   errors.log         (any errors that occurred during compilation)
+ *   svg/               (the resulting svg blockdiagrams)
+ *
+ * the compilation command is :
+ *   cd sourcecode/
+ *     && cp <filename>.dsp ../user_code.dsp
+ *     && faust <filename>.dsp -o ../generated.cpp -svg 2> ../errors.log";
+ *
+ * if no compilation errors where produced then errors.log is empty
+ * in this case we can move sourcecode/<filename>-svg/ to svg/
+ * and available :
+ *   <sha>/user_code.dsp
+ *   <sha>/generated.cpp
+ *   <sha>/svg/process.svg
+ *   <sha>/errors.log       (empty)
+ *
+ * if some compilation errors where produced then errors.log is not empty and are only available :
+ *   <sha>/user_code.dsp
+ *   <sha>/errors.log
+ *
  */
 
 static int validate_faust(connection_info_struct* con_info)
 {
-    // Generate unique path using random number
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(10000, 99999);
-    auto unique_name = "tmp_" + std::to_string(dis(gen)) + "_" + std::to_string(dis(gen));
-    fs::path tmpdir = fs::temp_directory_path() / unique_name;
-    fs::create_directory(tmpdir);
-    fs::path filename          = fs::path(con_info->filename);
-    fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
-    fs::path unzipedDir;
+    fs::path filename      = fs::path(con_info->filename);
+    fs::path uploaded_file = fs::path(con_info->tmppath) / filename;
 
-    if (gVerbosity >= 2) std::cerr << "\nENTER validate_faust for file : " << old_full_filename << std::endl;
+    if (gVerbosity >= 2) std::cerr << "\nENTER validate_faust for file: " << uploaded_file << std::endl;
 
-    // libarchive stuff
-    struct archive*       my_archive;
-    struct archive_entry* my_entry;
+    // Generate SHA1 for session directory
+    std::string sha1            = generate_sha1(con_info);
+    fs::path    session_path    = fs::path(con_info->directory) / fs::path(sha1);
+    fs::path    sourcecode_path = session_path / "sourcecode";
 
-    my_archive = archive_read_new();
-    archive_read_support_filter_all(my_archive);
-    archive_read_support_format_all(my_archive);
-    int archive_status = archive_read_open_filename(my_archive, old_full_filename.string().c_str(), 10240);
+    if (gVerbosity >= 2) std::cerr << "Session creation for: " << sha1 << std::endl;
 
-    // prepare for the tar
-
-    if (!fs::is_regular_file(old_full_filename)) {
-        fs::remove_all(tmpdir);
-        con_info->answerstring = completebuterrorpage;
-        if (gVerbosity >= 1)
-            std::cerr << "EXIT validate_faust with failure : not regular file : " << old_full_filename << std::endl;
-        return 1;
-    } else if (old_full_filename.string().substr(old_full_filename.string().find_last_of(".") + 1) == "dsp") {
-        fs::copy_file(old_full_filename, tmpdir / filename);
-    } else if (archive_status == ARCHIVE_OK) {
-        std::string dsp_file;
-
-        // BEGIN read archived files
-        while (archive_read_next_header(my_archive, &my_entry) == ARCHIVE_OK) {
-            fs::path current_file = fs::path(archive_entry_pathname(my_entry));
-            if (gVerbosity >= 1) std::cerr << "archive_read_next_header : " << current_file << std::endl;
-
-            if (current_file.string().substr(0, 8) == "__MACOSX") {
-                if (gVerbosity >= 1) std::cerr << "Ignore file " << current_file << std::endl;
-            } else {
-                if (current_file.string().substr(current_file.string().find_last_of(".") + 1) == "dsp") {
-                    if (!dsp_file.empty()) {
-                        archive_status = archive_read_free(my_archive);
-                        fs::remove_all(tmpdir);
-                        con_info->answerstring = completebutmorethanoneDSPfile;
-                        std::cerr << "ERROR, we have more than one dsp file " << current_file << std::endl;
-                        return 1;
-                    }
-                    dsp_file = current_file.string();
-                    filename = dsp_file;
-                }
-                unzipedDir     = fs::path(tmpdir / current_file).parent_path();
-                std::string newpath = fs::path(tmpdir / current_file).string();
-                archive_entry_set_pathname(my_entry, newpath.c_str());
-                archive_read_extract(my_archive, my_entry, ARCHIVE_EXTRACT_PERM);
-            }
-        }
-        // END read archived files
-
-        archive_status = archive_read_free(my_archive);
-        if (archive_status != ARCHIVE_OK) {
-            fs::remove_all(tmpdir);
-            con_info->answerstring = completebutdecompressionproblem;
-            if (gVerbosity >= 1)
-                std::cerr << "EXIT validate_faust with failure : Archive not OK case 1 : " << old_full_filename
-                          << std::endl;
+    // Create session structure
+    if (!fs::is_directory(session_path)) {
+        try {
+            fs::create_directories(sourcecode_path);
+        } catch (const fs::filesystem_error& e) {
+            std::cerr << "Error: can't create directory " << sourcecode_path << ": " << e.code().message() << std::endl;
+            con_info->answerstring = completebuterrorpage;
             return 1;
         }
-    } else {
-        fs::remove_all(tmpdir);
-        con_info->answerstring = completebutendoftheworld;
-        if (gVerbosity >= 1)
-            std::cerr << "EXIT validate_faust with failure : Archive not OK case 2 : " << old_full_filename
-                      << std::endl;
-        return 1;
-    }
 
-    // in case a dsp file wasn't found
-    if (filename.string() == "") {
-        fs::remove_all(tmpdir);
-        con_info->answerstring = completebutnoDSPfile;
-        if (gVerbosity >= 1)
-            std::cerr << "EXIT validate_faust with failure : empty filename : " << old_full_filename << std::endl;
-        return 1;
-    }
+        std::string main_dsp_filename;
 
-    if (gVerbosity >= 1) std::cerr << "TRY TO COMPILE validate_faust : " << (tmpdir / filename).string() << std::endl;
-    std::string result = "";
-    FILE*  pipe   = popen(("faust -a plot.cpp " + (tmpdir / filename).string() + " 2>&1").c_str(), "r");
-    if (!pipe) {
-        con_info->answerstring = completebutnopipe;
-    } else {
-        // Bleed off the pipe
-        char buffer[256];
-        while (!feof(pipe)) {
-            if (fgets(buffer, 128, pipe) != NULL) {
-                // std::cerr << "READ PIPE validate_faust : " << buffer<< std::endl;
-                result += buffer;
-            }
+        // Handle file upload: simple DSP file or archive
+        if (!fs::is_regular_file(uploaded_file)) {
+            con_info->answerstring = completebuterrorpage;
+            if (gVerbosity >= 1) std::cerr << "EXIT validate_faust: not regular file: " << uploaded_file << std::endl;
+            return 1;
         }
-    }
 
-    int exitstatus = pclose(pipe);
+        if (filename.extension() == ".dsp") {
+            // Simple DSP file: copy to sourcecode/ with original name
+            main_dsp_filename = filename.filename().string();
+            fs::copy_file(uploaded_file, sourcecode_path / main_dsp_filename);
+            if (gVerbosity >= 1) std::cerr << "Copied DSP file: " << main_dsp_filename << std::endl;
+        } else {
+            // Archive: extract to sourcecode/ and find main DSP file
+            struct archive*       archive;
+            struct archive_entry* entry;
 
-    if (exitstatus) {
-        if (gVerbosity >= 1)
-            std::cerr << "EXIT validate_faust with failure : completebutcorrupt_head  : " << old_full_filename
-                      << std::endl;
-        con_info->answerstring = completebutcorrupt_head + result + completebutcorrupt_tail;
-        // YANN
-        fs::remove_all(tmpdir);
-        return exitstatus;
-    }
+            archive = archive_read_new();
+            archive_read_support_filter_all(archive);
+            archive_read_support_format_all(archive);
+            int status = archive_read_open_filename(archive, uploaded_file.string().c_str(), 10240);
 
-    if (gVerbosity >= 2) std::cerr << "EXIT validate_faust is OK: " << old_full_filename << std::endl;
-
-    std::string sha1 = generate_sha1(con_info);
-
-    // build the sha1 directories here
-    {
-        fs::path sha1path = fs::path(con_info->directory) / fs::path(sha1);
-
-        if (!fs::is_directory(sha1path)) {
-            if (gVerbosity >= 2)
-                std::cerr << "ENTER make_initial_faust_directory(" << con_info << ", " << sha1path << std::endl;
-
-            try {
-                // first time we have this file
-                fs::create_directory(sha1path);
-            } catch (const fs::filesystem_error& e) {
-                std::cerr << "Warning : can't create directory " << sha1path << ":" << e.code().message() << std::endl;
-            }
-            std::string   filename(con_info->filename);
-            fs::path old_full_filename = fs::path(con_info->tmppath) / filename;
-
-            // libarchive stuff
-            struct archive* my_archive;
-            // struct archive_entry* my_entry;
-
-            my_archive = archive_read_new();
-            archive_read_support_filter_all(my_archive);
-            archive_read_support_format_all(my_archive);
-            int    archive_status = archive_read_open_filename(my_archive, old_full_filename.string().c_str(), 10240);
-            std::string result         = "";
-
-            if (!fs::is_regular_file(old_full_filename)) {
-                con_info->answerstring = completebuterrorpage;
-                return 1;
-
-            } else if (filename.substr(filename.find_last_of(".") + 1) == "dsp") {
-                create_file_tree(tmpdir, sha1path, fs::path(con_info->makefile_directory));
-
-            } else if (archive_status == ARCHIVE_OK) {
-                create_file_tree(unzipedDir, sha1path, fs::path(con_info->makefile_directory));
-
-            } else {
-                con_info->answerstring = completebutendoftheworld;
+            if (status != ARCHIVE_OK) {
+                con_info->answerstring = completebutdecompressionproblem;
+                archive_read_free(archive);
                 return 1;
             }
 
-            if (gVerbosity >= 2)
-                std::cerr << "EXIT make_initial_faust_directory" << con_info << ", " << sha1 << std::endl;
+            while (archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
+                fs::path entry_path = fs::path(archive_entry_pathname(entry));
+
+                // Skip system files
+                if (entry_path.string().substr(0, 8) == "__MACOSX") {
+                    if (gVerbosity >= 1) std::cerr << "Ignoring: " << entry_path << std::endl;
+                    continue;
+                }
+
+                // Check for DSP file
+                if (entry_path.extension() == ".dsp") {
+                    if (!main_dsp_filename.empty()) {
+                        con_info->answerstring = completebutmorethanoneDSPfile;
+                        std::cerr << "ERROR: multiple DSP files found" << std::endl;
+                        archive_read_free(archive);
+                        return 1;
+                    }
+                    main_dsp_filename = entry_path.filename().string();
+                }
+
+                // Extract file to sourcecode/
+                fs::path dest_path = sourcecode_path / entry_path;
+                fs::create_directories(dest_path.parent_path());
+                archive_entry_set_pathname(entry, dest_path.string().c_str());
+                archive_read_extract(archive, entry, ARCHIVE_EXTRACT_PERM);
+            }
+
+            archive_read_free(archive);
         }
-        con_info->answerstring = sha1;
+
+        // Verify we found a main DSP file
+        if (main_dsp_filename.empty()) {
+            con_info->answerstring = completebutnoDSPfile;
+            if (gVerbosity >= 1) std::cerr << "EXIT validate_faust: no DSP file found" << std::endl;
+            return 1;
+        }
+
+        // SINGLE COMPILATION: Copy main DSP file and compile in one step
+        if (gVerbosity >= 2) std::cerr << "SINGLE COMPILATION validate_faust" << std::endl;
+
+        // Single Faust compilation command
+        std::string faust_cmd = "cd " + sourcecode_path.string() + " && cp " + main_dsp_filename + " ../user_code.dsp" +
+                                " && faust " + main_dsp_filename + " -o ../generated.cpp -svg 2> ../errors.log";
+
+        if (gVerbosity >= 2) std::cerr << "Executing: " << faust_cmd << std::endl;
+
+        // Execute Faust compilation
+        FILE* faust_process = popen(faust_cmd.c_str(), "r");
+        if (!faust_process) {
+            if (gVerbosity >= 1) std::cerr << "Cannot launch faust command" << std::endl;
+            con_info->answerstring = completebutnopipe;
+            return 1;
+        }
+
+        // Read command output
+        std::string compilation_output;
+        char        buffer[1024];
+        while (fgets(buffer, sizeof(buffer), faust_process) != nullptr) {
+            compilation_output += buffer;
+        }
+
+        int return_code = pclose(faust_process);
+        if (return_code != 0) {
+            if (gVerbosity >= 1) {
+                std::cerr << "Faust compilation failed with code " << return_code << std::endl;
+                std::cerr << "Output: " << compilation_output << std::endl;
+            }
+            con_info->answerstring = completebutcorrupt_head + compilation_output + completebutcorrupt_tail;
+            return 1;
+        }
+
+        // Move generated SVG files to dedicated svg/ directory
+        fs::path svg_path = session_path / "svg";
+        try {
+            fs::create_directories(svg_path);
+
+            // Look for SVG files in sourcecode/ directory and its subdirectories
+            for (const auto& entry : fs::recursive_directory_iterator(sourcecode_path)) {
+                if (entry.is_regular_file() && entry.path().extension() == ".svg") {
+                    fs::path svg_file = svg_path / entry.path().filename();
+                    fs::rename(entry.path(), svg_file);
+                    if (gVerbosity >= 1) {
+                        std::cerr << "Moved SVG: \"" << entry.path().filename().string() << "\" to svg/" << std::endl;
+                    }
+                }
+            }
+
+            // Clean up empty SVG directories in sourcecode/
+            for (const auto& entry : fs::directory_iterator(sourcecode_path)) {
+                if (entry.is_directory() && entry.path().filename().string().find("-svg") != std::string::npos) {
+                    if (fs::is_empty(entry.path())) {
+                        fs::remove(entry.path());
+                        if (gVerbosity >= 1) {
+                            std::cerr << "Removed empty SVG directory: " << entry.path().filename().string()
+                                      << std::endl;
+                        }
+                    }
+                }
+            }
+        } catch (const fs::filesystem_error& e) {
+            if (gVerbosity >= 1) {
+                std::cerr << "Warning: Could not organize SVG files: " << e.code().message() << std::endl;
+            }
+        }
+
+        // Create metadata.json
+        fs::path metadata_file = session_path / "metadata.json";
+        try {
+            std::ofstream metadata(metadata_file);
+            metadata << "{\n";
+            metadata << "  \"sha1\": \"" << sha1 << "\",\n";
+            metadata << "  \"filename\": \"" << con_info->filename << "\",\n";
+            metadata << "  \"compilation_time\": \"" << std::time(nullptr) << "\",\n";
+            metadata << "  \"enhanced\": true,\n";
+            metadata << "  \"single_compilation\": true,\n";
+            metadata << "  \"structure\": {\n";
+            metadata << "    \"sourcecode/\": \"Original source files\",\n";
+            metadata << "    \"generated.cpp\": \"Generated C++ code\",\n";
+            metadata << "    \"svg/\": \"Block diagram SVG files\",\n";
+            metadata << "    \"metadata.json\": \"This file\"\n";
+            metadata << "  }\n";
+            metadata << "}\n";
+            metadata.close();
+        } catch (const fs::filesystem_error& e) {
+            if (gVerbosity >= 1) {
+                std::cerr << "Warning: Could not create metadata file: " << e.code().message() << std::endl;
+            }
+        }
+
+        // Create backward-compatible makefile structure
+        create_basic_session(sourcecode_path, session_path, fs::path(con_info->makefile_directory));
+
+        if (gVerbosity >= 2) std::cerr << "Session structure created successfully for: " << sha1 << std::endl;
     }
 
-    fs::remove_all(tmpdir);
-    return exitstatus;
+    con_info->answerstring = sha1;
+
+    if (gVerbosity >= 2) std::cerr << "EXIT validate_faust OK" << std::endl;
+    return 0;
 }
 
 /*
@@ -458,7 +508,8 @@ int FaustServer::send_page(struct MHD_Connection* connection, const char* page, 
     }
     // Add security headers
     MHD_add_response_header(response, "Content-Security-Policy",
-                            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; frame-ancestors "
+                            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+                            "img-src 'self'; frame-ancestors "
                             "'none'; form-action 'self';");
     MHD_add_response_header(response, "X-Frame-Options", "DENY");
     MHD_add_response_header(response, "X-Content-Type-Options", "nosniff");
@@ -717,8 +768,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/version")) {
         // Get Faust version by running faust --version
         std::string version_cmd = "faust --version 2>&1 | head -1 | grep -o '[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+'";
-        FILE* pipe = popen(version_cmd.c_str(), "r");
-        std::string version = "2.81.2"; // fallback
+        FILE*       pipe        = popen(version_cmd.c_str(), "r");
+        std::string version     = "2.81.2";  // fallback
         if (pipe) {
             char buffer[128];
             if (fgets(buffer, sizeof(buffer), pipe)) {
@@ -776,6 +827,32 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 
     } else if (matchURL(url, "/*/diagram/*") && matchExtension(url, ".svg")) {
         return makeAndSendResourceFile(connection, url);
+    
+    } else if (matchURL(url, "/*/generated.cpp")) {
+        // Serve the generated C++ file from validate_faust
+        std::vector<std::string> U = decomposeURL(url);
+        if (U.size() >= 2) {
+            fs::path filepath = fDirectory / U[1] / "generated.cpp";
+            if (fs::exists(filepath)) {
+                return send_file(connection, filepath, "text/x-c");
+            }
+        }
+        std::string error_msg = "File not found";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        
+    } else if (matchURL(url, "/*/svg/*") && matchExtension(url, ".svg")) {
+        // Serve SVG files from the svg/ directory created by validate_faust
+        std::vector<std::string> U = decomposeURL(url);
+        if (U.size() >= 4) {
+            // URL format: /<sha1>/svg/<filename.svg>
+            // U[0] is empty string, U[1] is sha1, U[2] is "svg", U[3] is filename
+            fs::path filepath = fDirectory / U[1] / U[2] / U[3];
+            if (fs::exists(filepath)) {
+                return send_file(connection, filepath, "image/svg+xml");
+            }
+        }
+        std::string error_msg = "SVG file not found";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "image/svg+xml");
 
     } else if (matchBeginURL(url, "/*/web/pwa/") || matchBeginURL(url, "/*/web/pwa-poly/")) {
         return makeAndSendResourceFile(connection, url);
@@ -825,19 +902,19 @@ std::string             FaustServer::getMakefileArtifactName(const fs::path& mak
 
 int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, const std::string& raw_url)
 {
-    std::vector<std::string> U        = decomposeURL(raw_url);
-    fs::path       url      = fs::path(raw_url);
+    std::vector<std::string> U   = decomposeURL(raw_url);
+    fs::path                 url = fs::path(raw_url);
     // Remove leading slash to make it relative for std::filesystem
     auto url_parent = url.parent_path();
     if (url_parent.is_absolute()) {
         url_parent = url_parent.relative_path();
     }
-    fs::path       fulldir  = getDirectory() / url_parent;
-    fs::path       target   = url.filename();
-    fs::path       makefile = fulldir / "Makefile";
-    fs::path       location;
-    const char*    mimetype;
-    bool           precompile = false;
+    fs::path    fulldir  = getDirectory() / url_parent;
+    fs::path    target   = url.filename();
+    fs::path    makefile = fulldir / "Makefile";
+    fs::path    location;
+    const char* mimetype;
+    bool        precompile = false;
 
     if (gVerbosity >= 2) std::cerr << "\nUSING SESSION " << U[1] << "\n\n";
     fSessionCache.refer(U[1]);
@@ -848,21 +925,21 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     // Check if we need to create the target directory on demand
     // URL format: /{sha1}/{platform}/{architecture}/{target}
     if (U.size() >= 4 && !fs::exists(makefile)) {
-        std::string platform = U[2];
+        std::string platform     = U[2];
         std::string architecture = U[3];
-        fs::path session_dir = getDirectory() / U[1];
-        
+        fs::path    session_dir  = getDirectory() / U[1];
+
         if (gVerbosity >= 2) {
-            std::cerr << "Target directory doesn't exist, creating on demand: " 
+            std::cerr << "Target directory doesn't exist, creating on demand: "
                       << "platform=" << platform << ", arch=" << architecture << std::endl;
         }
-        
+
         // Find the source directory - it might be the session root or a subdirectory
         fs::path source_dir = session_dir;
         if (fs::exists(session_dir / "source")) {
             source_dir = session_dir / "source";
         }
-        
+
         // Create the target directory on demand
         if (!create_target_directory(source_dir, session_dir, fMakefileDirectory, platform, architecture)) {
             if (gVerbosity >= 1) {
@@ -942,8 +1019,8 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 //------------------------------------------------------------------
 // dispatchPOSTConnections(), handle POST of a Faust source file
 
-int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const std::string& url, const char* upload_data,
-                                         size_t* upload_data_size, void** con_cls)
+int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const std::string& url,
+                                         const char* upload_data, size_t* upload_data_size, void** con_cls)
 {
     time_t tmNow = time(0);
 
@@ -1085,11 +1162,11 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
     if (con_info->tmppath.empty()) {
         con_info->filename = filename;
         // Generate unique path using random number
-        std::random_device rd;
-        std::mt19937 gen(rd());
+        std::random_device              rd;
+        std::mt19937                    gen(rd());
         std::uniform_int_distribution<> dis(10000, 99999);
-        auto unique_name = "tmp_" + std::to_string(dis(gen)) + "_" + std::to_string(dis(gen));
-        con_info->tmppath  = (fs::temp_directory_path() / unique_name).string();
+        auto unique_name  = "tmp_" + std::to_string(dis(gen)) + "_" + std::to_string(dis(gen));
+        con_info->tmppath = (fs::temp_directory_path() / unique_name).string();
         fs::create_directory(con_info->tmppath);
     }
 
@@ -1188,22 +1265,22 @@ int FaustServer::serveAppInterface(struct MHD_Connection* connection)
 {
     // Read the app.html file
     fs::path app_file_path = fs::current_path() / "app.html";
-    
+
     if (!fs::exists(app_file_path)) {
         return send_page(connection, "App interface not found", 23, MHD_HTTP_NOT_FOUND, "text/html");
     }
-    
+
     try {
         std::ifstream file(app_file_path);
         if (!file.is_open()) {
             return send_page(connection, "Cannot read app interface", 25, MHD_HTTP_INTERNAL_SERVER_ERROR, "text/html");
         }
-        
+
         std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         file.close();
-        
+
         return send_page(connection, content.c_str(), content.size(), MHD_HTTP_OK, "text/html");
-        
+
     } catch (const std::exception& e) {
         if (gVerbosity >= 1) {
             std::cerr << "Error serving app interface: " << e.what() << std::endl;

@@ -60,7 +60,7 @@
             flex-wrap: wrap;
         }
 
-        .platform-select, .arch-select {
+        .platform-select, .arch-select, .view-select {
             padding: 12px 16px;
             border: 1px solid #e1e5e9;
             border-radius: 8px;
@@ -71,16 +71,21 @@
             min-width: 160px;
         }
 
-        .platform-select:focus, .arch-select:focus {
+        .platform-select:focus, .arch-select:focus, .view-select:focus {
             outline: none;
             border-color: #3498db;
             box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
         }
 
-        .platform-select:disabled, .arch-select:disabled {
+        .platform-select:disabled, .arch-select:disabled, .view-select:disabled {
             background: #f8f9fa;
             cursor: not-allowed;
             opacity: 0.6;
+        }
+
+        .view-select {
+            border-color: #27ae60;
+            background: #f7fff8;
         }
 
         .btn {
@@ -232,6 +237,33 @@
         }
 
 
+        .svg-viewer {
+            flex: 1;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow: auto;
+            border-radius: 12px;
+        }
+
+        #svg-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+        }
+
+        #svg-container svg {
+            max-width: 100%;
+            max-height: 80vh;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            background: white;
+        }
+
         @media (max-width: 768px) {
             .toolbar {
                 flex-direction: column;
@@ -239,7 +271,7 @@
                 gap: 12px;
             }
             
-            .platform-select, .arch-select, .btn {
+            .platform-select, .arch-select, .view-select, .btn {
                 min-width: auto;
                 width: 100%;
             }
@@ -251,6 +283,37 @@
 
         #file-input {
             display: none;
+        }
+
+        .error-message {
+            background: #ffe6e6;
+            border: 1px solid #ffcccc;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            color: #cc0000;
+            font-size: 14px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-word;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .error-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #990000;
+        }
+
+        .error-hint {
+            font-size: 12px;
+            color: #cc6666;
+            margin-top: 8px;
+            font-style: italic;
         }
     </style>
 </head>
@@ -270,6 +333,21 @@
                 <option value="">Select platform first</option>
             </select>
             <button class="btn btn-success" id="download-btn" disabled>Download</button>
+            
+            <!-- View Selector -->
+            <select id="view-select" class="view-select" style="display: none;">
+                <option value="dsp">DSP Code</option>
+                <option value="cpp">Generated C++</option>
+                <option value="svg">Block Diagrams</option>
+                <option value="errors">Compilation Errors</option>
+            </select>
+        </div>
+
+        <!-- Error Message -->
+        <div class="error-message" id="error-message">
+            <div class="error-title">Compilation Error</div>
+            <div id="error-content"></div>
+            <div class="error-hint">Fix your Faust code or drop a new file to continue.</div>
         </div>
 
         <!-- Drop Zone -->
@@ -283,14 +361,99 @@
                 <div class="line-numbers" id="line-numbers"></div>
                 <div class="code-content" id="code-content"></div>
             </div>
+            <div class="svg-viewer" id="svg-viewer" style="display: none;">
+                <div id="svg-container"></div>
+            </div>
         </div>
         <input type="file" id="file-input" accept=".dsp,.zip,.tar.gz,.tar.bz2" style="display: none;">
     </div>
 
     <script>
+        /**
+         * VIEW PERSISTENCE AND ERROR HANDLING SPECIFICATION
+         * ==================================================
+         * 
+         * GENERAL PRINCIPLE:
+         * When a new .dsp file is dropped (drag & drop), the interface maintains
+         * the currently selected view instead of reverting to the default DSP view.
+         * Special handling applies when compilation errors occur.
+         * 
+         * VIEW MODES:
+         * The view selector has 4 modes:
+         * 1. DSP Code - Always enabled
+         * 2. Generated C++ - Enabled only when compilation succeeds
+         * 3. Block Diagrams - Enabled only when compilation succeeds
+         * 4. Compilation Errors - Enabled only when compilation fails
+         * 
+         * ERROR HANDLING BEHAVIOR:
+         * 
+         * When compilation SUCCEEDS:
+         * - First 3 modes (DSP, C++, SVG) are enabled
+         * - "Compilation Errors" mode is visible but disabled (grayed out)
+         * - This clearly indicates there are no errors
+         * - View persistence works as specified below
+         * 
+         * When compilation FAILS:
+         * - Only "DSP Code" and "Compilation Errors" modes are enabled
+         * - "Generated C++" and "Block Diagrams" are disabled (grayed out)
+         * - View automatically switches to "Compilation Errors" to show the error
+         * - Error displayed in red text on pink background
+         * - After fixing (dropping valid file), returns to persistent view
+         * 
+         * BEHAVIOR PER VIEW:
+         * 
+         * 1. DSP View:
+         *    - Always available
+         *    - Displays the DSP source code
+         *    - No special scroll handling (always starts at the top)
+         * 
+         * 2. C++ View (with smart scroll management):
+         *    - Only available when compilation succeeds
+         *    - Displays the generated C++ code
+         *    - SCROLL MANAGEMENT:
+         *      a) If viewing lines 100-130 of the old file:
+         *         → Tries to display the same lines (100-130) in the new file
+         *      b) If the new file has fewer than 130 lines:
+         *         → Displays the last 31 lines of the file (number of previously visible lines)
+         *      c) If the new file has fewer than 31 lines:
+         *         → Displays the complete file from the beginning
+         * 
+         * 3. SVG View:
+         *    - Only available when compilation succeeds
+         *    - Automatically displays the new SVG diagram after compilation
+         *    - Loads the process.svg file from the newly compiled code
+         * 
+         * 4. Compilation Errors View:
+         *    - Only available when compilation fails
+         *    - Shows compilation errors in red text on pink background
+         *    - Automatically selected when errors occur
+         * 
+         * EXECUTION FLOW:
+         * 1. Capture current state before drop (view + scroll position if C++)
+         * 2. Upload new file and obtain SHA1
+         * 3. Check compilation status:
+         *    - If success: restore previous view (persistence)
+         *    - If failure: switch to "Compilation Errors" view
+         * 4. Update view selector options based on compilation status
+         * 5. If C++ view and success: apply scroll restoration logic
+         * 
+         * KEY VARIABLES:
+         * - currentView: currently active view ('dsp', 'cpp', 'svg', 'errors')
+         * - hasCompilationError: boolean indicating if current file has errors
+         * - previousScrollInfo: captured scroll information for C++ view
+         * - originalDspCode: original DSP code stored to allow returning to DSP view
+         * - compilationErrors: stores the error messages from failed compilation
+         */
+        
         let selectedFile = null;
         let selectedTarget = null;
         let availableTargets = null;
+        let hasCompilationError = false;
+        let currentSha1 = null;
+        let currentView = 'dsp';
+        let originalDspCode = null;  // Store the original DSP code
+        let previousScrollInfo = null;  // Store scroll position info for C++ view
+        let compilationErrors = null;  // Store compilation error messages
 
         // Elements
         const titleElement = document.getElementById('title');
@@ -304,6 +467,11 @@
         const fileContent = document.getElementById('file-content');
         const lineNumbers = document.getElementById('line-numbers');
         const codeContent = document.getElementById('code-content');
+        const errorMessage = document.getElementById('error-message');
+        const errorContent = document.getElementById('error-content');
+        const viewSelect = document.getElementById('view-select');
+        const svgViewer = document.getElementById('svg-viewer');
+        const svgContainer = document.getElementById('svg-container');
 
         // Upload zone events (only drag and drop, no click)
         uploadZone.addEventListener('dragover', handleDragOver);
@@ -313,6 +481,9 @@
         // Platform/architecture selection events
         platformSelect.addEventListener('change', handlePlatformChange);
         archSelect.addEventListener('change', handleArchChange);
+        
+        // View selection events
+        viewSelect.addEventListener('change', handleViewChange);
         
         // Load targets and version when DOM is ready
         if (document.readyState === 'loading') {
@@ -349,18 +520,80 @@
 
         function handleFile(file) {
             selectedFile = file;
+            hasCompilationError = false; // Reset error state with new file
             updateCompileButton();
+            hideError();
             
             // Show file content if it's a DSP file
             if (file.name.endsWith('.dsp')) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    displayCodeWithLineNumbers(e.target.result);
+                    originalDspCode = e.target.result;  // Store the original DSP code
+                    // Only display if we're in DSP view or don't have a current view set
+                    // This avoids overwriting C++ view content when dropping a new file
+                    if (currentView === 'dsp' || !currentView) {
+                        displayCodeWithLineNumbers(originalDspCode);
+                    }
                 };
                 reader.readAsText(file);
             }
             
             checkAutoCompile();
+        }
+
+        function showError(message) {
+            hasCompilationError = true;
+            errorContent.textContent = message;
+            errorMessage.classList.add('show');
+            updateCompileButton(); // Update buttons after error
+        }
+
+        function hideError() {
+            errorMessage.classList.remove('show');
+            errorContent.textContent = '';
+        }
+
+        function extractFaustError(htmlText) {
+            // If it's not HTML, return as is
+            if (!htmlText.includes('<') || !htmlText.includes('>')) {
+                return htmlText;
+            }
+            
+            // Try to extract the Faust error message from HTML
+            // Look for text after "why Faust failed.</p>"
+            const faustFailedMatch = htmlText.match(/why Faust failed\.<\/p>(.*?)(<\/body>|$)/s);
+            if (faustFailedMatch) {
+                const errorPart = faustFailedMatch[1].trim();
+                // Remove any remaining HTML tags
+                const cleanError = errorPart.replace(/<[^>]*>/g, '').trim();
+                if (cleanError) {
+                    return cleanError;
+                }
+            }
+            
+            // Fallback: try to extract any error message from HTML
+            const errorMatch = htmlText.match(/ERROR[^<]*(?:<[^>]*>)*/i);
+            if (errorMatch) {
+                return errorMatch[0].replace(/<[^>]*>/g, '').trim();
+            }
+            
+            // Last resort: remove all HTML tags and return clean text
+            const cleanText = htmlText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            
+            // If text is too long, try to find the most relevant part
+            if (cleanText.length > 200) {
+                const lines = cleanText.split(/[.!]/).filter(line => 
+                    line.toLowerCase().includes('error') || 
+                    line.toLowerCase().includes('invalid') ||
+                    line.toLowerCase().includes('failed')
+                );
+                if (lines.length > 0) {
+                    return lines[0].trim() + '.';
+                }
+                return cleanText.substring(0, 200) + '...';
+            }
+            
+            return cleanText || 'Compilation failed';
         }
 
         function displayCodeWithLineNumbers(code) {
@@ -487,6 +720,7 @@
             // Clear architecture select
             archSelect.innerHTML = '<option value="">Select architecture...</option>';
             archSelect.disabled = !selectedPlatform;
+            // DO NOT hide error - invalid code remains invalid
             
             if (selectedPlatform && availableTargets[selectedPlatform]) {
                 // Populate architecture options
@@ -504,6 +738,7 @@
         }
         
         function handleArchChange() {
+            // DO NOT hide error - invalid code remains invalid
             updateCompileButton();
             checkAutoCompile();
         }
@@ -513,7 +748,17 @@
             const hasPlatform = platformSelect.value !== '';
             const hasArch = archSelect.value !== '';
             
+            // If there's a compilation error, disable both buttons
+            if (hasCompilationError) {
+                compileBtn.disabled = true;
+                downloadBtn.disabled = true;
+                compileBtn.textContent = 'Fix Code First';
+                return;
+            }
+            
+            // Normal logic when no error
             compileBtn.disabled = !(hasFile && hasPlatform && hasArch);
+            compileBtn.textContent = 'Compile';
             
             if (hasPlatform && hasArch) {
                 selectedTarget = {
@@ -529,6 +774,11 @@
             const hasFile = selectedFile !== null;
             const hasPlatform = platformSelect.value !== '';
             const hasArch = archSelect.value !== '';
+            
+            // Don't auto-compile if there's an error
+            if (hasCompilationError) {
+                return;
+            }
             
             if (hasFile && hasPlatform && hasArch && !compileBtn.disabled) {
                 compile();
@@ -629,12 +879,13 @@
         });
 
         async function compile() {
-            if (!selectedFile || !selectedTarget) return;
+            if (!selectedFile || !selectedTarget || hasCompilationError) return;
             
             try {
                 compileBtn.disabled = true;
                 downloadBtn.disabled = true;
                 downloadBtn.textContent = 'Compiling...';
+                compileBtn.textContent = 'Compiling...';
                 
                 // Use direct compilation API
                 const formData = new FormData();
@@ -647,23 +898,520 @@
                 });
                 
                 if (response.ok) {
-                    compiledBlob = await response.blob();
-                    downloadBtn.disabled = false;
-                    downloadBtn.textContent = 'Download';
+                    // First check content type - text indicates error, application/* indicates binary
+                    const contentType = response.headers.get('content-type') || '';
+                    
+                    if (contentType.includes('text/') || contentType.includes('html')) {
+                        // This is likely an error message
+                        const errorText = await response.text();
+                        const cleanError = extractFaustError(errorText);
+                        showError(cleanError);
+                        compiledBlob = null;
+                    } else {
+                        // This should be a binary response
+                        const blob = await response.blob();
+                        
+                        // Double-check: if blob is very small, it might be an error message
+                        if (blob.size < 100) {
+                            const text = await blob.text();
+                            if (text.includes('Invalid') || text.includes('ERROR') || text.includes('error')) {
+                                const cleanError = extractFaustError(text);
+                                showError(cleanError);
+                                compiledBlob = null;
+                            } else {
+                                compiledBlob = blob;
+                                downloadBtn.disabled = false;
+                                downloadBtn.textContent = 'Download';
+                                compileBtn.textContent = 'Compile';
+                            }
+                        } else {
+                            compiledBlob = blob;
+                            downloadBtn.disabled = false;
+                            downloadBtn.textContent = 'Download';
+                            compileBtn.textContent = 'Compile';
+                        }
+                    }
                 } else {
-                    throw new Error('Compilation failed');
+                    // Try to get detailed error message from response
+                    let errorMessage = 'Compilation failed';
+                    try {
+                        const errorText = await response.text();
+                        if (errorText.trim()) {
+                            errorMessage = extractFaustError(errorText);
+                        } else {
+                            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                        }
+                    } catch (e) {
+                        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                    }
+                    
+                    // Show error and mark code as invalid
+                    showError(errorMessage);
+                    compiledBlob = null;
                 }
             } catch (error) {
+                showError(`Network error: ${error.message}`);
                 compiledBlob = null;
-                downloadBtn.disabled = true;
-                downloadBtn.textContent = 'Error';
-                setTimeout(() => {
-                    downloadBtn.textContent = 'Download';
-                }, 2000);
-            } finally {
-                updateCompileButton();
+            }
+            // updateCompileButton is called in showError() if error occurs
+        }
+
+        /**
+         * Update view selector options based on compilation status
+         * - When no errors: DSP, C++, SVG enabled; Errors disabled
+         * - When errors exist: DSP, Errors enabled; C++, SVG disabled
+         */
+        function updateViewSelectorOptions() {
+            const options = viewSelect.querySelectorAll('option');
+            
+            options.forEach(option => {
+                switch(option.value) {
+                    case 'dsp':
+                        // DSP view is always enabled
+                        option.disabled = false;
+                        break;
+                    case 'cpp':
+                    case 'svg':
+                        // C++ and SVG views only enabled when no compilation errors
+                        option.disabled = hasCompilationError;
+                        break;
+                    case 'errors':
+                        // Errors view only enabled when compilation errors exist
+                        option.disabled = !hasCompilationError;
+                        break;
+                }
+            });
+        }
+
+        function handleViewChange() {
+            currentView = viewSelect.value;
+            if (currentSha1) {
+                switchView(currentView);
             }
         }
+
+        /**
+         * Capture scroll position information for C++ view
+         * 
+         * This function is part of the view persistence system.
+         * It captures the current scroll state in the C++ view to enable
+         * intelligent restoration when loading a new file.
+         * 
+         * Returns an object with:
+         * - firstVisibleLine: first line visible in the viewport (e.g., 100)
+         * - lastVisibleLine: last line visible in the viewport (e.g., 130)
+         * - scrollTop: raw scroll position in pixels
+         * - linesVisible: number of visible lines (e.g., 31)
+         * 
+         * This information is used by restoreScrollPosition() to
+         * maintain a continuous reading experience between files.
+         */
+        function captureScrollInfo() {
+            const codeView = document.getElementById('code-view');
+            if (!codeView || currentView !== 'cpp') return null;
+            
+            const lineHeight = parseFloat(window.getComputedStyle(codeView).lineHeight) || 20;
+            const scrollTop = codeView.scrollTop;
+            const viewportHeight = codeView.clientHeight;
+            
+            const firstVisibleLine = Math.floor(scrollTop / lineHeight) + 1;
+            const lastVisibleLine = Math.ceil((scrollTop + viewportHeight) / lineHeight);
+            
+            return {
+                firstVisibleLine,
+                lastVisibleLine,
+                scrollTop,
+                linesVisible: lastVisibleLine - firstVisibleLine + 1
+            };
+        }
+
+        /**
+         * Restore scroll position for C++ view based on previous position
+         * 
+         * SCROLL RESTORATION ALGORITHM:
+         * ============================
+         * This function implements the intelligent scroll position restoration
+         * logic when changing files in C++ view.
+         * 
+         * CASE 1: New file is long enough (>= lastVisibleLine)
+         *         → Display the same lines as before (e.g., 100-130)
+         * 
+         * CASE 2: New file is shorter but has more lines than were visible
+         *         → Display the last N lines (where N = previous linesVisible)
+         *         Example: If viewing 31 lines and new file has 80 lines,
+         *                  display lines 50-80
+         * 
+         * CASE 3: New file has fewer lines than were visible
+         *         → Display the entire file from the beginning
+         *         Example: If viewing 31 lines and new file has 20 lines,
+         *                  display lines 1-20
+         * 
+         * @param {number} totalLines - Total number of lines in the new file
+         */
+        function restoreScrollPosition(totalLines) {
+            if (!previousScrollInfo || currentView !== 'cpp') return;
+            
+            const codeView = document.getElementById('code-view');
+            if (!codeView) return;
+            
+            const lineHeight = parseFloat(window.getComputedStyle(codeView).lineHeight) || 20;
+            const { firstVisibleLine, lastVisibleLine, linesVisible } = previousScrollInfo;
+            
+            let targetScrollTop = 0;
+            
+            if (totalLines >= lastVisibleLine) {
+                // The same lines exist, restore to the same position
+                targetScrollTop = (firstVisibleLine - 1) * lineHeight;
+            } else if (totalLines > linesVisible) {
+                // File is shorter, show the last N lines (where N is the number of lines previously visible)
+                targetScrollTop = Math.max(0, (totalLines - linesVisible) * lineHeight);
+            }
+            // If file has fewer lines than were visible, targetScrollTop stays at 0 (show entire file)
+            
+            setTimeout(() => {
+                codeView.scrollTop = targetScrollTop;
+            }, 50); // Small delay to ensure content is rendered
+        }
+
+        /**
+         * Switch between DSP, C++, and SVG views
+         * 
+         * This function handles view switching with intelligent state saving
+         * for persistence when dropping new files.
+         * 
+         * BEHAVIOR:
+         * - Before leaving C++ view: captures scroll position
+         * - Switches to the requested new view
+         * - For DSP: restores original source code
+         * - For C++: loads generated code and restores scroll if applicable
+         * - For SVG: loads the SVG diagram
+         */
+        function switchView(view) {
+            // Capture scroll info before switching away from C++ view
+            // This allows maintaining position when returning to this view
+            if (currentView === 'cpp') {
+                previousScrollInfo = captureScrollInfo();
+            }
+            
+            // Hide all view containers
+            fileContent.style.display = 'none';
+            svgViewer.style.display = 'none';
+            
+            switch(view) {
+                case 'dsp':
+                    // Restore the original DSP code
+                    if (originalDspCode) {
+                        displayCodeWithLineNumbers(originalDspCode, 'faust');
+                    }
+                    fileContent.style.display = 'flex';
+                    break;
+                case 'cpp':
+                    loadGeneratedCpp();
+                    break;
+                case 'svg':
+                    loadSvgDiagrams();
+                    break;
+                case 'errors':
+                    displayCompilationErrors();
+                    break;
+            }
+        }
+
+        async function loadGeneratedCpp() {
+            if (!currentSha1) return;
+            
+            try {
+                const response = await fetch(`/${currentSha1}/generated.cpp`);
+                if (response.ok) {
+                    const cppCode = await response.text();
+                    const totalLines = cppCode.split('\n').length;
+                    displayCodeWithLineNumbers(cppCode, 'cpp');
+                    fileContent.style.display = 'flex';
+                    
+                    // Restore scroll position if we have previous scroll info
+                    restoreScrollPosition(totalLines);
+                } else {
+                    showViewError('Generated C++ code not available. Try compiling first.');
+                }
+            } catch (error) {
+                showViewError('Error loading generated C++ code: ' + error.message);
+            }
+        }
+
+        async function loadSvgDiagrams() {
+            if (!currentSha1) return;
+            
+            try {
+                // Try to load the main process.svg file
+                const response = await fetch(`/${currentSha1}/svg/process.svg`);
+                if (response.ok) {
+                    const svgContent = await response.text();
+                    svgContainer.innerHTML = svgContent;
+                    svgViewer.style.display = 'flex';
+                } else {
+                    // If process.svg doesn't exist, show a message
+                    svgContainer.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #666;">
+                            <h3>SVG Block Diagrams</h3>
+                            <p>No block diagrams available for this code.</p>
+                            <p style="font-size: 14px; margin-top: 20px;">Try compiling first or check if your DSP code generates diagrams.</p>
+                        </div>
+                    `;
+                    svgViewer.style.display = 'flex';
+                }
+            } catch (error) {
+                showViewError('Error loading SVG diagrams: ' + error.message);
+            }
+        }
+
+        /**
+         * Display compilation errors in a dedicated view
+         * Shows errors in red text on pink background as specified
+         */
+        function displayCompilationErrors() {
+            if (!compilationErrors) {
+                // Shouldn't happen, but handle gracefully
+                svgContainer.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <p>No compilation errors to display</p>
+                    </div>
+                `;
+            } else {
+                // Display errors in red on pink background
+                svgContainer.innerHTML = `
+                    <div style="background: #ffe6e6; border: 1px solid #ffcccc; border-radius: 8px; padding: 20px; margin: 20px;">
+                        <h3 style="color: #cc0000; margin-top: 0;">Compilation Errors</h3>
+                        <pre style="color: #cc0000; white-space: pre-wrap; word-break: break-word; font-family: monospace; font-size: 14px; line-height: 1.6;">
+${compilationErrors}
+                        </pre>
+                    </div>
+                `;
+            }
+            svgViewer.style.display = 'flex';
+        }
+
+        function showViewError(message) {
+            svgContainer.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #cc0000; background: #ffe6e6; border-radius: 8px; margin: 20px;">
+                    <p>${message}</p>
+                </div>
+            `;
+            svgViewer.style.display = 'flex';
+        }
+
+        function displayCodeWithLineNumbers(code, language = 'faust') {
+            const lines = code.split('\n');
+            const totalLines = lines.length;
+            
+            // Generate line numbers
+            let lineNumbersHtml = '';
+            for (let i = 1; i <= totalLines; i++) {
+                lineNumbersHtml += i + '\n';
+            }
+            
+            // Hide upload content and show file content
+            uploadContent.style.display = 'none';
+            uploadZone.classList.add('has-content');
+            
+            // Set line numbers and highlighted code
+            lineNumbers.textContent = lineNumbersHtml;
+            if (language === 'cpp') {
+                codeContent.innerHTML = highlightCppCode(code);
+            } else {
+                codeContent.innerHTML = highlightFaustCode(code);
+            }
+            fileContent.classList.add('show');
+            
+            // Show view selector when we have compiled content
+            if (currentSha1) {
+                viewSelect.style.display = 'inline-block';
+            }
+            
+            // Synchronize scroll between line numbers and code content
+            codeContent.addEventListener('scroll', function() {
+                lineNumbers.scrollTop = codeContent.scrollTop;
+            });
+        }
+
+        function highlightCppCode(code) {
+            // Escape HTML first
+            let highlighted = code.replace(/&/g, '&amp;')
+                                 .replace(/</g, '&lt;')
+                                 .replace(/>/g, '&gt;');
+            
+            // C++ keywords
+            const keywords = [
+                'class', 'struct', 'public', 'private', 'protected', 'virtual', 'static',
+                'const', 'int', 'float', 'double', 'void', 'char', 'bool', 'string',
+                'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue',
+                'return', 'include', 'namespace', 'using', 'template', 'typename'
+            ];
+            
+            // Split into lines to handle highlighting line by line
+            const lines = highlighted.split('\n');
+            
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i];
+                
+                // Skip if line is already highlighted
+                if (line.includes('<span')) continue;
+                
+                // Highlight comments first
+                if (line.includes('//')) {
+                    const commentIndex = line.indexOf('//');
+                    const beforeComment = line.substring(0, commentIndex);
+                    const comment = line.substring(commentIndex);
+                    line = beforeComment + '<span class="faust-comment">' + comment + '</span>';
+                }
+                
+                // Only highlight other elements if not in a comment
+                if (!line.includes('class="faust-comment"')) {
+                    // Highlight strings
+                    line = line.replace(/"[^"]*"/g, '<span class="faust-string">$&</span>');
+                    
+                    // Highlight numbers
+                    line = line.replace(/\b\d+(\.\d+)?f?\b/g, '<span class="faust-number">$&</span>');
+                    
+                    // Highlight keywords
+                    keywords.forEach(keyword => {
+                        const regex = new RegExp(`\\b${keyword}\\b`, 'g');
+                        line = line.replace(regex, `<span class="faust-keyword">${keyword}</span>`);
+                    });
+                }
+                
+                lines[i] = line;
+            }
+            
+            return lines.join('\n');
+        }
+
+        // Override handleFile to store SHA1 for enhanced features
+        const originalHandleFile = handleFile;
+        
+        /**
+         * Enhanced file handler with view persistence
+         * Specification:
+         * - When dropping a new DSP file, maintain the current view selection
+         * - If in SVG view, show the new SVG after compilation
+         * - If in C++ view, show the new C++ code with smart scroll preservation
+         * - For C++ view: try to maintain scroll position at same lines, or show last N lines if file is shorter
+         */
+        async function handleFileEnhanced(file) {
+            selectedFile = file;
+            hasCompilationError = false;
+            
+            // Capture scroll info before processing new file (if in C++ view)
+            if (currentView === 'cpp') {
+                previousScrollInfo = captureScrollInfo();
+            }
+            
+            // Remember the current view to restore it after loading
+            const previousView = currentView;
+            
+            currentSha1 = null; // Reset SHA1
+            viewSelect.style.display = 'none'; // Hide view selector until we have SHA1
+            updateCompileButton();
+            hideError();
+            
+            // Show file content if it's a DSP file
+            if (file.name.endsWith('.dsp')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    originalDspCode = e.target.result;  // Store the original DSP code
+                    // Only display DSP code if we're in DSP view
+                    // For other views, content will be loaded after SHA1 is obtained
+                    if (previousView === 'dsp') {
+                        displayCodeWithLineNumbers(originalDspCode, 'faust');
+                    }
+                };
+                reader.readAsText(file);
+            }
+            
+            // Upload file to get SHA1 for enhanced features
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await fetch('/filepost', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const sha1 = await response.text();
+                    currentSha1 = sha1.trim();
+                    console.log('File uploaded successfully, SHA1:', currentSha1);
+                    
+                    // Clear any previous errors
+                    hasCompilationError = false;
+                    compilationErrors = null;
+                    
+                    // Update view selector options (enable C++/SVG, disable errors)
+                    updateViewSelectorOptions();
+                    
+                    // Show view selector now that we have SHA1
+                    viewSelect.style.display = 'inline-block';
+                    
+                    /**
+                     * PREVIOUS VIEW RESTORATION
+                     * =========================
+                     * Implementation of view persistence after dropping a new file.
+                     * 
+                     * If the user was viewing the C++ code or SVG diagram,
+                     * we stay in that view instead of reverting to the default DSP view.
+                     * 
+                     * This enables a smooth workflow where the user can:
+                     * 1. Examine the generated C++ code from a file
+                     * 2. Drop a new DSP file
+                     * 3. Immediately see the newly generated C++ code
+                     * 4. With intelligently preserved scroll position
+                     * 
+                     * Note: If already in DSP view, we stay there (no change)
+                     * If previous view was 'errors', switch to 'dsp' as a safe default
+                     */
+                    if (previousView !== 'dsp' && previousView !== 'errors') {
+                        currentView = previousView;
+                        viewSelect.value = previousView;
+                        // Switch to the previous view (C++ or SVG)
+                        switchView(previousView);
+                    } else if (previousView === 'errors') {
+                        // If we were viewing errors, switch to DSP view
+                        currentView = 'dsp';
+                        viewSelect.value = 'dsp';
+                        switchView('dsp');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    const cleanError = extractFaustError(errorText);
+                    
+                    // Store the error for the error view
+                    compilationErrors = cleanError;
+                    hasCompilationError = true;
+                    
+                    // Update view selector options
+                    updateViewSelectorOptions();
+                    
+                    // Automatically switch to error view
+                    currentView = 'errors';
+                    viewSelect.value = 'errors';
+                    viewSelect.style.display = 'inline-block'; // Make sure selector is visible
+                    
+                    // Display the errors
+                    switchView('errors');
+                    
+                    // Also show in the traditional error area
+                    showError(cleanError);
+                }
+            } catch (error) {
+                console.log('Upload failed, continuing with basic mode:', error.message);
+                // Continue without enhanced features
+            }
+            
+            checkAutoCompile();
+        }
+        
+        // Replace the original handleFile function
+        handleFile = handleFileEnhanced;
     </script>
 </body>
 </html>
