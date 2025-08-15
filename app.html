@@ -347,6 +347,42 @@
             font-weight: 500;
         }
 
+        /* Download button for content areas */
+        .content-area {
+            position: relative;
+        }
+
+        .download-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .content-area:hover .download-button {
+            opacity: 1;
+        }
+
+        .download-button:hover {
+            background: #2980b9;
+        }
+
+        .download-button:active {
+            transform: translateY(1px);
+        }
+
         .global-drag-icon {
             font-size: 48px;
             margin-bottom: 15px;
@@ -392,11 +428,17 @@
                 <div class="upload-text">Drop your .dsp file here</div>
                 <div class="upload-hint">Supports .dsp files and archives (.zip, .tar.gz)</div>
             </div>
-            <div class="file-content" id="file-content">
+            <div class="file-content content-area" id="file-content">
+                <button class="download-button" id="code-download-btn" style="display: none;">
+                    💾 Download
+                </button>
                 <div class="line-numbers" id="line-numbers"></div>
                 <div class="code-content" id="code-content"></div>
             </div>
-            <div class="svg-viewer" id="svg-viewer" style="display: none;">
+            <div class="svg-viewer content-area" id="svg-viewer" style="display: none;">
+                <button class="download-button" id="svg-download-btn" style="display: none;">
+                    📦 Download ZIP
+                </button>
                 <div id="svg-container"></div>
             </div>
         </div>
@@ -511,6 +553,8 @@
         const viewSelect = document.getElementById('view-select');
         const svgViewer = document.getElementById('svg-viewer');
         const svgContainer = document.getElementById('svg-container');
+        const codeDownloadBtn = document.getElementById('code-download-btn');
+        const svgDownloadBtn = document.getElementById('svg-download-btn');
 
         // Upload zone events (only drag and drop, no click)
         uploadZone.addEventListener('dragover', handleDragOver);
@@ -531,6 +575,10 @@
         
         // View selection events
         viewSelect.addEventListener('change', handleViewChange);
+        
+        // Download button events
+        codeDownloadBtn.addEventListener('click', handleCodeDownload);
+        svgDownloadBtn.addEventListener('click', handleSvgDownload);
         
         // Load targets and version when DOM is ready
         if (document.readyState === 'loading') {
@@ -607,6 +655,91 @@
         }
 
         // ========================================
+        // DOWNLOAD FUNCTIONALITY
+        // ========================================
+
+        /**
+         * Handle code download button click (DSP or C++)
+         */
+        async function handleCodeDownload() {
+            if (!currentSha1) return;
+            
+            try {
+                let filename, content, mimeType;
+                
+                if (currentView === 'dsp') {
+                    // Download DSP source code with original filename
+                    const filenameResponse = await fetch(`/${currentSha1}/filename`);
+                    if (filenameResponse.ok) {
+                        filename = (await filenameResponse.text()).trim();
+                    } else {
+                        filename = 'source.dsp';
+                    }
+                    content = originalDspCode || '';
+                    mimeType = 'text/plain';
+                } else if (currentView === 'cpp') {
+                    // Download generated C++ code
+                    const cppResponse = await fetch(`/${currentSha1}/generated.cpp`);
+                    if (cppResponse.ok) {
+                        content = await cppResponse.text();
+                        
+                        // Get original filename and change extension to .cpp
+                        const filenameResponse = await fetch(`/${currentSha1}/filename`);
+                        if (filenameResponse.ok) {
+                            const originalName = (await filenameResponse.text()).trim();
+                            const baseName = originalName.replace(/\.[^/.]+$/, "");
+                            filename = baseName + '.cpp';
+                        } else {
+                            filename = 'generated.cpp';
+                        }
+                        mimeType = 'text/x-c++src';
+                    } else {
+                        throw new Error('Could not fetch C++ code');
+                    }
+                }
+                
+                triggerDownload(content, filename, mimeType);
+                
+            } catch (error) {
+                console.error('Error downloading code:', error);
+                alert('Error downloading file: ' + error.message);
+            }
+        }
+
+        /**
+         * Handle SVG download button click
+         */
+        async function handleSvgDownload() {
+            if (!currentSha1) return;
+            
+            try {
+                const zipResponse = await fetch(`/${currentSha1}/svg.zip`);
+                if (zipResponse.ok) {
+                    const blob = await zipResponse.blob();
+                    
+                    // Get original filename and create ZIP name
+                    const filenameResponse = await fetch(`/${currentSha1}/filename`);
+                    let filename;
+                    if (filenameResponse.ok) {
+                        const originalName = (await filenameResponse.text()).trim();
+                        const baseName = originalName.replace(/\.[^/.]+$/, "");
+                        filename = baseName + '_diagrams.zip';
+                    } else {
+                        filename = 'diagrams.zip';
+                    }
+                    
+                    triggerDownload({ blob, isBlob: true }, filename, 'application/zip');
+                } else {
+                    throw new Error('Could not fetch SVG ZIP');
+                }
+                
+            } catch (error) {
+                console.error('Error downloading SVG ZIP:', error);
+                alert('Error downloading SVG diagrams: ' + error.message);
+            }
+        }
+
+        // ========================================
         // DRAG-AND-DROP SORTANT (Export functionality)
         // ========================================
 
@@ -622,51 +755,67 @@
             svgContainer.removeEventListener('dragstart', handleSvgDragStart);
             svgContainer.removeEventListener('dragend', handleDragEnd);
             
-            // Reset draggable state
+            // Reset draggable state and hide all download buttons
             fileContent.draggable = false;
             svgContainer.draggable = false;
+            codeDownloadBtn.style.display = 'none';
+            svgDownloadBtn.style.display = 'none';
             
-            // Add appropriate drag handler based on current view
+            // Add appropriate drag handler and show download button based on current view
             switch(currentView) {
                 case 'dsp':
                     fileContent.draggable = true;
                     fileContent.addEventListener('dragstart', handleCodeDragStart);
                     fileContent.addEventListener('dragend', handleDragEnd);
+                    codeDownloadBtn.style.display = 'flex';
                     break;
                 case 'cpp':
                     fileContent.draggable = true;
                     fileContent.addEventListener('dragstart', handleCodeDragStart);
                     fileContent.addEventListener('dragend', handleDragEnd);
+                    codeDownloadBtn.style.display = 'flex';
                     break;
                 case 'svg':
                     svgContainer.draggable = true;
                     svgContainer.addEventListener('dragstart', handleSvgDragStart);
                     svgContainer.addEventListener('dragend', handleDragEnd);
+                    svgDownloadBtn.style.display = 'flex';
                     break;
             }
         }
 
         // Variable to store drag data for fallback download
         let lastDragData = null;
+        let dragStartTime = null;
 
         /**
-         * Handle drag end - trigger download if drag was unsuccessful
+         * Handle drag end - only trigger download if clearly failed
          */
         function handleDragEnd(e) {
-            // Small delay to see if the drag was successful
+            const dragDuration = Date.now() - dragStartTime;
+            
             setTimeout(() => {
-                if (lastDragData && e.dataTransfer.dropEffect === 'none') {
-                    console.log('Drag failed, triggering download as fallback');
+                if (lastDragData) {
+                    // Only trigger fallback if clearly failed (very conservative approach)
+                    // The drag-and-drop to desktop often reports 'none' even when successful
+                    const clearFailure = e.dataTransfer.dropEffect === 'none' && dragDuration < 300;
                     
-                    if (lastDragData.isBlob) {
-                        // For blob data (SVG ZIP)
-                        triggerDownload(lastDragData, lastDragData.filename, lastDragData.mimeType);
+                    console.log(`Drag ended (dropEffect: ${e.dataTransfer.dropEffect}, duration: ${dragDuration}ms)`);
+                    
+                    if (clearFailure) {
+                        console.log('Clear drag failure detected, triggering download as fallback');
+                        
+                        if (lastDragData.isBlob) {
+                            triggerDownload(lastDragData, lastDragData.filename, lastDragData.mimeType);
+                        } else {
+                            triggerDownload(lastDragData.content, lastDragData.filename, lastDragData.mimeType);
+                        }
                     } else {
-                        // For text content (DSP/C++)
-                        triggerDownload(lastDragData.content, lastDragData.filename, lastDragData.mimeType);
+                        console.log('Drag operation completed (success uncertain due to browser limitations)');
                     }
                 }
-                lastDragData = null; // Reset
+                lastDragData = null;
+                dragStartTime = null;
             }, 100);
         }
 
@@ -746,27 +895,58 @@
                     }
                 }
                 
-                // Create data transfer with multiple formats for better compatibility
+                // Create data transfer with optimized formats for desktop drop
                 const blob = new Blob([content], { type: mimeType });
                 const url = URL.createObjectURL(blob);
                 
-                // Set multiple data transfer formats for maximum compatibility
+                // Primary format: DownloadURL (Chrome/Edge support)
                 e.dataTransfer.setData('DownloadURL', `${mimeType}:${filename}:${url}`);
-                e.dataTransfer.setData('text/uri-list', url);
-                e.dataTransfer.setData('text/plain', content); // Fallback: raw content
-                e.dataTransfer.setData('application/octet-stream', url);
                 
-                // Try to set a custom filename (not widely supported but worth trying)
+                // Alternative formats for better compatibility
+                e.dataTransfer.setData('text/uri-list', url);
+                e.dataTransfer.setData('text/plain', content);
+                
+                // File-specific formats
+                if (currentView === 'cpp') {
+                    e.dataTransfer.setData('text/x-c++src', content);
+                    e.dataTransfer.setData('application/x-cpp', content);
+                } else if (currentView === 'dsp') {
+                    e.dataTransfer.setData('text/x-faust', content);
+                    e.dataTransfer.setData('application/x-faust', content);
+                }
+                
+                // Set file information
                 try {
+                    // These are non-standard but some applications might use them
                     e.dataTransfer.setData('application/x-filename', filename);
+                    e.dataTransfer.setData('application/x-downloadurl', `${mimeType}:${filename}:${url}`);
                 } catch (err) {
                     // Ignore if not supported
                 }
                 
+                // Allow copy and move operations
                 e.dataTransfer.effectAllowed = 'copyMove';
+                
+                // Set drag image to show we're dragging a file
+                const dragImg = document.createElement('div');
+                dragImg.style.cssText = `
+                    position: absolute;
+                    top: -1000px;
+                    padding: 10px;
+                    background: #333;
+                    color: white;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    white-space: nowrap;
+                `;
+                dragImg.textContent = `📄 ${filename}`;
+                document.body.appendChild(dragImg);
+                e.dataTransfer.setDragImage(dragImg, 20, 10);
+                setTimeout(() => document.body.removeChild(dragImg), 0);
                 
                 // Store drag data for potential fallback download
                 lastDragData = { content, filename, mimeType };
+                dragStartTime = Date.now();
                 
                 console.log(`Dragging ${currentView} file: ${filename} (${content.length} chars)`);
                 
@@ -814,22 +994,42 @@
                     throw new Error('Could not fetch SVG ZIP');
                 }
                 
-                // Set multiple data transfer formats for better compatibility
+                // Set optimized data transfer formats for ZIP files
                 e.dataTransfer.setData('DownloadURL', `${mimeType}:${filename}:${url}`);
                 e.dataTransfer.setData('text/uri-list', url);
+                e.dataTransfer.setData('application/zip', url);
                 e.dataTransfer.setData('application/octet-stream', url);
                 
-                // Try to set a custom filename
+                // Set file information
                 try {
                     e.dataTransfer.setData('application/x-filename', filename);
+                    e.dataTransfer.setData('application/x-downloadurl', `${mimeType}:${filename}:${url}`);
                 } catch (err) {
                     // Ignore if not supported
                 }
                 
                 e.dataTransfer.effectAllowed = 'copyMove';
                 
+                // Set drag image for ZIP file
+                const dragImg = document.createElement('div');
+                dragImg.style.cssText = `
+                    position: absolute;
+                    top: -1000px;
+                    padding: 10px;
+                    background: #333;
+                    color: white;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    white-space: nowrap;
+                `;
+                dragImg.textContent = `📦 ${filename}`;
+                document.body.appendChild(dragImg);
+                e.dataTransfer.setDragImage(dragImg, 20, 10);
+                setTimeout(() => document.body.removeChild(dragImg), 0);
+                
                 // Store blob data for potential fallback download
                 lastDragData = { blob, filename, mimeType, isBlob: true };
+                dragStartTime = Date.now();
                 
                 console.log(`Dragging SVG ZIP: ${filename}`);
                 
