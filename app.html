@@ -1112,7 +1112,7 @@
                     loadSvgDiagrams();
                     break;
                 case 'errors':
-                    displayCompilationErrors();
+                    loadErrorsLog();
                     break;
             }
         }
@@ -1161,6 +1161,37 @@
                 }
             } catch (error) {
                 showViewError('Error loading SVG diagrams: ' + error.message);
+            }
+        }
+
+        /**
+         * Load compilation errors from errors.log file
+         * This function reads the errors.log file for the current SHA1
+         */
+        async function loadErrorsLog() {
+            if (!currentSha1) return;
+            
+            try {
+                const response = await fetch(`/${currentSha1}/errors.log`);
+                if (response.ok) {
+                    const errorContent = await response.text();
+                    if (errorContent.trim()) {
+                        compilationErrors = errorContent;
+                        displayCompilationErrors();
+                    } else {
+                        // Empty errors.log means no errors
+                        svgContainer.innerHTML = `
+                            <div style="text-align: center; padding: 40px; color: #666;">
+                                <p>No compilation errors found</p>
+                            </div>
+                        `;
+                        svgViewer.style.display = 'flex';
+                    }
+                } else {
+                    showViewError('Could not load compilation errors');
+                }
+            } catch (error) {
+                showViewError('Error loading compilation errors: ' + error.message);
             }
         }
 
@@ -1342,9 +1373,55 @@ ${compilationErrors}
                     currentSha1 = sha1.trim();
                     console.log('File uploaded successfully, SHA1:', currentSha1);
                     
-                    // Clear any previous errors
-                    hasCompilationError = false;
-                    compilationErrors = null;
+                    // Immediately check errors.log to determine if there were compilation errors
+                    try {
+                        const errorsResponse = await fetch(`/${currentSha1}/errors.log`);
+                        if (errorsResponse.ok) {
+                            const errorsContent = await errorsResponse.text();
+                            
+                            if (errorsContent.trim()) {
+                                // There are compilation errors
+                                console.log('Compilation errors detected in errors.log');
+                                hasCompilationError = true;
+                                compilationErrors = errorsContent;
+                                
+                                // Update view selector options (enable errors, disable C++/SVG)
+                                updateViewSelectorOptions();
+                                
+                                // Show view selector now that we have SHA1
+                                viewSelect.style.display = 'inline-block';
+                                
+                                // Automatically switch to error view
+                                currentView = 'errors';
+                                viewSelect.value = 'errors';
+                                
+                                // Load and display the errors
+                                switchView('errors');
+                                
+                                // Also show in the traditional error area
+                                showError('Compilation errors detected. Check the Compilation Errors view.');
+                                
+                                return; // Exit early for error case
+                            } else {
+                                // No errors in errors.log - compilation was successful
+                                console.log('No compilation errors detected - errors.log is empty');
+                                hasCompilationError = false;
+                                compilationErrors = null;
+                            }
+                        } else {
+                            // Could not fetch errors.log - assume no errors for now
+                            console.log('Could not fetch errors.log - assuming no compilation errors');
+                            hasCompilationError = false;
+                            compilationErrors = null;
+                        }
+                    } catch (error) {
+                        console.log('Error checking errors.log:', error.message);
+                        hasCompilationError = false;
+                        compilationErrors = null;
+                    }
+                    
+                    // Success case - clear any previous errors and continue normally
+                    hideError();
                     
                     // Update view selector options (enable C++/SVG, disable errors)
                     updateViewSelectorOptions();
@@ -1381,25 +1458,15 @@ ${compilationErrors}
                         switchView('dsp');
                     }
                 } else {
+                    // Upload failed - show server error
                     const errorText = await response.text();
                     const cleanError = extractFaustError(errorText);
                     
-                    // Store the error for the error view
+                    // This is a server-side error (not a Faust compilation error)
                     compilationErrors = cleanError;
                     hasCompilationError = true;
                     
-                    // Update view selector options
-                    updateViewSelectorOptions();
-                    
-                    // Automatically switch to error view
-                    currentView = 'errors';
-                    viewSelect.value = 'errors';
-                    viewSelect.style.display = 'inline-block'; // Make sure selector is visible
-                    
-                    // Display the errors
-                    switchView('errors');
-                    
-                    // Also show in the traditional error area
+                    // Show error in traditional error area
                     showError(cleanError);
                 }
             } catch (error) {
