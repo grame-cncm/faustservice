@@ -13,11 +13,11 @@ LDFLAGS = -L/opt/local/lib
 CXXFLAGS = -Wall -Wextra -Wno-unused-local-typedef -O3 -I/opt/local/include
 CLANGVERSION =
 CXX=clang++$(CLANGVERSION)
-STD=c++20
+STD=c++17
 else
 EXT = ""
 CXXFLAGS = -Wall -Wextra -O3
-STD=c++20
+STD=c++17
 endif
 
 all : faustweb
