@@ -205,7 +205,7 @@ static bool create_target_directory(fs::path srcdir, fs::path sha1path, fs::path
     }
 
     // Create the target directory
-    fs::path target_dir = sha1path / platform / architecture;
+    fs::path target_dir = sha1path / "targets" / platform / architecture;
     try {
         fs::create_directories(target_dir);
         fs::copy_file(makefile_path, target_dir / "Makefile", fs::copy_options::overwrite_existing);
@@ -346,6 +346,11 @@ void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefile_dire
  *   generated.cpp      (the generated C++ code)
  *   errors.log         (any errors that occurred during compilation)
  *   svg/               (the resulting svg blockdiagrams)
+ *   targets/           (platform/architecture specific compilation directories)
+ *     <platform>/<architecture>/
+ *       Makefile
+ *       <filename>.dsp   (copied from sourcecode/)
+ *       ...other source files
  *
  * the compilation command is :
  *   cd sourcecode/
@@ -1077,7 +1082,15 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     if (url_parent.is_absolute()) {
         url_parent = url_parent.relative_path();
     }
-    fs::path    fulldir  = getDirectory() / url_parent;
+    
+    // For platform/architecture targets, add "targets" prefix to the path
+    fs::path fulldir;
+    if (U.size() >= 4) {
+        // URL format: /{sha1}/{platform}/{architecture}/{target}
+        fulldir = getDirectory() / U[1] / "targets" / U[2] / U[3];
+    } else {
+        fulldir = getDirectory() / url_parent;
+    }
     fs::path    target   = url.filename();
     fs::path    makefile = fulldir / "Makefile";
     fs::path    location;
