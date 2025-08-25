@@ -28,14 +28,22 @@ Select a file *kisana.dsp* and send it. The sent file can be a either a .dsp or 
 
 #### General API ####
 
- - http://localhost:8888/<key\>/src.cpp returns the 'src.cpp' file containing the cpp source code 
- - http://localhost:8888/<key\>/svg.zip returns a 'svg.zip' archive containing a svg folder with all .svg files
- - http://localhost:8888/<key\>/mdoc.zip returns a ’mdoc.zip' archive  containing a kisana-mdoc folder with automatic documentation
+**Session-level endpoints:**
+ - http://localhost:8888/<key\>/generated.cpp returns the generated C++ source code from Faust compilation
+ - http://localhost:8888/<key\>/errors.log returns compilation errors log (empty if no errors)
+ - http://localhost:8888/<key\>/svg.zip returns a ZIP archive containing all SVG block diagrams
+ - http://localhost:8888/<key\>/svg/\<filename\>.svg returns individual SVG block diagram files
+ - http://localhost:8888/<key\>/filename returns the original uploaded filename
+ - http://localhost:8888/<key\>/diagram/\<filename\>.svg returns SVG diagrams (alias for svg/ endpoint)
 
-#### API for each architecture ####
+#### API for platform/architecture specific compilation ####
 
- - http://localhost:8888/<key\>/\<plateform\>/\<architecture\>/binary.zip returns the 'binary.zip' archive containing one or several binairies
- - http://localhost:8888/<key\>/\<plateform\>/\<architecture\>/src.cpp	returns the architecture wrapped cpp source code 
+ - http://localhost:8888/<key\>/\<platform\>/\<architecture\>/binary.zip returns compiled binary archive
+ - http://localhost:8888/<key\>/\<platform\>/\<architecture\>/binary.apk returns Android APK package
+ - http://localhost:8888/<key\>/\<platform\>/\<architecture\>/installer.sh returns installation script
+ - http://localhost:8888/<key\>/\<platform\>/\<architecture\>/precompile triggers compilation without download (returns location header)
+ - http://localhost:8888/<key\>/\<platform\>/\<architecture\>/web/pwa/\* serves Progressive Web App files
+ - http://localhost:8888/<key\>/\<platform\>/\<architecture\>/web/pwa-poly/\* serves PWA files with polyfills 
 
 #### List of available architectures for each platform (here of OSX as en example) ####
 
@@ -56,16 +64,27 @@ For OSX :
 
 The local service run on the http://localhost:8888/ URL, and can be tested like in the following examples:
 
+**List available targets:**
 	curl http://localhost:8888/targets
+
+**Upload and get session key:**
 	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"'  http://localhost:8888/filepost
-	returned SHA key: 5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF
-	curl http://localhost:8888/5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF/android/smartkeyb/binary.apk --output binary.apk
+	# Returns SHA key: 5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF
+
+**Access session-level resources:**
+	curl http://localhost:8888/5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF/generated.cpp
+	curl http://localhost:8888/5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF/errors.log
+	curl http://localhost:8888/5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF/svg.zip --output diagrams.zip
+
+**Compile for specific platform/architecture:**
+	curl http://localhost:8888/5ADBDAF2AFFF8387F4FCB9F05BA84E374DE3ABAF/android/android/binary.apk --output binary.apk
 
 #### Direct compilation
 
-Or with a single complete command:
+Compile and download in a single command:
 
-	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"'  http://localhost:8888/compile/android/android/binary.apk --output binary3.apk
+	curl -F'file=@"clarinet.dsp";filename="clarinet.dsp"' http://localhost:8888/compile/android/android/binary.apk --output clarinet.apk
+	curl -F'file=@"kisana.dsp";filename="kisana.dsp"' http://localhost:8888/compile/web/pwa/binary.zip --output kisana.zip
 
 #### Google Cloud compilation
 
@@ -85,7 +104,7 @@ Or with a single complete command:
 
 	curl localhost:8888/targets
 	curl -F'file=@"kisana.dsp";filename="kisana.dsp"' localhost:8888/filepost
-	curl -F'file=@"kisana.dsp";filename="kisana.dsp"' localhost:8888/compile/android/android/binary.zip --output kisana.apk
+	curl -F'file=@"kisana.dsp";filename="kisana.dsp"' localhost:8888/compile/android/android/binary.apk --output kisana.apk
 
 #### Using the remote service
 
