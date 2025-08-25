@@ -1666,22 +1666,22 @@
                 }
                 
                 // Only highlight other elements if not in a comment
-                if (!line.includes('class="faust-comment"')) {
-                    // Highlight strings
-                    line = line.replace(/"[^"]*"/g, '<span class="faust-string">$&</span>');
+                if (!line.includes('faust-comment')) {
+                    // Highlight strings first (to avoid conflicts)
+                    line = line.replace(/"([^"\\]|\\.)*"/g, '<span class="faust-string">$&</span>');
                     
-                    // Highlight numbers (simple pattern)
+                    // Highlight numbers
                     line = line.replace(/\b\d+(\.\d+)?\b/g, '<span class="faust-number">$&</span>');
                     
-                    // Highlight keywords
+                    // Highlight keywords (avoid matching inside existing spans)
                     keywords.forEach(keyword => {
-                        const regex = new RegExp(`\\b${keyword}\\b`, 'g');
+                        const regex = new RegExp(`(?<!<[^>]*?)\\b${keyword}\\b(?![^<]*>)`, 'g');
                         line = line.replace(regex, `<span class="faust-keyword">${keyword}</span>`);
                     });
                     
-                    // Highlight functions
+                    // Highlight functions (avoid matching inside existing spans)
                     functions.forEach(func => {
-                        const regex = new RegExp(`\\b${func}\\b`, 'g');
+                        const regex = new RegExp(`(?<!<[^>]*?)\\b${func}\\b(?![^<]*>)`, 'g');
                         line = line.replace(regex, `<span class="faust-function">${func}</span>`);
                     });
                 }
@@ -2101,7 +2101,7 @@
                 // Skip if line is already highlighted
                 if (line.includes('<span')) continue;
                 
-                // Highlight comments first
+                // Highlight comments first (single line comments)
                 if (line.includes('//')) {
                     const commentIndex = line.indexOf('//');
                     const beforeComment = line.substring(0, commentIndex);
@@ -2110,16 +2110,17 @@
                 }
                 
                 // Only highlight other elements if not in a comment
-                if (!line.includes('class="faust-comment"')) {
-                    // Highlight strings
-                    line = line.replace(/"[^"]*"/g, '<span class="faust-string">$&</span>');
+                if (!line.includes('faust-comment')) {
+                    // Highlight strings first (to avoid conflicts with other patterns)
+                    line = line.replace(/"([^"\\]|\\.)*"/g, '<span class="faust-string">$&</span>');
                     
-                    // Highlight numbers
-                    line = line.replace(/\b\d+(\.\d+)?f?\b/g, '<span class="faust-number">$&</span>');
+                    // Highlight numbers (improved pattern)
+                    line = line.replace(/\b\d+(\.\d+)?[fF]?\b/g, '<span class="faust-number">$&</span>');
                     
-                    // Highlight keywords
+                    // Highlight keywords (only if not already inside a span)
                     keywords.forEach(keyword => {
-                        const regex = new RegExp(`\\b${keyword}\\b`, 'g');
+                        // Use negative lookbehind/lookahead to avoid matching inside spans
+                        const regex = new RegExp(`(?<!<[^>]*?)\\b${keyword}\\b(?![^<]*>)`, 'g');
                         line = line.replace(regex, `<span class="faust-keyword">${keyword}</span>`);
                     });
                 }
