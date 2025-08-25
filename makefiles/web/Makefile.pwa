@@ -13,5 +13,12 @@ index.html : $(faustfile)
 	touch $(out)/faust-ui/Makefile
 	touch $(out)/faustwasm/Makefile
 
+binary.zip : $(faustfile)
+	faust2wasm-ts $(faustfile) ./app -pwa
+	touch ./app/faust-ui/Makefile
+	touch ./app/faustwasm/Makefile
+	zip -r binary.zip ./app
+
+
 src.wasm : $(faustfile)
 	faust -lang wasm -i $(faustfile) -o src.wasm
