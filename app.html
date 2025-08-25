@@ -21,7 +21,8 @@
         }
 
         .container {
-            max-width: 1200px;
+            width: 100%;
+            max-width: 95%; /* Légère limite sur très grands écrans */
             margin: 0 auto;
             padding: 40px 20px;
             display: flex;
@@ -29,35 +30,40 @@
             height: 100vh;
         }
 
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        header h1 {
-            font-size: 2.8em;
-            margin-bottom: 8px;
-            font-weight: 300;
-            color: #2c3e50;
-        }
-
-        header p {
-            font-size: 1.1em;
-            color: #7f8c8d;
-            margin: 0;
-        }
 
         .toolbar {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 20px;
+            justify-content: space-between; /* Espace entre gauche et droite */
+            gap: 25px; /* Espacement légèrement plus grand */
             background: white;
-            padding: 20px;
+            padding: 20px 30px; /* Plus de padding horizontal */
             border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.08);
             margin-bottom: 30px;
             flex-wrap: wrap;
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .toolbar-title {
+            font-size: 1.2em;
+            font-weight: 500;
+            color: #2c3e50;
+            margin-right: 20px; /* Plus d'espace après le titre */
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .platform-select, .arch-select, .view-select {
@@ -101,6 +107,12 @@
             text-align: center;
         }
 
+        /* Fixed width for main action button to prevent layout shifts */
+        #main-action-btn {
+            min-width: 280px;
+            white-space: nowrap;
+        }
+
         .btn-primary {
             background: #3498db;
             color: white;
@@ -119,6 +131,21 @@
         .btn-success:hover:not(:disabled) {
             background: #219a52;
             transform: translateY(-1px);
+        }
+
+        .btn-success-light {
+            background: #52c788;
+            color: white;
+        }
+
+        .btn-success-light:hover:not(:disabled) {
+            background: #45b376;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #bdc3c7;
+            color: #2c3e50;
         }
 
         .btn:disabled {
@@ -265,15 +292,38 @@
         }
 
         @media (max-width: 768px) {
+            .container {
+                padding: 20px 15px; /* Marges plus petites sur mobile */
+            }
+
             .toolbar {
                 flex-direction: column;
                 align-items: stretch;
                 gap: 12px;
             }
+
+            .toolbar-left, .toolbar-right {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .toolbar-title {
+                text-align: center;
+                margin-right: 0;
+                margin-bottom: 10px;
+                font-size: 1.1em;
+            }
             
             .platform-select, .arch-select, .view-select, .btn {
                 min-width: auto;
                 width: 100%;
+            }
+        }
+
+        /* Optimisation pour très grands écrans */
+        @media (min-width: 1920px) {
+            .container {
+                max-width: 90%; /* Plus d'espace sur très grands écrans */
             }
         }
 
@@ -392,27 +442,27 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1 id="title">Faust Compiler</h1>
-        </header>
-
-        <!-- Toolbar -->
+        <!-- Toolbar with integrated title -->
         <div class="toolbar">
-            <button class="btn btn-primary" id="compile-btn" disabled>Compile</button>
-            <select id="platform-select" class="platform-select">
-                <option value="">Loading platforms...</option>
-            </select>
-            <select id="arch-select" class="arch-select" disabled>
-                <option value="">Select platform first</option>
-            </select>
-            <button class="btn btn-success" id="download-btn" disabled>Download</button>
+            <div class="toolbar-left">
+                <div class="toolbar-title" id="title">Faust Compiler</div>
+                <button class="btn btn-primary" id="main-action-btn" data-state="1">(1) Load File to Compile</button>
+                <select id="platform-select" class="platform-select">
+                    <option value="">Loading platforms...</option>
+                </select>
+                <select id="arch-select" class="arch-select" disabled>
+                    <option value="">Select platform first</option>
+                </select>
+            </div>
             
-            <!-- View Selector -->
-            <select id="view-select" class="view-select" style="display: none;">
-                <option value="dsp">DSP Code</option>
-                <option value="cpp">Generated C++</option>
-                <option value="svg">Block Diagrams</option>
-            </select>
+            <div class="toolbar-right">
+                <!-- View Selector -->
+                <select id="view-select" class="view-select" disabled>
+                    <option value="dsp">View DSP Code</option>
+                    <option value="cpp">View Generated C++</option>
+                    <option value="svg">View Block Diagrams</option>
+                </select>
+            </div>
         </div>
 
         <!-- Error Message -->
@@ -535,6 +585,12 @@
         let originalDspCode = null;  // Store the original DSP code
         let previousScrollInfo = null;  // Store scroll position info for C++ view
         let compilationErrors = null;  // Store compilation error messages
+        
+        // New state management variables
+        let buttonState = 1;  // Current button state (1-6)
+        let isCompiling = false;  // Flag to track compilation in progress
+        let compilationCache = {};  // Cache of completed compilations
+        // Structure: { "<sha1>": { "<platform>/<architecture>": { compiled: true, downloaded: false, timestamp: Date, blob: Blob } } }
 
         // Elements
         const titleElement = document.getElementById('title');
@@ -542,8 +598,7 @@
         const fileInput = document.getElementById('file-input');
         const platformSelect = document.getElementById('platform-select');
         const archSelect = document.getElementById('arch-select');
-        const compileBtn = document.getElementById('compile-btn');
-        const downloadBtn = document.getElementById('download-btn');
+        const mainActionBtn = document.getElementById('main-action-btn');
         const uploadContent = document.getElementById('upload-content');
         const fileContent = document.getElementById('file-content');
         const lineNumbers = document.getElementById('line-numbers');
@@ -572,6 +627,12 @@
         // Platform/architecture selection events
         platformSelect.addEventListener('change', handlePlatformChange);
         archSelect.addEventListener('change', handleArchChange);
+        
+        // Main action button event
+        mainActionBtn.addEventListener('click', handleMainAction);
+        
+        // File input event (when user selects file via button)
+        fileInput.addEventListener('change', handleFileInputChange);
         
         // View selection events
         viewSelect.addEventListener('change', handleViewChange);
@@ -651,6 +712,254 @@
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 handleFile(files[0]);
+            }
+        }
+
+        // ========================================
+        // VIEW SELECTOR MANAGEMENT
+        // ========================================
+
+        /**
+         * Update view selector state based on available content
+         */
+        function updateViewSelector() {
+            const hasFile = selectedFile !== null;
+            const hasValidFile = hasFile && !hasCompilationError;
+            
+            // Enable/disable view selector based on file availability
+            viewSelect.disabled = !hasValidFile;
+            
+            // If no valid file, reset to DSP view
+            if (!hasValidFile) {
+                currentView = 'dsp';
+                viewSelect.value = 'dsp';
+            } else {
+                // If we have a valid file, ensure the menu reflects the current view
+                viewSelect.value = currentView;
+            }
+        }
+
+        // ========================================
+        // FILE HANDLING
+        // ========================================
+
+        /**
+         * Handle file selection via file input (Load File button)
+         */
+        function handleFileInputChange(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        // ========================================
+        // MAIN BUTTON STATE MANAGEMENT
+        // ========================================
+
+        /**
+         * Update button state and appearance based on current conditions
+         */
+        function updateButtonState() {
+            const hasFile = selectedFile !== null;
+            const hasValidFile = hasFile && !hasCompilationError;
+            const hasPlatform = platformSelect.value !== '';
+            const hasArch = archSelect.value !== '';
+            const hasTarget = hasPlatform && hasArch;
+            
+            let newState = 1;
+            let buttonText = '(1) Load File to Compile';
+            let buttonClass = 'btn-primary';
+            let disabled = false;
+            
+            if (!hasValidFile) {
+                // État 1: Pas de fichier ou fichier avec erreurs
+                newState = 1;
+                buttonText = '(1) Load File to Compile';
+                buttonClass = 'btn-primary';
+                disabled = false; // Cliquable pour ouvrir sélecteur de fichier
+            } else if (!hasTarget) {
+                // État 2: Fichier valide mais target manquante
+                newState = 2;
+                buttonText = '(2) Select Platform & Architecture';
+                buttonClass = 'btn-secondary';
+                disabled = true;
+            } else {
+                // États 3-6: Fichier valide + target
+                const targetKey = `${platformSelect.value}/${archSelect.value}`;
+                const cacheEntry = compilationCache[currentSha1]?.[targetKey];
+                
+                if (isCompiling) {
+                    // État 4: Compilation en cours
+                    newState = 4;
+                    buttonText = '(4) Compiling...';
+                    buttonClass = 'btn-secondary';
+                    disabled = true;
+                } else if (cacheEntry?.compiled && cacheEntry?.downloaded) {
+                    // État 6: Déjà compilé et téléchargé
+                    newState = 6;
+                    buttonText = '(6) Download Again';
+                    buttonClass = 'btn-success-light';
+                    disabled = false;
+                } else if (cacheEntry?.compiled) {
+                    // État 5: Compilé mais pas encore téléchargé
+                    newState = 5;
+                    buttonText = '(5) Download Ready';
+                    buttonClass = 'btn-success';
+                    disabled = false;
+                } else {
+                    // État 3: Prêt à compiler
+                    newState = 3;
+                    buttonText = '(3) Compile';
+                    buttonClass = 'btn-primary';
+                    disabled = false;
+                }
+            }
+            
+            // Mettre à jour l'état et l'apparence du bouton
+            buttonState = newState;
+            mainActionBtn.textContent = buttonText;
+            mainActionBtn.className = `btn ${buttonClass}`;
+            mainActionBtn.disabled = disabled;
+            mainActionBtn.setAttribute('data-state', newState);
+        }
+
+        /**
+         * Handle main action button click based on current state
+         */
+        async function handleMainAction() {
+            switch(buttonState) {
+                case 1:
+                    // Open file selector
+                    fileInput.click();
+                    break;
+                case 3:
+                    // Start compilation
+                    await performCompilation();
+                    break;
+                case 5:
+                case 6:
+                    // Download file
+                    await performDownload();
+                    break;
+                default:
+                    console.log('Button not clickable in current state:', buttonState);
+            }
+        }
+
+        /**
+         * Perform compilation for current target
+         */
+        async function performCompilation() {
+            if (!selectedFile || !selectedTarget || hasCompilationError) return;
+            
+            try {
+                // Set compiling state
+                isCompiling = true;
+                updateButtonState();
+                
+                // Use direct compilation API
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+                
+                const url = `/compile/${selectedTarget.platform}/${selectedTarget.arch}/binary.zip`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type') || '';
+                    
+                    if (contentType.includes('text/') || contentType.includes('html')) {
+                        // Compilation error
+                        const errorText = await response.text();
+                        const cleanError = extractFaustError(errorText);
+                        hasCompilationError = true;
+                        isCompiling = false;
+                        showError(cleanError);
+                        updateButtonState(); // Will go back to state 1
+                    } else {
+                        // Compilation success
+                        const blob = await response.blob();
+                        
+                        if (blob.size < 100) {
+                            const text = await blob.text();
+                            if (text.includes('Invalid') || text.includes('ERROR')) {
+                                hasCompilationError = true;
+                                isCompiling = false;
+                                showError(extractFaustError(text));
+                                updateButtonState();
+                                return;
+                            }
+                        }
+                        
+                        // Store in cache
+                        const targetKey = `${selectedTarget.platform}/${selectedTarget.arch}`;
+                        if (!compilationCache[currentSha1]) {
+                            compilationCache[currentSha1] = {};
+                        }
+                        compilationCache[currentSha1][targetKey] = {
+                            compiled: true,
+                            downloaded: false,
+                            timestamp: new Date(),
+                            blob: blob
+                        };
+                        
+                        isCompiling = false;
+                        hideError();
+                        updateButtonState(); // Will go to state 5
+                    }
+                } else {
+                    // HTTP error
+                    let errorMessage = 'Compilation failed';
+                    try {
+                        const errorText = await response.text();
+                        if (errorText.trim()) {
+                            errorMessage = extractFaustError(errorText);
+                        } else {
+                            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                        }
+                    } catch (e) {
+                        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                    }
+                    
+                    hasCompilationError = true;
+                    isCompiling = false;
+                    showError(errorMessage);
+                    updateButtonState(); // Will go back to state 1
+                }
+            } catch (error) {
+                hasCompilationError = true;
+                isCompiling = false;
+                showError(`Network error: ${error.message}`);
+                updateButtonState(); // Will go back to state 1
+            }
+        }
+
+        /**
+         * Perform download of compiled file
+         */
+        async function performDownload() {
+            if (!currentSha1 || !selectedTarget) return;
+            
+            const targetKey = `${selectedTarget.platform}/${selectedTarget.arch}`;
+            const cacheEntry = compilationCache[currentSha1]?.[targetKey];
+            
+            if (cacheEntry?.blob) {
+                // Download from cache
+                const url = URL.createObjectURL(cacheEntry.blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${selectedFile.name.replace('.dsp', '')}_${selectedTarget.platform}_${selectedTarget.arch}.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                // Mark as downloaded
+                cacheEntry.downloaded = true;
+                updateButtonState(); // Will go to state 6
             }
         }
 
@@ -1048,7 +1357,9 @@
         function handleFile(file) {
             selectedFile = file;
             hasCompilationError = false; // Reset error state with new file
-            updateCompileButton();
+            currentSha1 = null; // Reset SHA1 for new file
+            updateButtonState(); // Use new state management
+            updateViewSelector(); // Update view selector state
             hideError();
             
             // Show file content if it's a DSP file
@@ -1072,7 +1383,8 @@
             hasCompilationError = true;
             errorContent.textContent = message;
             errorMessage.classList.add('show');
-            updateCompileButton(); // Update buttons after error
+            updateButtonState(); // Update button state after error
+            updateViewSelector(); // Update view selector after error
         }
 
         function hideError() {
@@ -1260,32 +1572,20 @@
                 archSelect.disabled = false;
             }
             
-            updateCompileButton();
+            updateButtonState();
             checkAutoCompile();
         }
         
         function handleArchChange() {
             // DO NOT hide error - invalid code remains invalid
-            updateCompileButton();
+            updateButtonState();
+            updateSelectedTarget();
             checkAutoCompile();
         }
         
-        function updateCompileButton() {
-            const hasFile = selectedFile !== null;
+        function updateSelectedTarget() {
             const hasPlatform = platformSelect.value !== '';
             const hasArch = archSelect.value !== '';
-            
-            // If there's a compilation error, disable both buttons
-            if (hasCompilationError) {
-                compileBtn.disabled = true;
-                downloadBtn.disabled = true;
-                compileBtn.textContent = 'Fix Code First';
-                return;
-            }
-            
-            // Normal logic when no error
-            compileBtn.disabled = !(hasFile && hasPlatform && hasArch);
-            compileBtn.textContent = 'Compile';
             
             if (hasPlatform && hasArch) {
                 selectedTarget = {
@@ -1295,6 +1595,12 @@
             } else {
                 selectedTarget = null;
             }
+        }
+        
+        // Replaced by updateButtonState() - keeping for compatibility during transition
+        function updateCompileButton() {
+            updateButtonState();
+            updateSelectedTarget();
         }
 
         function checkAutoCompile() {
@@ -1386,102 +1692,7 @@
             return lines.join('\n');
         }
 
-        let compiledBlob = null;
-
-        compileBtn.addEventListener('click', () => {
-            compile();
-        });
-
-        downloadBtn.addEventListener('click', () => {
-            if (compiledBlob && selectedFile && selectedTarget) {
-                const url = URL.createObjectURL(compiledBlob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `${selectedFile.name.replace('.dsp', '')}_${selectedTarget.platform}_${selectedTarget.arch}.zip`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            }
-        });
-
-        async function compile() {
-            if (!selectedFile || !selectedTarget || hasCompilationError) return;
-            
-            try {
-                compileBtn.disabled = true;
-                downloadBtn.disabled = true;
-                downloadBtn.textContent = 'Compiling...';
-                compileBtn.textContent = 'Compiling...';
-                
-                // Use direct compilation API
-                const formData = new FormData();
-                formData.append('file', selectedFile);
-                
-                const url = `/compile/${selectedTarget.platform}/${selectedTarget.arch}/binary.zip`;
-                const response = await fetch(url, {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                if (response.ok) {
-                    // First check content type - text indicates error, application/* indicates binary
-                    const contentType = response.headers.get('content-type') || '';
-                    
-                    if (contentType.includes('text/') || contentType.includes('html')) {
-                        // This is likely an error message
-                        const errorText = await response.text();
-                        const cleanError = extractFaustError(errorText);
-                        showError(cleanError);
-                        compiledBlob = null;
-                    } else {
-                        // This should be a binary response
-                        const blob = await response.blob();
-                        
-                        // Double-check: if blob is very small, it might be an error message
-                        if (blob.size < 100) {
-                            const text = await blob.text();
-                            if (text.includes('Invalid') || text.includes('ERROR') || text.includes('error')) {
-                                const cleanError = extractFaustError(text);
-                                showError(cleanError);
-                                compiledBlob = null;
-                            } else {
-                                compiledBlob = blob;
-                                downloadBtn.disabled = false;
-                                downloadBtn.textContent = 'Download';
-                                compileBtn.textContent = 'Compile';
-                            }
-                        } else {
-                            compiledBlob = blob;
-                            downloadBtn.disabled = false;
-                            downloadBtn.textContent = 'Download';
-                            compileBtn.textContent = 'Compile';
-                        }
-                    }
-                } else {
-                    // Try to get detailed error message from response
-                    let errorMessage = 'Compilation failed';
-                    try {
-                        const errorText = await response.text();
-                        if (errorText.trim()) {
-                            errorMessage = extractFaustError(errorText);
-                        } else {
-                            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-                        }
-                    } catch (e) {
-                        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-                    }
-                    
-                    // Show error and mark code as invalid
-                    showError(errorMessage);
-                    compiledBlob = null;
-                }
-            } catch (error) {
-                showError(`Network error: ${error.message}`);
-                compiledBlob = null;
-            }
-            // updateCompileButton is called in showError() if error occurs
-        }
+        // Removed old compile function - now using performCompilation with state management
 
         /**
          * Update view selector options based on compilation status
@@ -1615,6 +1826,9 @@
             if (currentView === 'cpp') {
                 previousScrollInfo = captureScrollInfo();
             }
+            
+            // Update current view first
+            currentView = view;
             
             // Hide all view containers
             fileContent.style.display = 'none';
@@ -1856,10 +2070,7 @@
             }
             fileContent.classList.add('show');
             
-            // Show view selector when we have compiled content
-            if (currentSha1) {
-                viewSelect.style.display = 'inline-block';
-            }
+            // View selector state is managed separately
             
             // Synchronize scroll between line numbers and code content
             codeContent.addEventListener('scroll', function() {
@@ -1943,7 +2154,7 @@
             const previousView = currentView;
             
             currentSha1 = null; // Reset SHA1
-            viewSelect.style.display = 'none'; // Hide view selector until we have SHA1
+            updateViewSelector(); // Update view selector state
             updateCompileButton();
             hideError();
             
@@ -1991,8 +2202,8 @@
                                 // Update view selector options (disable C++/SVG)
                                 updateViewSelectorOptions();
                                 
-                                // Show view selector now that we have SHA1
-                                viewSelect.style.display = 'inline-block';
+                                // Update view selector now that we have SHA1
+                                updateViewSelector();
                                 
                                 // Automatically switch to DSP view to show errors
                                 currentView = 'dsp';
@@ -2035,8 +2246,8 @@
                     // Update view selector options (enable C++/SVG, disable errors)
                     updateViewSelectorOptions();
                     
-                    // Show view selector now that we have SHA1
-                    viewSelect.style.display = 'inline-block';
+                    // Update view selector now that we have SHA1
+                    updateViewSelector();
                     
                     // Enable drag-and-drop export
                     enableDragExport();
