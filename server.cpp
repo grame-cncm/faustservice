@@ -1085,7 +1085,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     
     // For platform/architecture targets, add "targets" prefix to the path
     fs::path fulldir;
-    if (U.size() >= 4 && U[2] != "diagram" && U[2] != "svg" && U[2] != "web") {
+    if (U.size() >= 4 && U[2] != "diagram" && U[2] != "svg") {
         // URL format: /{sha1}/{platform}/{architecture}/{target}
         fulldir = getDirectory() / U[1] / "targets" / U[2] / U[3];
     } else {
