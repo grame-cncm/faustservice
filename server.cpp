@@ -148,6 +148,24 @@ static void copyFaustOrAudioFiles(const fs::path& src, const fs::path& dst)
 }
 
 /*
+ * Copy all Faust source files and additional resources from sourcecode directory to destination
+ * directory (for platform/architecture specific compilation)
+ */
+
+static void copyFaustSourceCodes(const fs::path& sourcecode_dir, const fs::path& dst)
+{
+    assert(is_directory(sourcecode_dir));
+    assert(is_directory(dst));
+    for (const auto& entry : fs::directory_iterator(sourcecode_dir)) {
+        if (isFaustFile(entry.path())) {
+            fs::copy_file(entry.path(), dst / entry.path().filename());
+        } else if (isAudioFile(entry.path())) {
+            fs::copy_file(entry.path(), dst / entry.path().filename());
+        }
+    }
+}
+
+/*
  * Creates an arboreal structure in root with the appropriate makefiles.
  */
 
@@ -191,7 +209,7 @@ static bool create_target_directory(fs::path srcdir, fs::path sha1path, fs::path
     try {
         fs::create_directories(target_dir);
         fs::copy_file(makefile_path, target_dir / "Makefile", fs::copy_options::overwrite_existing);
-        copyFaustOrAudioFiles(srcdir, target_dir);
+        copyFaustSourceCodes(srcdir / "sourcecode", target_dir);
 
         if (gVerbosity >= 2) {
             std::cerr << "Created target directory: " << target_dir << std::endl;
