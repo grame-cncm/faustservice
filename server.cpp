@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <algorithm>
 #include <cassert>
+#include <cstring>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -34,7 +35,6 @@
 #include <regex>
 #include <sstream>
 #include <string>
-#include <cstring>
 #include <vector>
 
 // libmicrohttpd
@@ -106,7 +106,6 @@ static std::string generate_sha1(connection_info_struct* con_info)
 
     return sha1key;
 }
-
 
 /*
  * True if it is a .dsp or a .lib source file
@@ -249,62 +248,62 @@ static bool create_svg_zip(const fs::path& svg_dir, const fs::path& zip_path)
     if (gVerbosity >= 2) {
         std::cerr << "Creating SVG ZIP: " << svg_dir << " -> " << zip_path << std::endl;
     }
-    
+
     struct archive* archive = archive_write_new();
     if (!archive) {
         std::cerr << "Error: Could not create archive" << std::endl;
         return false;
     }
-    
+
     // Set ZIP format
     archive_write_set_format_zip(archive);
     archive_write_add_filter_none(archive);
-    
+
     // Open the output file
     if (archive_write_open_filename(archive, zip_path.string().c_str()) != ARCHIVE_OK) {
         std::cerr << "Error: Could not open ZIP file: " << archive_error_string(archive) << std::endl;
         archive_write_free(archive);
         return false;
     }
-    
+
     try {
         // Iterate through all SVG files in the directory
         for (const auto& entry : fs::directory_iterator(svg_dir)) {
             if (entry.is_regular_file() && entry.path().extension() == ".svg") {
-                fs::path svg_file = entry.path();
+                fs::path    svg_file = entry.path();
                 std::string filename = svg_file.filename().string();
-                
+
                 // Read the SVG file
                 std::ifstream file(svg_file, std::ios::binary);
                 if (!file) {
                     std::cerr << "Warning: Could not read SVG file: " << svg_file << std::endl;
                     continue;
                 }
-                
+
                 // Get file size
                 file.seekg(0, std::ios::end);
                 size_t file_size = file.tellg();
                 file.seekg(0, std::ios::beg);
-                
+
                 // Read file content
                 std::vector<char> content(file_size);
                 file.read(content.data(), file_size);
                 file.close();
-                
+
                 // Create archive entry
                 struct archive_entry* entry_hdr = archive_entry_new();
                 archive_entry_set_pathname(entry_hdr, filename.c_str());
                 archive_entry_set_size(entry_hdr, file_size);
                 archive_entry_set_filetype(entry_hdr, AE_IFREG);
                 archive_entry_set_perm(entry_hdr, 0644);
-                
+
                 // Write header and data
                 if (archive_write_header(archive, entry_hdr) == ARCHIVE_OK) {
                     archive_write_data(archive, content.data(), file_size);
                 }
-                
+
                 archive_entry_free(entry_hdr);
-                
+
                 if (gVerbosity >= 2) {
                     std::cerr << "Added to ZIP: " << filename << " (" << file_size << " bytes)" << std::endl;
                 }
@@ -315,15 +314,15 @@ static bool create_svg_zip(const fs::path& svg_dir, const fs::path& zip_path)
         archive_write_free(archive);
         return false;
     }
-    
+
     // Close the archive
     archive_write_close(archive);
     archive_write_free(archive);
-    
+
     if (gVerbosity >= 2) {
         std::cerr << "SVG ZIP created successfully: " << zip_path << std::endl;
     }
-    
+
     return true;
 }
 
@@ -557,7 +556,7 @@ static int validate_faust(connection_info_struct* con_info)
 
         // Save original filename for drag-and-drop functionality
         try {
-            fs::path filename_path = session_path / "filename.txt";
+            fs::path      filename_path = session_path / "filename.txt";
             std::ofstream filename_file(filename_path);
             filename_file << con_info->filename << std::endl;
             filename_file.close();
@@ -996,7 +995,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             if (fs::exists(svg_dir) && fs::is_directory(svg_dir)) {
                 // Create temporary ZIP file
                 fs::path temp_zip = fDirectory / U[1] / "temp_svg.zip";
-                
+
                 if (create_svg_zip(svg_dir, temp_zip)) {
                     // Send the ZIP file and then delete it
                     int result = send_file(connection, temp_zip, "application/zip");
@@ -1030,6 +1029,12 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 
     } else if (matchBeginURL(url, "/*/web/pwa/") || matchBeginURL(url, "/*/web/pwa-poly/")) {
         return makeAndSendResourceFile(connection, url);
+
+    } else if (matchURL(url, "/*/signals.svg")) {
+        return serveSignalsSvg(connection, url);
+
+    } else if (matchURL(url, "/*/task.svg")) {
+        return serveTaskSvg(connection, url);
 
     } else if (matchURL(url, "/favicon.ico")) {
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
@@ -1083,7 +1088,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     if (url_parent.is_absolute()) {
         url_parent = url_parent.relative_path();
     }
-    
+
     // For platform/architecture targets, add "targets" prefix to the path
     fs::path fulldir;
     if (U.size() >= 4 && U[2] != "diagram" && U[2] != "svg") {
@@ -1468,5 +1473,177 @@ int FaustServer::serveAppInterface(struct MHD_Connection* connection)
             std::cerr << "Error serving app interface: " << e.what() << std::endl;
         }
         return send_page(connection, "Error loading app interface", 27, MHD_HTTP_INTERNAL_SERVER_ERROR, "text/html");
+    }
+}
+
+//------------------------------------------------------------------
+// Serve signals.svg with dynamic generation
+//
+int FaustServer::serveSignalsSvg(struct MHD_Connection* connection, const std::string& url)
+{
+    std::vector<std::string> U = decomposeURL(url);
+    if (U.size() < 2) {
+        std::string error_msg = "Invalid URL format for signals.svg";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+    }
+
+    std::string sha1             = U[1];
+    fs::path    session_dir      = fDirectory / sha1;
+    fs::path    signals_svg_path = session_dir / "signals.svg";
+    fs::path    sourcecode_dir   = session_dir / "sourcecode";
+
+    if (gVerbosity >= 2) {
+        std::cerr << "Request for signals.svg: " << sha1 << std::endl;
+    }
+
+    // Check if signals.svg already exists
+    if (fs::exists(signals_svg_path)) {
+        if (gVerbosity >= 2) {
+            std::cerr << "Serving existing signals.svg" << std::endl;
+        }
+        return send_file(connection, signals_svg_path, "image/svg+xml");
+    }
+
+    // Generate signals.svg if it doesn't exist
+    if (!fs::exists(sourcecode_dir) || !fs::is_directory(sourcecode_dir)) {
+        std::string error_msg = "Source code directory not found for session: " + sha1;
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+    }
+
+    // Find the main DSP file in sourcecode directory
+    std::string main_dsp_file;
+    for (const auto& entry : fs::directory_iterator(sourcecode_dir)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".dsp") {
+            main_dsp_file = entry.path().filename().string();
+            break;
+        }
+    }
+
+    if (main_dsp_file.empty()) {
+        std::string error_msg = "No DSP file found in session: " + sha1;
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+    }
+
+    if (gVerbosity >= 2) {
+        std::cerr << "Generating signals.svg for " << main_dsp_file << " in session " << sha1 << std::endl;
+    }
+
+    // Generate signals diagram
+    std::string dot_file     = main_dsp_file + "-sig.dot";
+    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust -sg " + main_dsp_file + " -o /dev/null" +
+                               " && dot -Tsvg " + dot_file + " -o ../signals.svg" + " && rm " + dot_file;
+
+    if (gVerbosity >= 2) {
+        std::cerr << "Executing: " << generate_cmd << std::endl;
+    }
+
+    int result = system(generate_cmd.c_str());
+    if (result != 0) {
+        if (gVerbosity >= 1) {
+            std::cerr << "Failed to generate signals.svg for session " << sha1 << " (exit code: " << result << ")"
+                      << std::endl;
+        }
+        std::string error_msg = "Failed to generate signal diagram";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+    }
+
+    // Check if generation was successful
+    if (fs::exists(signals_svg_path)) {
+        if (gVerbosity >= 2) {
+            std::cerr << "Successfully generated signals.svg" << std::endl;
+        }
+        return send_file(connection, signals_svg_path, "image/svg+xml");
+    } else {
+        if (gVerbosity >= 1) {
+            std::cerr << "signals.svg was not created despite successful command execution" << std::endl;
+        }
+        std::string error_msg = "Signal diagram generation completed but file not found";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+    }
+}
+
+//------------------------------------------------------------------
+// Serve task.svg with dynamic generation
+//
+int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::string& url)
+{
+    std::vector<std::string> U = decomposeURL(url);
+    if (U.size() < 2) {
+        std::string error_msg = "Invalid URL format for task.svg";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+    }
+
+    std::string sha1           = U[1];
+    fs::path    session_dir    = fDirectory / sha1;
+    fs::path    task_svg_path  = session_dir / "task.svg";
+    fs::path    sourcecode_dir = session_dir / "sourcecode";
+
+    if (gVerbosity >= 2) {
+        std::cerr << "Request for task.svg: " << sha1 << std::endl;
+    }
+
+    // Check if task.svg already exists
+    if (fs::exists(task_svg_path)) {
+        if (gVerbosity >= 2) {
+            std::cerr << "Serving existing task.svg" << std::endl;
+        }
+        return send_file(connection, task_svg_path, "image/svg+xml");
+    }
+
+    // Generate task.svg if it doesn't exist
+    if (!fs::exists(sourcecode_dir) || !fs::is_directory(sourcecode_dir)) {
+        std::string error_msg = "Source code directory not found for session: " + sha1;
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+    }
+
+    // Find the main DSP file in sourcecode directory
+    std::string main_dsp_file;
+    for (const auto& entry : fs::directory_iterator(sourcecode_dir)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".dsp") {
+            main_dsp_file = entry.path().filename().string();
+            break;
+        }
+    }
+
+    if (main_dsp_file.empty()) {
+        std::string error_msg = "No DSP file found in session: " + sha1;
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+    }
+
+    if (gVerbosity >= 2) {
+        std::cerr << "Generating task.svg for " << main_dsp_file << " in session " << sha1 << std::endl;
+    }
+
+    // Generate task diagram
+    std::string dot_file     = main_dsp_file + ".dot";
+    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust -vec -tg " + main_dsp_file +
+                               " -o /dev/null" + " && dot -Tsvg " + dot_file + " -o ../task.svg" + " && rm " + dot_file;
+
+    if (gVerbosity >= 2) {
+        std::cerr << "Executing: " << generate_cmd << std::endl;
+    }
+
+    int result = system(generate_cmd.c_str());
+    if (result != 0) {
+        if (gVerbosity >= 1) {
+            std::cerr << "Failed to generate task.svg for session " << sha1 << " (exit code: " << result << ")"
+                      << std::endl;
+        }
+        std::string error_msg = "Failed to generate task diagram";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+    }
+
+    // Check if generation was successful
+    if (fs::exists(task_svg_path)) {
+        if (gVerbosity >= 2) {
+            std::cerr << "Successfully generated task.svg" << std::endl;
+        }
+        return send_file(connection, task_svg_path, "image/svg+xml");
+    } else {
+        if (gVerbosity >= 1) {
+            std::cerr << "task.svg was not created despite successful command execution" << std::endl;
+        }
+        std::string error_msg = "Task diagram generation completed but file not found";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
     }
 }

@@ -461,6 +461,8 @@
                     <option value="dsp">View DSP Code</option>
                     <option value="cpp">View Generated C++</option>
                     <option value="svg">View Block Diagrams</option>
+                    <option value="signals">View Signals</option>
+                    <option value="task">View Task</option>
                 </select>
             </div>
         </div>
@@ -1085,6 +1087,8 @@
                     codeDownloadBtn.style.display = 'flex';
                     break;
                 case 'svg':
+                case 'signals':
+                case 'task':
                     svgContainer.draggable = true;
                     svgContainer.addEventListener('dragstart', handleSvgDragStart);
                     svgContainer.addEventListener('dragend', handleDragEnd);
@@ -1710,6 +1714,8 @@
                         break;
                     case 'cpp':
                     case 'svg':
+                    case 'signals':
+                    case 'task':
                         // C++ and SVG views only enabled when no compilation errors
                         option.disabled = hasCompilationError;
                         break;
@@ -1848,6 +1854,12 @@
                 case 'svg':
                     loadSvgDiagrams();
                     break;
+                case 'signals':
+                    loadSignalsSvg();
+                    break;
+                case 'task':
+                    loadTaskSvg();
+                    break;
             }
             
             // Enable drag-and-drop export for the new view
@@ -1904,6 +1916,70 @@
                 }
             } catch (error) {
                 showViewError('Error loading SVG diagrams: ' + error.message);
+            }
+        }
+
+        async function loadSignalsSvg() {
+            if (!currentSha1) return;
+            
+            // Hide file content when displaying SVG
+            fileContent.style.display = 'none';
+            
+            try {
+                // Try to load the signals.svg file
+                const response = await fetch(`/${currentSha1}/signals.svg`);
+                if (response.ok) {
+                    const svgContent = await response.text();
+                    svgContainer.innerHTML = svgContent;
+                    svgViewer.style.display = 'flex';
+                    
+                    // Add click interceptors for SVG links
+                    addSvgLinkInterceptors();
+                } else {
+                    // If signals.svg doesn't exist, show a message
+                    svgContainer.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #666;">
+                            <h3>Signal Flow Diagram</h3>
+                            <p>No signal diagram available for this code.</p>
+                            <p style="font-size: 14px; margin-top: 20px;">The diagram will be generated automatically when you first view it.</p>
+                        </div>
+                    `;
+                    svgViewer.style.display = 'flex';
+                }
+            } catch (error) {
+                showViewError('Error loading signal diagram: ' + error.message);
+            }
+        }
+
+        async function loadTaskSvg() {
+            if (!currentSha1) return;
+            
+            // Hide file content when displaying SVG
+            fileContent.style.display = 'none';
+            
+            try {
+                // Try to load the task.svg file
+                const response = await fetch(`/${currentSha1}/task.svg`);
+                if (response.ok) {
+                    const svgContent = await response.text();
+                    svgContainer.innerHTML = svgContent;
+                    svgViewer.style.display = 'flex';
+                    
+                    // Add click interceptors for SVG links
+                    addSvgLinkInterceptors();
+                } else {
+                    // If task.svg doesn't exist, show a message
+                    svgContainer.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #666;">
+                            <h3>Task Diagram</h3>
+                            <p>No task diagram available for this code.</p>
+                            <p style="font-size: 14px; margin-top: 20px;">The diagram will be generated automatically when you first view it.</p>
+                        </div>
+                    `;
+                    svgViewer.style.display = 'flex';
+                }
+            } catch (error) {
+                showViewError('Error loading task diagram: ' + error.message);
             }
         }
 
