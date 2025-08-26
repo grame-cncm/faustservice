@@ -34,6 +34,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <cstring>
 #include <vector>
 
 // libmicrohttpd
