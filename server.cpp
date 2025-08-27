@@ -896,7 +896,35 @@ static bool isValidTarget(const fs::path& target, const char*& mimetype)
         return true;
 
     } else {
-        return false;
+        // For PWA assets, check file extension
+        std::string extension = target.extension().string();
+        if (extension == ".html") {
+            mimetype = "text/html";
+            return true;
+        } else if (extension == ".js") {
+            mimetype = "application/javascript";
+            return true;
+        } else if (extension == ".css") {
+            mimetype = "text/css";
+            return true;
+        } else if (extension == ".json") {
+            mimetype = "application/json";
+            return true;
+        } else if (extension == ".wasm") {
+            mimetype = "application/wasm";
+            return true;
+        } else if (extension == ".png") {
+            mimetype = "image/png";
+            return true;
+        } else if (extension == ".svg") {
+            mimetype = "image/svg+xml";
+            return true;
+        } else if (extension == ".map") {
+            mimetype = "application/json";
+            return true;
+        } else {
+            return false;
+        }
     }
 }
 
@@ -1171,7 +1199,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         std::string error_msg = "SVG file not found";
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "image/svg+xml");
 
-    } else if (matchBeginURL(url, "/*/web/pwa/") || matchBeginURL(url, "/*/web/pwa-poly/")) {
+    } else if (matchBeginURL(url, "/*/web/pwa") || matchBeginURL(url, "/*/web/pwa-poly")) {
         return makeAndSendResourceFile(connection, url);
 
     } else if (matchURL(url, "/*/signals.svg")) {
@@ -1341,13 +1369,31 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 
     // For platform/architecture targets, add "targets" prefix to the path
     fs::path fulldir;
-    if (U.size() >= 4 && U[2] != "diagram" && U[2] != "svg") {
+    if (U.size() >= 4 && U[2] != "diagram" && U[2] != "svg" && U[2] != "web") {
         // URL format: /{sha1}/{platform}/{architecture}/{target}
+        fulldir = getDirectory() / U[1] / "targets" / U[2] / U[3];
+    } else if (U.size() >= 4 && U[2] == "web" && (U[3] == "pwa" || U[3] == "pwa-poly")) {
+        // URL format: /{sha1}/web/pwa/asset.js or /{sha1}/web/pwa-poly/asset.js
+        // These are served from targets/web/pwa/ or targets/web/pwa-poly/
         fulldir = getDirectory() / U[1] / "targets" / U[2] / U[3];
     } else {
         fulldir = getDirectory() / url_parent;
     }
-    fs::path    target   = url.filename();
+    fs::path    target;
+    // For web/pwa URLs, target includes the relative path after pwa/pwa-poly
+    if (U.size() >= 4 && U[2] == "web" && (U[3] == "pwa" || U[3] == "pwa-poly")) {
+        // Reconstruct path from segment 4 onwards: /{sha}/web/pwa/js/app.js -> js/app.js
+        if (U.size() > 4) {
+            for (size_t i = 4; i < U.size(); ++i) {
+                target = target / U[i];
+            }
+        } else {
+            // For URLs like /{sha}/web/pwa/, use the last segment as target
+            target = url.filename();
+        }
+    } else {
+        target = url.filename();
+    }
     fs::path    makefile = fulldir / "Makefile";
     fs::path    location;
     const char* mimetype;
@@ -1360,8 +1406,9 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     if (gVerbosity >= 2) std::cerr << "makefile : " << makefile << std::endl;
 
     // Check if we need to create the target directory on demand
-    // URL format: /{sha1}/{platform}/{architecture}/{target}
-    if (U.size() >= 4 && !fs::exists(makefile)) {
+    // URL format: /{sha1}/{platform}/{architecture}/{target} or /{sha1}/web/pwa/{asset}
+    if (U.size() >= 4 && !fs::exists(makefile) && 
+        (U[2] != "web" || (U[2] == "web" && (U[3] == "pwa" || U[3] == "pwa-poly")))) {
         std::string platform     = U[2];
         std::string architecture = U[3];
         fs::path    session_dir  = getDirectory() / U[1];
