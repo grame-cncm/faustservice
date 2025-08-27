@@ -441,6 +441,22 @@ static std::string filterFaustOptions(const std::string& options) {
     return result.str();
 }
 
+static std::string readFaustOptions(const fs::path& session_dir) {
+    fs::path options_file = session_dir / "faustoptions.txt";
+    if (fs::exists(options_file)) {
+        std::ifstream file(options_file);
+        std::string options;
+        std::getline(file, options);
+        if (!options.empty()) {
+            if (gVerbosity >= 2) {
+                std::cout << "Using faustoptions: '" << options << "'" << std::endl;
+            }
+            return options;
+        }
+    }
+    return "";
+}
+
 /**
  * Extract Faust options from DSP source code
  * Looks for: declare faustoptions "options";
@@ -592,9 +608,10 @@ static int validate_faust(connection_info_struct* con_info)
             }
         }
         
-        // Now compile (for now, not using the options yet)
+        // Now compile using the extracted options
+        std::string options_str = readFaustOptions(session_path);
         std::string faust_cmd = "cd " + sourcecode_path.string() + 
-                                " && faust " + main_dsp_filename + " -o ../generated.cpp -svg 2> ../errors.log";
+                                " && faust " + options_str + (options_str.empty() ? "" : " ") + main_dsp_filename + " -o ../generated.cpp -svg 2> ../errors.log";
 
         if (gVerbosity >= 2) std::cerr << "Executing compilation: " << faust_cmd << std::endl;
 
@@ -1671,8 +1688,9 @@ int FaustServer::serveSignalsSvg(struct MHD_Connection* connection, const std::s
     }
 
     // Generate signals diagram
+    std::string options_str = readFaustOptions(session_dir);
     std::string dot_file     = main_dsp_file + "-sig.dot";
-    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust -sg " + main_dsp_file + " -o /dev/null" +
+    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust " + options_str + (options_str.empty() ? "" : " ") + "-sg " + main_dsp_file + " -o /dev/null" +
                                " && dot -Tsvg " + dot_file + " -o ../signals.svg" + " && rm " + dot_file;
 
     if (gVerbosity >= 2) {
@@ -1757,8 +1775,9 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
     }
 
     // Generate task diagram
+    std::string options_str = readFaustOptions(session_dir);
     std::string dot_file     = main_dsp_file + ".dot";
-    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust -vec -tg " + main_dsp_file +
+    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust " + options_str + (options_str.empty() ? "" : " ") + "-vec -tg " + main_dsp_file +
                                " -o /dev/null" + " && dot -Tsvg " + dot_file + " -o ../task.svg" + " && rm " + dot_file;
 
     if (gVerbosity >= 2) {
