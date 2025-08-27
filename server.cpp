@@ -1036,6 +1036,21 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/*/task.svg")) {
         return serveTaskSvg(connection, url);
 
+    } else if (matchURL(url, "/sessions/list")) {
+        return serveSessionsList(connection);
+
+    } else if (matchURL(url, "/*/user_code.dsp")) {
+        // Serve the original DSP code from a session
+        std::vector<std::string> U = decomposeURL(url);
+        if (U.size() >= 2) {
+            fs::path filepath = fDirectory / U[1] / "user_code.dsp";
+            if (fs::exists(filepath)) {
+                return send_file(connection, filepath, "text/plain");
+            }
+        }
+        std::string error_msg = "DSP file not found";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+
     } else if (matchURL(url, "/favicon.ico")) {
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
 
@@ -1646,4 +1661,91 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
         std::string error_msg = "Task diagram generation completed but file not found";
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
     }
+}
+
+//------------------------------------------------------------------
+// Serve sessions list as JSON
+//
+int FaustServer::serveSessionsList(struct MHD_Connection* connection)
+{
+    if (gVerbosity >= 2) {
+        std::cerr << "Request for sessions list" << std::endl;
+    }
+
+    std::ostringstream json;
+    json << "{\n  \"sessions\": [\n";
+
+    bool first = true;
+    try {
+        // Iterate through all session directories
+        if (fs::exists(fDirectory) && fs::is_directory(fDirectory)) {
+            std::vector<std::pair<fs::path, std::time_t>> sessions;
+            
+            // Collect all sessions with their modification times
+            for (const auto& entry : fs::directory_iterator(fDirectory)) {
+                if (entry.is_directory()) {
+                    fs::path session_dir = entry.path();
+                    fs::path filename_file = session_dir / "filename.txt";
+                    
+                    // Only include sessions that have a filename.txt file
+                    if (fs::exists(filename_file)) {
+                        std::time_t mod_time = fs::last_write_time(session_dir).time_since_epoch().count();
+                        sessions.emplace_back(session_dir, mod_time);
+                    }
+                }
+            }
+            
+            // Sort sessions by modification time (oldest first)
+            std::sort(sessions.begin(), sessions.end(), 
+                     [](const auto& a, const auto& b) { return a.second < b.second; });
+            
+            // Generate JSON for each session
+            for (const auto& [session_dir, mod_time] : sessions) {
+                std::string sha1 = session_dir.filename().string();
+                fs::path filename_file = session_dir / "filename.txt";
+                
+                // Read the original filename
+                std::string filename = "unknown.dsp";
+                try {
+                    std::ifstream file(filename_file);
+                    if (file.is_open()) {
+                        std::getline(file, filename);
+                        file.close();
+                        // Remove any trailing whitespace/newlines
+                        filename.erase(filename.find_last_not_of(" \n\r\t") + 1);
+                    }
+                } catch (const std::exception& e) {
+                    if (gVerbosity >= 1) {
+                        std::cerr << "Warning: Could not read filename for session " << sha1 << ": " << e.what() << std::endl;
+                    }
+                }
+                
+                if (!first) {
+                    json << ",\n";
+                }
+                first = false;
+                
+                json << "    {\n";
+                json << "      \"sha1\": \"" << sha1 << "\",\n";
+                json << "      \"filename\": \"" << filename << "\",\n";
+                json << "      \"timestamp\": " << mod_time << "\n";
+                json << "    }";
+            }
+        }
+    } catch (const fs::filesystem_error& e) {
+        if (gVerbosity >= 1) {
+            std::cerr << "Error reading sessions directory: " << e.what() << std::endl;
+        }
+        std::string error_msg = "Error reading sessions";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+    }
+
+    json << "\n  ]\n}";
+    
+    std::string json_str = json.str();
+    if (gVerbosity >= 2) {
+        std::cerr << "Returning " << (first ? 0 : json_str.length()) << " bytes of sessions data" << std::endl;
+    }
+    
+    return send_page(connection, json_str.c_str(), json_str.size(), MHD_HTTP_OK, "application/json");
 }

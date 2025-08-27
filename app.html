@@ -335,6 +335,67 @@
             display: none;
         }
 
+        /* Session Navigation Styles */
+        .session-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            background: #f5f7fa;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 12px 20px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .nav-btn {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            min-width: 40px;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: #f0f0f0;
+            border-color: #3498db;
+        }
+
+        .nav-btn:disabled {
+            background: #f8f9fa;
+            color: #ccc;
+            cursor: not-allowed;
+            border-color: #eee;
+        }
+
+        .session-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 15px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e1e5e9;
+        }
+
+        .session-sha {
+            color: #666;
+            font-weight: 500;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .session-filename {
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
         .error-message {
             background: #ffe6e6;
             border: 1px solid #ffcccc;
@@ -467,6 +528,16 @@
             </div>
         </div>
 
+        <!-- Session Navigation Tab -->
+        <div class="session-nav" id="session-nav" style="display: none;">
+            <button id="prev-session-btn" class="nav-btn" disabled>◀</button>
+            <div class="session-info">
+                <span id="current-sha" class="session-sha">-</span>
+                <span id="current-filename" class="session-filename">No file loaded</span>
+            </div>
+            <button id="next-session-btn" class="nav-btn" disabled>▶</button>
+        </div>
+
         <!-- Error Message -->
         <div class="error-message" id="error-message">
             <div class="error-title">Compilation Error</div>
@@ -588,6 +659,10 @@
         let previousScrollInfo = null;  // Store scroll position info for C++ view
         let compilationErrors = null;  // Store compilation error messages
         
+        // Session navigation variables
+        let allSessions = [];
+        let currentSessionIndex = 0; // Starts at 0 (empty session when allSessions.length = 0)
+        
         // New state management variables
         let buttonState = 1;  // Current button state (1-6)
         let isCompiling = false;  // Flag to track compilation in progress
@@ -612,6 +687,13 @@
         const svgContainer = document.getElementById('svg-container');
         const codeDownloadBtn = document.getElementById('code-download-btn');
         const svgDownloadBtn = document.getElementById('svg-download-btn');
+        
+        // Session navigation elements
+        const sessionNav = document.getElementById('session-nav');
+        const prevSessionBtn = document.getElementById('prev-session-btn');
+        const nextSessionBtn = document.getElementById('next-session-btn');
+        const currentShaSpan = document.getElementById('current-sha');
+        const currentFilenameSpan = document.getElementById('current-filename');
 
         // Upload zone events (only drag and drop, no click)
         uploadZone.addEventListener('dragover', handleDragOver);
@@ -639,6 +721,10 @@
         // View selection events
         viewSelect.addEventListener('change', handleViewChange);
         
+        // Session navigation event listeners
+        prevSessionBtn.addEventListener('click', navigateToPreviousSession);
+        nextSessionBtn.addEventListener('click', navigateToNextSession);
+        
         // Download button events
         codeDownloadBtn.addEventListener('click', handleCodeDownload);
         svgDownloadBtn.addEventListener('click', handleSvgDownload);
@@ -646,14 +732,16 @@
         // Load targets and version when DOM is ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() {
-                console.log('DOM loaded via event, loading targets and version...');
+                console.log('DOM loaded via event, loading targets, version and sessions...');
                 loadTargets();
                 loadVersion();
+                loadAllSessions();
             });
         } else {
-            console.log('DOM already loaded, loading targets and version immediately...');
+            console.log('DOM already loaded, loading targets, version and sessions immediately...');
             loadTargets();
             loadVersion();
+            loadAllSessions();
         }
 
         // Get the global drag overlay element
@@ -2120,6 +2208,202 @@
             svgViewer.style.display = 'flex';
         }
 
+        // Session navigation functions
+        async function loadAllSessions() {
+            try {
+                const response = await fetch('/sessions/list');
+                if (response.ok) {
+                    const data = await response.json();
+                    allSessions = data.sessions || [];
+                } else {
+                    console.error('Failed to load sessions list');
+                    allSessions = [];
+                }
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+                allSessions = [];
+            }
+            
+            // If we're not in an active session, stay in empty session
+            if (!currentSha1) {
+                currentSessionIndex = allSessions.length; // Empty session index
+            }
+            
+            updateSessionNavigation();
+        }
+
+        function updateSessionNavigation() {
+            // Always show navigation if we have at least one session or are starting
+            if (allSessions.length === 0 && currentSessionIndex !== 0) {
+                sessionNav.style.display = 'none';
+                return;
+            }
+
+            // Show navigation
+            sessionNav.style.display = 'flex';
+            
+            if (currentSessionIndex === allSessions.length) {
+                // Empty session (rightmost) - index n where n = allSessions.length
+                currentShaSpan.textContent = 'New';
+                currentFilenameSpan.textContent = 'Load File to Compile';
+                
+                // In empty session: can only go left (to most recent session)
+                prevSessionBtn.disabled = (allSessions.length === 0); // Can't go left if no sessions
+                nextSessionBtn.disabled = true; // Can't go right from empty session
+            } else {
+                // Real session at index currentSessionIndex
+                const currentSession = allSessions[currentSessionIndex];
+                currentShaSpan.textContent = currentSession.sha1.substring(0, 8) + '...';
+                currentFilenameSpan.textContent = currentSession.filename;
+                
+                // Update button states
+                // Left button (◀) = go to OLDER session (index--)
+                prevSessionBtn.disabled = (currentSessionIndex === 0);
+                // Right button (▶) = go to NEWER session or empty session (index++)
+                nextSessionBtn.disabled = false; // Can always go right
+            }
+        }
+
+        async function navigateToPreviousSession() {
+            // Left button (◀) = go to OLDER session (index--)
+            if (currentSessionIndex > 0) {
+                currentSessionIndex--;
+                if (currentSessionIndex < allSessions.length) {
+                    // Go to real session
+                    const session = allSessions[currentSessionIndex];
+                    await loadSession(session.sha1, session.filename);
+                } else {
+                    // This shouldn't happen with our logic, but safety check
+                    await loadEmptySession();
+                }
+            }
+        }
+
+        async function navigateToNextSession() {
+            // Right button (▶) = go to NEWER session or empty session (index++)
+            if (currentSessionIndex < allSessions.length) {
+                currentSessionIndex++;
+                if (currentSessionIndex < allSessions.length) {
+                    // Go to newer real session
+                    const session = allSessions[currentSessionIndex];
+                    await loadSession(session.sha1, session.filename);
+                } else {
+                    // Go to empty session (index === allSessions.length)
+                    await loadEmptySession();
+                }
+            }
+        }
+
+        async function loadEmptySession() {
+            // Reset to empty session state
+            currentSha1 = null;
+            currentSessionIndex = allSessions.length; // Empty session is at index n
+            selectedFile = null;
+            originalDspCode = null;
+            hasCompilationError = false;
+            compilationErrors = null;
+            
+            // Update session navigation display
+            updateSessionNavigation();
+            
+            // Reset UI to initial state
+            uploadZone.classList.remove('hidden');
+            document.getElementById('upload-content').style.display = 'block';
+            fileContent.style.display = 'none';
+            svgViewer.style.display = 'none';
+            errorMessage.style.display = 'none';
+            
+            // Reset button state
+            updateButtonState(); // Will determine correct state based on selectedFile being null
+            
+            // Disable view selector but preserve current view
+            viewSelect.disabled = true;
+        }
+
+        async function loadSession(sha1, filename) {
+            // Update current session
+            currentSha1 = sha1;
+            
+            // Find and set current session index (if not already set by navigation)
+            if (currentSessionIndex >= allSessions.length || 
+                allSessions[currentSessionIndex]?.sha1 !== currentSha1) {
+                currentSessionIndex = allSessions.findIndex(session => session.sha1 === currentSha1);
+            }
+            
+            // Update session navigation display
+            updateSessionNavigation();
+            
+            // Load session content first
+            await loadSessionContent();
+            
+            // Now that content is loaded, determine the appropriate view
+            // If current view is not available (e.g., C++ with compilation errors), fall back to DSP
+            let targetView = currentView;
+            if (hasCompilationError && (currentView === 'cpp' || currentView === 'svg' || currentView === 'signals' || currentView === 'task')) {
+                targetView = 'dsp';
+            }
+            
+            viewSelect.value = targetView;
+            currentView = targetView;
+            switchView(targetView);
+        }
+
+        async function loadSessionContent() {
+            if (!currentSha1) return;
+            
+            try {
+                // Load DSP code
+                const response = await fetch(`/${currentSha1}/user_code.dsp`);
+                if (response.ok) {
+                    const dspCode = await response.text();
+                    originalDspCode = dspCode;
+                    
+                    // Get filename from session info
+                    const session = allSessions.find(s => s.sha1 === currentSha1);
+                    const filename = session ? session.filename : 'session.dsp';
+                    
+                    // Create a pseudo File object for compatibility
+                    selectedFile = new File([dspCode], filename, { type: 'text/plain' });
+                    
+                    // Check for compilation errors
+                    hasCompilationError = false;
+                    compilationErrors = null;
+                    
+                    try {
+                        const errorsResponse = await fetch(`/${currentSha1}/errors.log`);
+                        if (errorsResponse.ok) {
+                            const errorsContent = await errorsResponse.text();
+                            if (errorsContent.trim()) {
+                                hasCompilationError = true;
+                                compilationErrors = errorsContent;
+                            }
+                        }
+                    } catch (e) {
+                        console.log('No errors.log found (normal for successful compilations)');
+                    }
+                    
+                    // Update UI state
+                    document.getElementById('upload-content').style.display = 'none';
+                    // Show file content area (hidden when in empty session)
+                    fileContent.style.display = 'flex';
+                    
+                    // Enable view selector first
+                    viewSelect.disabled = false;
+                    
+                    // Update view selector options based on error state
+                    updateViewSelectorOptions();
+                    
+                    // Update button state (will be determined by file validity and target selection)
+                    updateButtonState();
+                    
+                } else {
+                    console.error('Failed to load session content for', currentSha1);
+                }
+            } catch (error) {
+                console.error('Error loading session content:', error);
+            }
+        }
+
         function displayCodeWithLineNumbers(code, language = 'faust') {
             const lines = code.split('\n');
             const totalLines = lines.length;
@@ -2263,6 +2547,21 @@
                     const sha1 = await response.text();
                     currentSha1 = sha1.trim();
                     console.log('File uploaded successfully, SHA1:', currentSha1);
+                    
+                    // Load all sessions and update navigation
+                    await loadAllSessions();
+                    
+                    // Set current session index to the new session (most recent = highest index)
+                    currentSessionIndex = allSessions.findIndex(session => session.sha1 === currentSha1);
+                    if (currentSessionIndex === -1) {
+                        // Fallback: if not found, assume it's the newest (last in array)
+                        currentSessionIndex = allSessions.length - 1;
+                    }
+                    updateSessionNavigation();
+                    
+                    // Hide upload content and show file content (exit empty session state)
+                    document.getElementById('upload-content').style.display = 'none';
+                    fileContent.style.display = 'flex';
                     
                     // Immediately check errors.log to determine if there were compilation errors
                     try {

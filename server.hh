@@ -120,6 +120,7 @@ class FaustServer {
     int serveAppInterface(struct MHD_Connection* connection);
     int serveSignalsSvg(struct MHD_Connection* connection, const std::string& url);
     int serveTaskSvg(struct MHD_Connection* connection, const std::string& url);
+    int serveSessionsList(struct MHD_Connection* connection);
 
     int makeAndSendResourceFile(struct MHD_Connection* connection, const string& raw_url);
     std::string getMakefileArtifactName(const fs::path&);
