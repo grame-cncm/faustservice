@@ -1021,7 +1021,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     // MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
     if (gVerbosity >= 2) std::cerr << "ANSWER GET CONNECTION " << url << std::endl;
 
-    if (matchExtension(url, ".php") || url.length() > 100 /*matchExtension(url, ".js")*/) {
+    if (matchExtension(url, ".php") || (url.length() > 100 && url.find("/webapp/") == std::string::npos) /*matchExtension(url, ".js")*/) {
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
 
     } else if (matchURL(url, "/")) {
@@ -1180,6 +1180,97 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/*/task.svg")) {
         return serveTaskSvg(connection, url);
 
+    } else if (matchURL(url, "/*/webapp")) {
+        // Extract SHA from URL: /sha1/webapp -> sha1
+        std::string sha1 = url.substr(1, url.find('/', 1) - 1);
+        return generate_webapp_view(connection, sha1);
+
+    } else if (url.find("/webapp/") != std::string::npos && url.size() > 40) {
+        // Handle webapp assets using string matching instead of pattern matching
+        // Expected format: /<sha>/webapp/path/to/file.ext
+        if (gVerbosity >= 2) {
+            std::cerr << "DEBUG: Processing webapp asset URL: " << url << std::endl;
+        }
+        
+        // Find the position of "/webapp/"
+        size_t webapp_pos = url.find("/webapp/");
+        if (webapp_pos != std::string::npos) {
+            // Extract SHA (everything before /webapp/)
+            std::string sha1 = url.substr(1, webapp_pos - 1);  // Skip leading '/'
+            
+            // Extract asset path (everything after /webapp/)
+            std::string asset_path = url.substr(webapp_pos + 8);  // Skip "/webapp/"
+            
+            if (!sha1.empty() && !asset_path.empty()) {
+                auto session_dir = fDirectory / sha1;
+                auto webapp_file = session_dir / "webapp" / asset_path;
+                
+                if (fs::exists(webapp_file)) {
+                    // Determine MIME type based on file extension
+                    std::string ext = webapp_file.extension().string();
+                    const char* mime_type = "application/octet-stream";
+                    if (ext == ".html") mime_type = "text/html";
+                    else if (ext == ".js") mime_type = "application/javascript";
+                    else if (ext == ".css") mime_type = "text/css";
+                    else if (ext == ".wasm") mime_type = "application/wasm";
+                    else if (ext == ".json") mime_type = "application/json";
+                    else if (ext == ".png") mime_type = "image/png";
+                    else if (ext == ".svg") mime_type = "image/svg+xml";
+                    
+                    return send_file(connection, webapp_file, mime_type);
+                }
+            }
+        }
+        
+        if (gVerbosity >= 2) {
+            std::cerr << "DEBUG: Webapp asset not found for URL: " << url << std::endl;
+        }
+        std::string error_msg = "Webapp asset not found";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+
+    } else if (url.find(".js") != std::string::npos || url.find(".wasm") != std::string::npos || 
+               url.find(".css") != std::string::npos || url.find(".json") != std::string::npos ||
+               url.find(".png") != std::string::npos) {
+        // Handle webapp asset requests that come as direct paths (for iframe compatibility)
+        // Expected patterns: /<sha>/index.js, /<sha>/faust-ui/index.css, /<sha>/faustwasm/create-node.js, etc.
+        std::vector<std::string> parts = decomposeURL(url);
+        if (parts.size() >= 2) {
+            std::string sha1 = parts[1];
+            
+            // Reconstruct the full asset path (everything after /<sha>/)
+            std::string asset_path = "";
+            for (size_t i = 2; i < parts.size(); i++) {
+                if (!asset_path.empty()) asset_path += "/";
+                asset_path += parts[i];
+            }
+            
+            auto session_dir = fDirectory / sha1;
+            auto webapp_file = session_dir / "webapp" / asset_path;
+            
+            if (fs::exists(webapp_file)) {
+                // Determine MIME type based on file extension
+                std::string ext = webapp_file.extension().string();
+                const char* mime_type = "application/octet-stream";
+                if (ext == ".html") mime_type = "text/html";
+                else if (ext == ".js") mime_type = "application/javascript";
+                else if (ext == ".css") mime_type = "text/css";
+                else if (ext == ".wasm") mime_type = "application/wasm";
+                else if (ext == ".json") mime_type = "application/json";
+                else if (ext == ".png") mime_type = "image/png";
+                else if (ext == ".svg") mime_type = "image/svg+xml";
+                
+                if (gVerbosity >= 2) {
+                    std::cerr << "Serving webapp asset: " << webapp_file << " as " << mime_type << std::endl;
+                }
+                
+                return send_file(connection, webapp_file, mime_type);
+            }
+        }
+        
+        // If not found as webapp asset, return 404
+        std::string error_msg = "Webapp asset not found: " + url;
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        
     } else if (matchURL(url, "/sessions/list")) {
         return serveSessionsList(connection);
 
@@ -1805,6 +1896,75 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
             std::cerr << "task.svg was not created despite successful command execution" << std::endl;
         }
         std::string error_msg = "Task diagram generation completed but file not found";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+    }
+}
+
+//------------------------------------------------------------------
+// Generate and serve web application
+//
+int FaustServer::generate_webapp_view(struct MHD_Connection* connection, const std::string& sha1)
+{
+    if (gVerbosity >= 2) {
+        std::cerr << "Generating webapp for " << sha1 << std::endl;
+    }
+
+    auto session_dir = fDirectory / sha1;
+    if (!fs::exists(session_dir)) {
+        std::string error_msg = "Session not found: " + sha1;
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+    }
+
+    auto sourcecode_dir = session_dir / "sourcecode";
+    auto webapp_dir = session_dir / "webapp";
+    
+    // Get the main DSP file name
+    std::string main_dsp_file;
+    for (const auto& entry : fs::directory_iterator(sourcecode_dir)) {
+        if (entry.path().extension() == ".dsp") {
+            main_dsp_file = entry.path().filename().string();
+            break;
+        }
+    }
+    
+    if (main_dsp_file.empty()) {
+        std::string error_msg = "No DSP file found in session";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+    }
+
+    if (gVerbosity >= 2) {
+        std::cerr << "Generating webapp for " << main_dsp_file << " in session " << sha1 << std::endl;
+    }
+
+    // Generate web application using faust2wasm-ts
+    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust2wasm-ts " + main_dsp_file + " ../webapp -pwa 2> ../errors.log";
+
+    if (gVerbosity >= 2) {
+        std::cerr << "Executing: " << generate_cmd << std::endl;
+    }
+
+    int result = system(generate_cmd.c_str());
+    if (result != 0) {
+        if (gVerbosity >= 1) {
+            std::cerr << "Failed to generate webapp for session " << sha1 << " (exit code: " << result << ")"
+                      << std::endl;
+        }
+        std::string error_msg = "Failed to generate web application";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+    }
+
+    // Check if generation was successful
+    auto index_html_path = webapp_dir / "index.html";
+    if (fs::exists(index_html_path)) {
+        if (gVerbosity >= 2) {
+            std::cerr << "Successfully generated webapp" << std::endl;
+        }
+        return send_file(connection, index_html_path, "text/html");
+    } else {
+        if (gVerbosity >= 1) {
+            std::cerr << "webapp was not created despite successful command execution" << std::endl;
+        }
+        std::string error_msg = "Web application generation completed but index.html not found";
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
     }
 }

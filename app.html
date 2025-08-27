@@ -532,6 +532,7 @@
                     <option value="svg">View Block Diagrams</option>
                     <option value="signals">View Signals</option>
                     <option value="task">View Tasks</option>
+                    <option value="webapp">View Web Application</option>
                 </select>
             </div>
         </div>
@@ -1956,6 +1957,9 @@
                 case 'task':
                     loadTaskSvg();
                     break;
+                case 'webapp':
+                    loadWebApp();
+                    break;
             }
             
             // Enable drag-and-drop export for the new view
@@ -2203,6 +2207,29 @@
             return false;
         }
 
+        async function loadWebApp() {
+            if (!currentSha1) return;
+            
+            // Hide file content when displaying webapp
+            fileContent.style.display = 'none';
+            
+            try {
+                // Create iframe to load the web application
+                svgContainer.innerHTML = `
+                    <iframe 
+                        src="/${currentSha1}/webapp" 
+                        style="width: 100%; height: 100%; border: none; border-radius: 8px; background: white;"
+                        title="Faust Web Application"
+                        allow="audio-worklet"
+                        onload="console.log('Web app loaded successfully');"
+                        onerror="console.error('Failed to load web app');">
+                    </iframe>
+                `;
+                svgViewer.style.display = 'flex';
+            } catch (error) {
+                showViewError('Error loading web application: ' + error.message);
+            }
+        }
 
         function showViewError(message) {
             // Hide file content when showing view error
