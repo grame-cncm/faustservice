@@ -33,6 +33,7 @@
 #include <iostream>
 #include <random>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -371,6 +372,105 @@ void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefile_dire
  *
  */
 
+/**
+ * Filter Faust compilation options to remove file-generating and unsafe options
+ */
+static std::string filterFaustOptions(const std::string& options) {
+    std::istringstream iss(options);
+    std::string token;
+    std::vector<std::string> filtered_options;
+    
+    // Options to filter out (remove)
+    std::set<std::string> forbidden_options = {
+        // Input options
+        "-a", "-i", "--inline-architecture-files", "-A", "--architecture-dir", 
+        "-I", "--import-dir", "-L", "--library",
+        // Output options  
+        "-o", "-e", "--export-dsp", "-uim", "--user-interface-macros",
+        "-xml", "-json", "-O", "--output-dir",
+        // Block diagram options (all)
+        "-ps", "--postscript", "-svg", "--svg", "-sd", "--simplify-diagrams",
+        "-drf", "--draw-route-frame", "-f", "--fold", "-fc", "--fold-complexity",
+        "-mns", "--max-name-size", "-sn", "--simple-names", "-blur", "--shadow-blur",
+        "-sc", "--scaled-svg",
+        // Math doc options (all)
+        "-mdoc", "--mathdoc", "-mdlang", "--mathdoc-lang", "-stripmdoc", "--strip-mdoc-tags",
+        // Debug file generation
+        "-tg", "--task-graph", "-sg", "--signal-graph", "-rg", "--retiming-graph",
+        // Information options (all)
+        "-h", "--help", "-v", "--version", "-libdir", "--libdir", "-includedir", "--includedir",
+        "-archdir", "--archdir", "-dspdir", "--dspdir", "-pathslist", "--pathslist"
+    };
+    
+    // Options that take a parameter
+    std::set<std::string> options_with_param = {
+        "-a", "-A", "--architecture-dir", "-I", "--import-dir", "-L", "--library",
+        "-o", "-O", "--output-dir", "-lang", "--language", "-cn", "--class-name",
+        "-scn", "--super-class-name", "-pn", "--process-name", "-mcd", "--max-copy-delay",
+        "-mdd", "--max-dense-delay", "-mdy", "--min-density", "-dlt", "--delay-line-threshold",
+        "-ftz", "--flush-to-zero", "-inj", "--inject", "-vs", "--vec-size", 
+        "-lv", "--loop-variant", "-fm", "--fast-math", "-ns", "--namespace",
+        "-vhdl-components", "--vhdl-components", "-fpga-mem", "--fpga-mem",
+        "-wi", "--widening-iterations", "-ni", "--narrowing-iterations",
+        "-f", "--fold", "-fc", "--fold-complexity", "-mns", "--max-name-size",
+        "-mdlang", "--mathdoc-lang", "-t", "--timeout", "-fx-size", "--fixed-point-size"
+    };
+    
+    while (iss >> token) {
+        if (forbidden_options.count(token)) {
+            // Skip this option
+            if (options_with_param.count(token)) {
+                // Also skip the next token (parameter)
+                if (iss >> token) {
+                    // Parameter skipped
+                }
+            }
+        } else {
+            // Keep this option
+            filtered_options.push_back(token);
+        }
+    }
+    
+    // Join filtered options back into a string
+    std::ostringstream result;
+    for (size_t i = 0; i < filtered_options.size(); ++i) {
+        if (i > 0) result << " ";
+        result << filtered_options[i];
+    }
+    
+    return result.str();
+}
+
+/**
+ * Extract Faust options from DSP source code
+ * Looks for: declare faustoptions "options";
+ */
+static std::string extractFaustOptions(const fs::path& dsp_file) {
+    std::ifstream file(dsp_file);
+    if (!file.is_open()) {
+        return "";
+    }
+    
+    std::string line;
+    std::regex pattern(R"###(\s*declare\s+faustoptions\s+"([^"]*)"\s*;\s*)###");
+    std::smatch match;
+    
+    while (std::getline(file, line)) {
+        if (std::regex_match(line, match, pattern)) {
+            std::string options = match[1].str();
+            if (gVerbosity >= 2) {
+                std::cerr << "Found faustoptions: '" << options << "'" << std::endl;
+            }
+            return options; // Return content between quotes
+        }
+    }
+    
+    if (gVerbosity >= 2) {
+        std::cerr << "No faustoptions declaration found" << std::endl;
+    }
+    return ""; // No faustoptions declaration found
+}
+
 static int validate_faust(connection_info_struct* con_info)
 {
     fs::path filename      = fs::path(con_info->filename);
@@ -465,11 +565,38 @@ static int validate_faust(connection_info_struct* con_info)
         // SINGLE COMPILATION: Copy main DSP file and compile in one step
         if (gVerbosity >= 2) std::cerr << "SINGLE COMPILATION validate_faust" << std::endl;
 
-        // Single Faust compilation command
-        std::string faust_cmd = "cd " + sourcecode_path.string() + " && cp " + main_dsp_filename + " ../user_code.dsp" +
+        // First, copy the DSP file
+        std::string copy_cmd = "cd " + sourcecode_path.string() + " && cp " + main_dsp_filename + " ../user_code.dsp";
+        if (gVerbosity >= 2) std::cerr << "Executing copy: " << copy_cmd << std::endl;
+        
+        int copy_result = system(copy_cmd.c_str());
+        if (copy_result != 0) {
+            if (gVerbosity >= 1) std::cerr << "Failed to copy DSP file" << std::endl;
+            con_info->answerstring = completebutnopipe;
+            return 1;
+        }
+        
+        // Extract and process faustoptions
+        fs::path user_dsp_file = session_path / "user_code.dsp";
+        std::string raw_options = extractFaustOptions(user_dsp_file);
+        std::string filtered_options = filterFaustOptions(raw_options);
+        
+        // Create faustoptions.txt file
+        fs::path faustoptions_file = session_path / "faustoptions.txt";
+        std::ofstream options_out(faustoptions_file);
+        if (options_out.is_open()) {
+            options_out << filtered_options;
+            options_out.close();
+            if (gVerbosity >= 2) {
+                std::cerr << "Created faustoptions.txt with: '" << filtered_options << "'" << std::endl;
+            }
+        }
+        
+        // Now compile (for now, not using the options yet)
+        std::string faust_cmd = "cd " + sourcecode_path.string() + 
                                 " && faust " + main_dsp_filename + " -o ../generated.cpp -svg 2> ../errors.log";
 
-        if (gVerbosity >= 2) std::cerr << "Executing: " << faust_cmd << std::endl;
+        if (gVerbosity >= 2) std::cerr << "Executing compilation: " << faust_cmd << std::endl;
 
         // Execute Faust compilation
         FILE* faust_process = popen(faust_cmd.c_str(), "r");
