@@ -166,9 +166,9 @@
         }
         
         .export-toggle.active {
-            background: #3498db;
+            background: #f8f9fa;
             border-color: #3498db;
-            color: white;
+            color: #3498db;
         }
         
         .export-toggle:disabled {
@@ -752,15 +752,15 @@
         <div class="toolbar-controls-flat">
             <div class="toolbar-left">
                 <!-- Session navigation -->
-                <button id="prev-session-btn" class="nav-btn" disabled>◀</button>
-                <div class="session-info" id="session-info-clickable">
+                <button id="prev-session-btn" class="nav-btn" disabled title="Previous Session">◀</button>
+                <div class="session-info" id="session-info-clickable" title="Click to load a Faust file">
                     <span id="current-sha" class="session-sha">-</span>
                     <span id="current-filename" class="session-filename">No file</span>
                 </div>
-                <button id="next-session-btn" class="nav-btn" disabled>▶</button>
+                <button id="next-session-btn" class="nav-btn" disabled title="Next Session">▶</button>
                 
                 <!-- View selector -->
-                <select id="view-select" class="view-select" disabled>
+                <select id="view-select" class="view-select" disabled title="Choose view type">
                     <option value="dsp">View DSP Code</option>
                     <option value="cpp">View Generated C++</option>
                     <option value="svg">View Block Diagrams</option>
@@ -782,10 +782,10 @@
     <!-- Toolbar Export (conditionnelle) -->
     <div class="toolbar-export" id="toolbar-export" style="display: none;">
         <div class="export-controls">
-            <select id="platform-select" class="platform-select">
+            <select id="platform-select" class="platform-select" title="Select target platform">
                 <option value="">Loading platforms...</option>
             </select>
-            <select id="arch-select" class="arch-select" disabled>
+            <select id="arch-select" class="arch-select" disabled title="Select target architecture">
                 <option value="">Select platform first</option>
             </select>
             <button class="btn btn-primary" id="main-action-btn" data-state="1">Select Target</button>
@@ -819,10 +819,10 @@
             
             <!-- Boutons download flottants dans la zone -->
             <div class="floating-download-buttons" id="floating-download-buttons">
-                <button class="download-button" id="code-download-btn" style="display: none;">
+                <button class="download-button" id="code-download-btn" style="display: none;" title="Download generated C++ source code">
                     💾 Download
                 </button>
-                <button class="download-button" id="svg-download-btn" style="display: none;">
+                <button class="download-button" id="svg-download-btn" style="display: none;" title="Download SVG diagrams archive">
                     📦 Download ZIP
                 </button>
             </div>
@@ -1204,6 +1204,15 @@
             mainActionBtn.className = `btn ${buttonClass}`;
             mainActionBtn.disabled = disabled;
             mainActionBtn.setAttribute('data-state', newState);
+            
+            // Mettre à jour le titre selon l'état
+            const titles = {
+                1: "Choose platform and architecture to compile",
+                2: "Start Faust compilation", 
+                3: "Compilation in progress...",
+                4: "Download compiled binary"
+            };
+            mainActionBtn.title = titles[newState] || "";
         }
 
         /**
