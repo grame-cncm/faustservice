@@ -18,52 +18,162 @@
             color: #2c3e50;
             margin: 0;
             padding: 0;
+            padding-top: 90px; /* Espace pour la toolbar navigation */
+        }
+        
+        body.export-visible {
+            padding-top: 160px; /* Espace pour les deux toolbars */
         }
 
         .container {
             width: 100%;
             max-width: 95%; /* Légère limite sur très grands écrans */
             margin: 0 auto;
-            padding: 40px 20px;
+            padding: 30px 0;
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            height: calc(100vh - 90px); /* HAUTEUR FIXE pour forcer l'expansion */
+        }
+        
+        body.export-visible .container {
+            height: calc(100vh - 160px); /* HAUTEUR FIXE avec deux toolbars */
         }
 
 
-        .toolbar {
+        /* Toolbar Navigation */
+        .toolbar-navigation {
+            background: white;
+            padding: 15px 30px 20px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            margin: 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            box-sizing: border-box;
+        }
+        
+        /* Toolbar Export */
+        .toolbar-export {
+            background: #f8f9fa;
+            border-top: 1px solid #e1e5e9;
+            border-bottom: 1px solid #e1e5e9;
+            padding: 12px 30px;
+            position: fixed;
+            top: 100px; /* Plus d'espace pour la toolbar navigation */
+            left: 0;
+            right: 0;
+            z-index: 99;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .toolbar-title {
+            font-size: 0.9em;
+            font-weight: 400;
+            color: #666;
+            margin-bottom: 8px;
+            text-align: left;
+        }
+        
+        .toolbar-controls-flat {
             display: flex;
             align-items: center;
-            justify-content: space-between; /* Espace entre gauche et droite */
-            gap: 25px; /* Espacement légèrement plus grand */
-            background: white;
-            padding: 20px 30px; /* Plus de padding horizontal */
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-            margin-bottom: 30px;
+            justify-content: space-between;
+            gap: 15px;
             flex-wrap: wrap;
+            width: 100%;
         }
-
+        
         .toolbar-left {
             display: flex;
             align-items: center;
-            gap: 25px;
-            flex-wrap: wrap;
+            gap: 15px;
         }
-
+        
         .toolbar-right {
             display: flex;
             align-items: center;
             gap: 15px;
         }
-
-        .toolbar-title {
-            font-size: 1.2em;
-            font-weight: 500;
-            color: #2c3e50;
-            margin-right: 20px; /* Plus d'espace après le titre */
+        
+        .export-controls {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        /* Session directement dans toolbar */
+        
+        .session-info {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            transition: background-color 0.2s ease;
+            border-radius: 6px;
+            padding: 8px 12px;
+            background: #f5f7fa;
+            border: 1px solid #e1e5e9;
+            min-width: 180px;
             white-space: nowrap;
-            flex-shrink: 0;
+        }
+        
+        .session-info.clickable {
+            cursor: pointer;
+        }
+        
+        .session-info.clickable:hover {
+            background: rgba(52, 152, 219, 0.1);
+        }
+        
+        .session-sha {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .session-filename {
+            color: #2c3e50;
+            font-weight: 400;
+        }
+        
+        .session-sha::after {
+            content: " | ";
+            color: #ccc;
+            font-weight: normal;
+        }
+        
+        /* Export toggle */
+        .export-toggle {
+            background: #f8f9fa;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 10px 12px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+        
+        .export-toggle:enabled:hover {
+            background: #e9ecef;
+            transform: translateY(-1px);
+        }
+        
+        .export-toggle.active {
+            background: #3498db;
+            border-color: #3498db;
+            color: white;
+        }
+        
+        .export-toggle:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .platform-select, .arch-select, .view-select {
@@ -143,6 +253,21 @@
             background: #bdc3c7;
             color: #2c3e50;
         }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: #95a5a6;
+            transform: translateY(-1px);
+        }
+        
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .btn-warning:hover:not(:disabled) {
+            background: #e67e22;
+            transform: translateY(-1px);
+        }
 
         .btn:disabled {
             background: #bdc3c7;
@@ -151,9 +276,10 @@
         }
 
         .upload-zone {
-            border: 2px dashed #bdc3c7;
-            border-radius: 0 0 12px 12px;
-            padding: 40px;
+            border: 1px dashed #bdc3c7;
+            border-radius: 8px;
+            padding: 40px 30px; /* Même padding horizontal que toolbar (30px) */
+            margin: 0;
             transition: all 0.3s ease;
             background: white;
             flex: 1;
@@ -162,6 +288,7 @@
             overflow: hidden;
             position: relative;
             box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            height: 100%;
         }
 
         .upload-zone.has-content {
@@ -203,7 +330,7 @@
         .line-numbers {
             background: #f8f9fa;
             color: #999;
-            padding: 20px 10px 20px 20px;
+            padding: 20px 10px 20px 20px; /* Garder padding pour lisibilité */
             text-align: right;
             user-select: none;
             white-space: pre;
@@ -215,7 +342,7 @@
 
         .code-content {
             flex: 1;
-            padding: 20px;
+            padding: 20px; /* Garder padding pour lisibilité */
             white-space: pre-wrap;
             overflow-y: auto;
             user-select: text;
@@ -266,9 +393,10 @@
             background: white;
             display: flex;
             flex-direction: column;
-            padding: 20px;
+            padding: 20px 30px; /* Même padding horizontal que toolbar (30px) */
             overflow: auto;
             border-radius: 12px;
+            height: 100%; /* FORCER la hauteur réelle */
         }
 
         #svg-container {
@@ -278,6 +406,12 @@
             align-items: center;
             justify-content: center;
             min-height: 200px;
+        }
+        
+        #svg-container.webapp-container {
+            align-items: stretch;
+            justify-content: stretch;
+            height: 100%; /* FORCER hauteur complète pour webapp */
         }
 
         #svg-container svg {
@@ -289,31 +423,84 @@
         }
 
         @media (max-width: 768px) {
+            body {
+                padding-top: 140px; /* Plus d'espace sur mobile pour la toolbar navigation */
+            }
+            
+            body.export-visible {
+                padding-top: 220px; /* Espace pour les deux toolbars sur mobile */
+            }
+            
             .container {
-                padding: 20px 15px; /* Marges plus petites sur mobile */
+                padding: 0; /* Pas de padding sur mobile non plus */
+                height: calc(100vh - 140px); /* HAUTEUR FIXE pour mobile */
+            }
+            
+            .upload-zone {
+                padding: 40px 15px; /* Même padding que toolbar mobile (15px) */
+                margin: 15px 0; /* Moins d'espace sur mobile */
+                height: calc(100% - 30px); /* Compenser le margin mobile */
+            }
+            
+            .svg-viewer {
+                padding: 20px 15px; /* Même padding que toolbar mobile (15px) */
+            }
+            
+            body.export-visible .container {
+                height: calc(100vh - 220px); /* HAUTEUR FIXE avec deux toolbars sur mobile */
             }
 
-            .toolbar {
+            .toolbar-navigation {
+                padding: 12px 15px 15px 15px;
+            }
+            
+            .toolbar-export {
+                padding: 10px 15px;
+                top: 160px; /* Ajuster selon nouvelle hauteur navigation */
+            }
+            
+            .toolbar-title {
+                text-align: center;
+                margin-bottom: 8px;
+                font-size: 0.85em;
+            }
+            
+            .toolbar-controls-flat {
                 flex-direction: column;
                 align-items: stretch;
                 gap: 12px;
             }
-
-            .toolbar-left, .toolbar-right {
-                flex-direction: column;
+            
+            .toolbar-left,
+            .toolbar-right {
+                justify-content: center;
+            }
+            
+            .export-controls {
+                justify-content: center;
                 gap: 12px;
             }
-
-            .toolbar-title {
+            
+            .session-info {
                 text-align: center;
-                margin-right: 0;
-                margin-bottom: 10px;
-                font-size: 1.1em;
             }
             
             .platform-select, .arch-select, .view-select, .btn {
                 min-width: auto;
                 width: 100%;
+            }
+            
+            /* Boutons flottants sur mobile */
+            .floating-download-buttons {
+                top: 8px;
+                right: 18px; /* 10px plus loin de la scrollbar sur mobile */
+                gap: 4px;
+            }
+            
+            .download-button {
+                padding: 6px 8px;
+                font-size: 11px;
+                min-width: 90px;
             }
         }
 
@@ -332,28 +519,7 @@
             display: none;
         }
 
-        /* Session Navigation Styles */
-        .session-nav {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            background: #f5f7fa;
-            border: 1px solid #e1e5e9;
-            border-radius: 12px 12px 0 0;
-            padding: 12px 20px;
-            margin: 15px 0 0 0;
-            font-family: monospace;
-            font-size: 13px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        }
-        
-        /* Force equal heights for navigation elements */
-        .session-nav > * {
-            height: 40px;
-            display: flex;
-            align-items: center;
-        }
+        /* Navigation buttons */
 
         .nav-btn {
             background: white;
@@ -471,35 +637,53 @@
             position: relative;
         }
 
-        .download-button {
+        /* Conteneur flottant pour les boutons download */
+        .floating-download-buttons {
             position: absolute;
             top: 10px;
-            right: 10px;
+            right: 20px; /* 10px plus loin de la scrollbar */
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.5s ease; /* Plus lent pour effet plus élégant */
+            pointer-events: none;
+        }
+        
+        .upload-zone:hover .floating-download-buttons {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+        
+        .download-button {
             background: #3498db;
             color: white;
             border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
+            padding: 10px 14px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 12px;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            z-index: 10;
+            font-size: 13px;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            min-width: 120px;
         }
-
-        .content-area:hover .download-button {
-            opacity: 1;
-        }
-
+        
         .download-button:hover {
             background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(52, 152, 219, 0.4);
         }
-
+        
         .download-button:active {
-            transform: translateY(1px);
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
         }
 
         .global-drag-icon {
@@ -562,22 +746,20 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Toolbar with integrated title -->
-        <div class="toolbar">
+    <!-- Toolbar Navigation principale - tout sur une ligne -->
+    <div class="toolbar-navigation">
+        <div class="toolbar-title" id="title">Faust Compiler</div>
+        <div class="toolbar-controls-flat">
             <div class="toolbar-left">
-                <div class="toolbar-title" id="title">Faust Compiler</div>
-                <button class="btn btn-primary" id="main-action-btn" data-state="1">(1) Load File to Compile</button>
-                <select id="platform-select" class="platform-select">
-                    <option value="">Loading platforms...</option>
-                </select>
-                <select id="arch-select" class="arch-select" disabled>
-                    <option value="">Select platform first</option>
-                </select>
-            </div>
-            
-            <div class="toolbar-right">
-                <!-- View Selector -->
+                <!-- Session navigation -->
+                <button id="prev-session-btn" class="nav-btn" disabled>◀</button>
+                <div class="session-info" id="session-info-clickable">
+                    <span id="current-sha" class="session-sha">-</span>
+                    <span id="current-filename" class="session-filename">No file</span>
+                </div>
+                <button id="next-session-btn" class="nav-btn" disabled>▶</button>
+                
+                <!-- View selector -->
                 <select id="view-select" class="view-select" disabled>
                     <option value="dsp">View DSP Code</option>
                     <option value="cpp">View Generated C++</option>
@@ -587,17 +769,32 @@
                     <option value="webapp">View Web Application</option>
                 </select>
             </div>
-        </div>
-
-        <!-- Session Navigation Tab -->
-        <div class="session-nav" id="session-nav" style="display: none;">
-            <button id="prev-session-btn" class="nav-btn" disabled>◀</button>
-            <div class="session-info">
-                <span id="current-sha" class="session-sha">-</span>
-                <span id="current-filename" class="session-filename">No file loaded</span>
+            
+            <div class="toolbar-right">
+                <!-- Toggle export -->
+                <button id="export-toggle" class="export-toggle" disabled title="Show Export Tools">
+                    ⬇
+                </button>
             </div>
-            <button id="next-session-btn" class="nav-btn" disabled>▶</button>
         </div>
+    </div>
+    
+    <!-- Toolbar Export (conditionnelle) -->
+    <div class="toolbar-export" id="toolbar-export" style="display: none;">
+        <div class="export-controls">
+            <select id="platform-select" class="platform-select">
+                <option value="">Loading platforms...</option>
+            </select>
+            <select id="arch-select" class="arch-select" disabled>
+                <option value="">Select platform first</option>
+            </select>
+            <button class="btn btn-primary" id="main-action-btn" data-state="1">Select Target</button>
+        </div>
+    </div>
+    
+    <div class="container">
+
+        <!-- L'ancienne session navigation est maintenant dans la toolbar -->
 
         <!-- Error Message -->
         <div class="error-message" id="error-message">
@@ -613,17 +810,21 @@
                 <div class="upload-hint">Supports .dsp files and archives (.zip, .tar.gz)</div>
             </div>
             <div class="file-content content-area" id="file-content">
-                <button class="download-button" id="code-download-btn" style="display: none;">
-                    💾 Download
-                </button>
                 <div class="line-numbers" id="line-numbers"></div>
                 <div class="code-content" id="code-content"></div>
             </div>
             <div class="svg-viewer content-area" id="svg-viewer" style="display: none;">
+                <div id="svg-container"></div>
+            </div>
+            
+            <!-- Boutons download flottants dans la zone -->
+            <div class="floating-download-buttons" id="floating-download-buttons">
+                <button class="download-button" id="code-download-btn" style="display: none;">
+                    💾 Download
+                </button>
                 <button class="download-button" id="svg-download-btn" style="display: none;">
                     📦 Download ZIP
                 </button>
-                <div id="svg-container"></div>
             </div>
         </div>
         <input type="file" id="file-input" accept=".dsp,.zip,.tar.gz,.tar.bz2" style="display: none;">
@@ -761,15 +962,21 @@
         const viewSelect = document.getElementById('view-select');
         const svgViewer = document.getElementById('svg-viewer');
         const svgContainer = document.getElementById('svg-container');
+        const floatingDownloadButtons = document.getElementById('floating-download-buttons');
         const codeDownloadBtn = document.getElementById('code-download-btn');
         const svgDownloadBtn = document.getElementById('svg-download-btn');
         
-        // Session navigation elements
-        const sessionNav = document.getElementById('session-nav');
+        // Session navigation elements (now flat in toolbar)
         const prevSessionBtn = document.getElementById('prev-session-btn');
         const nextSessionBtn = document.getElementById('next-session-btn');
         const currentShaSpan = document.getElementById('current-sha');
         const currentFilenameSpan = document.getElementById('current-filename');
+        const sessionInfoClickable = document.getElementById('session-info-clickable');
+        
+        // Export toolbar elements
+        const exportToggle = document.getElementById('export-toggle');
+        const toolbarExport = document.getElementById('toolbar-export');
+        let exportVisible = false;
 
         // Progress overlay elements
         progressOverlay = document.getElementById('progress-overlay');
@@ -801,6 +1008,16 @@
         
         // View selection events
         viewSelect.addEventListener('change', handleViewChange);
+        
+        // Export toggle event
+        exportToggle.addEventListener('click', toggleExportToolbar);
+        
+        // Session info click event (pour session vide)
+        sessionInfoClickable.addEventListener('click', function() {
+            if (this.classList.contains('clickable')) {
+                fileInput.click();
+            }
+        });
         
         // Session navigation event listeners
         prevSessionBtn.addEventListener('click', navigateToPreviousSession);
@@ -939,49 +1156,43 @@
             const hasTarget = hasPlatform && hasArch;
             
             let newState = 1;
-            let buttonText = '(1) Load File to Compile';
-            let buttonClass = 'btn-primary';
-            let disabled = false;
+            let buttonText = 'Select Target';
+            let buttonClass = 'btn-secondary';
+            let disabled = true;
             
             if (!hasValidFile) {
-                // État 1: Pas de fichier ou fichier avec erreurs
+                // État 1: Pas de fichier valide - bouton désactivé
                 newState = 1;
-                buttonText = '(1) Load File to Compile';
-                buttonClass = 'btn-primary';
-                disabled = false; // Cliquable pour ouvrir sélecteur de fichier
+                buttonText = 'Select Target';
+                buttonClass = 'btn-secondary';
+                disabled = true;
             } else if (!hasTarget) {
-                // État 2: Fichier valide mais target manquante
-                newState = 2;
-                buttonText = '(2) Select Platform & Architecture';
+                // État 1: Fichier valide mais target manquante
+                newState = 1;
+                buttonText = 'Select Target';
                 buttonClass = 'btn-secondary';
                 disabled = true;
             } else {
-                // États 3-6: Fichier valide + target
+                // États 2-4: Fichier valide + target
                 const targetKey = `${platformSelect.value}/${archSelect.value}`;
                 const cacheEntry = compilationCache[currentSha1]?.[targetKey];
                 
                 if (isCompiling) {
-                    // État 4: Compilation en cours
-                    newState = 4;
-                    buttonText = '(4) Compiling...';
-                    buttonClass = 'btn-secondary';
+                    // État 3: Compilation en cours
+                    newState = 3;
+                    buttonText = 'Compiling...';
+                    buttonClass = 'btn-warning';
                     disabled = true;
-                } else if (cacheEntry?.compiled && cacheEntry?.downloaded) {
-                    // État 6: Déjà compilé et téléchargé
-                    newState = 6;
-                    buttonText = '(6) Download Again';
-                    buttonClass = 'btn-success-light';
-                    disabled = false;
                 } else if (cacheEntry?.compiled) {
-                    // État 5: Compilé mais pas encore téléchargé
-                    newState = 5;
-                    buttonText = '(5) Download Ready';
+                    // État 4: Prêt au téléchargement
+                    newState = 4;
+                    buttonText = 'Download';
                     buttonClass = 'btn-success';
                     disabled = false;
                 } else {
-                    // État 3: Prêt à compiler
-                    newState = 3;
-                    buttonText = '(3) Compile';
+                    // État 2: Prêt à compiler
+                    newState = 2;
+                    buttonText = 'Compile';
                     buttonClass = 'btn-primary';
                     disabled = false;
                 }
@@ -1001,20 +1212,23 @@
         async function handleMainAction() {
             switch(buttonState) {
                 case 1:
-                    // Open file selector
-                    fileInput.click();
+                    // État "Select Target" - bouton désactivé, rien à faire
+                    console.log('Please select platform and architecture first');
                     break;
-                case 3:
-                    // Start compilation
+                case 2:
+                    // État "Compile" - lancer la compilation
                     await performCompilation();
                     break;
-                case 5:
-                case 6:
-                    // Download file
+                case 3:
+                    // État "Compiling..." - bouton désactivé, compilation en cours
+                    console.log('Compilation in progress...');
+                    break;
+                case 4:
+                    // État "Download" - télécharger le fichier
                     await performDownload();
                     break;
                 default:
-                    console.log('Button not clickable in current state:', buttonState);
+                    console.log('Unknown button state:', buttonState);
             }
         }
 
@@ -1342,7 +1556,9 @@
          * Enable drag-and-drop export for content areas based on current view
          */
         function enableDragExport() {
-            if (!currentSha1) return;
+            if (!currentSha1) {
+                return;
+            }
             
             // Remove existing drag handlers
             fileContent.removeEventListener('dragstart', handleCodeDragStart);
@@ -1395,7 +1611,7 @@
                     break;
                 case 'webapp':
                     // For webapp view, download button is embedded in the iframe
-                    // No need to show the standard buttons here
+                    // No need to show the floating buttons here
                     break;
             }
         }
@@ -2143,6 +2359,9 @@
             fileContent.style.display = 'none';
             svgViewer.style.display = 'none';
             
+            // Reset svg container classes
+            svgContainer.classList.remove('webapp-container');
+            
             switch(view) {
                 case 'dsp':
                     // Restore the original DSP code
@@ -2455,9 +2674,12 @@
             startProgressTracking('webapp');
             
             try {
+                // Configure container for webapp display
+                svgContainer.classList.add('webapp-container');
+                
                 // Create iframe to load the web application with audio control overlay
                 svgContainer.innerHTML = `
-                    <div style="position: relative; width: 100%; height: 100%;">
+                    <div style="position: relative; width: 100%; height: 100%; flex: 1;">
                         <iframe 
                             id="webapp-frame"
                             src="/${currentSha1}/webapp" 
@@ -2724,35 +2946,49 @@
         }
 
         function updateSessionNavigation() {
-            // Always show navigation if we have at least one session or are starting
-            if (allSessions.length === 0 && currentSessionIndex !== 0) {
-                sessionNav.style.display = 'none';
-                return;
-            }
-
-            // Show navigation
-            sessionNav.style.display = 'flex';
+            const isEmpty = (currentSessionIndex === allSessions.length);
+            const sessionInfoClickable = document.getElementById('session-info-clickable');
             
-            if (currentSessionIndex === allSessions.length) {
-                // Empty session (rightmost) - index n where n = allSessions.length
-                currentShaSpan.textContent = 'New';
-                currentFilenameSpan.textContent = 'Load File to Compile';
+            // La navigation est toujours visible (plus besoin de display)
+            
+            if (isEmpty) {
+                // Session vide : afficher "Empty +" cliquable
+                currentShaSpan.textContent = 'Empty';
+                currentFilenameSpan.textContent = '+ Load File';
+                sessionInfoClickable.classList.add('clickable');
                 
-                // In empty session: can only go left (to most recent session)
-                prevSessionBtn.disabled = (allSessions.length === 0); // Can't go left if no sessions
-                nextSessionBtn.disabled = true; // Can't go right from empty session
+                // Navigation : peut aller à gauche si des sessions existent
+                prevSessionBtn.disabled = (allSessions.length === 0);
+                nextSessionBtn.disabled = true; // Ne peut pas aller plus à droite
+                
+                // Désactiver export toggle
+                exportToggle.disabled = true;
+                exportToggle.classList.remove('active');
             } else {
-                // Real session at index currentSessionIndex
+                // Session active : afficher info normale
                 const currentSession = allSessions[currentSessionIndex];
                 currentShaSpan.textContent = currentSession.sha1.substring(0, 8) + '...';
                 currentFilenameSpan.textContent = currentSession.filename;
+                sessionInfoClickable.classList.remove('clickable');
                 
                 // Update button states
-                // Left button (◀) = go to OLDER session (index--)
                 prevSessionBtn.disabled = (currentSessionIndex === 0);
-                // Right button (▶) = go to NEWER session or empty session (index++)
-                nextSessionBtn.disabled = false; // Can always go right
+                nextSessionBtn.disabled = false; // Peut toujours aller vers session vide
+                
+                // Activer export toggle
+                exportToggle.disabled = false;
             }
+        }
+        
+        function toggleExportToolbar() {
+            if (exportToggle.disabled) return;
+            
+            exportVisible = !exportVisible;
+            exportToggle.classList.toggle('active', exportVisible);
+            toolbarExport.style.display = exportVisible ? 'block' : 'none';
+            document.body.classList.toggle('export-visible', exportVisible);
+            
+            console.log('Export toolbar toggled:', exportVisible);
         }
 
         async function navigateToPreviousSession() {
