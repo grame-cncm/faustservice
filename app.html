@@ -1118,7 +1118,25 @@
             }, 3000);
         }
         
-        // File validation function
+        // Files validation function (checks count + individual file)
+        function validateFiles(files) {
+            // Check number of files first
+            if (files.length === 0) {
+                return { valid: false, error: `❌ No files detected` };
+            }
+            
+            if (files.length > 1) {
+                return { 
+                    valid: false, 
+                    error: `❌ Multiple files not allowed\n\n📁 You dropped: ${files.length} files\n🎯 Please drop only ONE file at a time` 
+                };
+            }
+            
+            // Validate the single file
+            return validateFile(files[0]);
+        }
+        
+        // Single file validation function
         function validateFile(file) {
             const allowedExtensions = ['.dsp', '.lib', '.zip'];
             const extension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
@@ -1176,17 +1194,16 @@
             
             // Handle the dropped files with validation
             const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                const validation = validateFile(files[0]);
-                
-                if (!validation.valid) {
-                    // Show temporary validation error overlay
-                    showValidationError(validation.error);
-                    return;
-                }
-                
-                handleFile(files[0]);
+            const validation = validateFiles(files);
+            
+            if (!validation.valid) {
+                // Show temporary validation error overlay
+                showValidationError(validation.error);
+                return;
             }
+            
+            // Validation passed - handle the single file
+            handleFile(files[0]);
         }
 
         // Original upload zone handlers (kept for specific styling)
@@ -1204,16 +1221,15 @@
             e.preventDefault();
             uploadZone.classList.remove('dragover');
             const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                const validation = validateFile(files[0]);
-                
-                if (!validation.valid) {
-                    showValidationError(validation.error);
-                    return;
-                }
-                
-                handleFile(files[0]);
+            const validation = validateFiles(files);
+            
+            if (!validation.valid) {
+                showValidationError(validation.error);
+                return;
             }
+            
+            // Validation passed - handle the single file
+            handleFile(files[0]);
         }
 
         // ========================================
@@ -1249,18 +1265,17 @@
          */
         function handleFileInputChange(event) {
             const files = event.target.files;
-            if (files.length > 0) {
-                const validation = validateFile(files[0]);
-                
-                if (!validation.valid) {
-                    showValidationError(validation.error);
-                    // Clear the input to allow selecting the same file again
-                    event.target.value = '';
-                    return;
-                }
-                
-                handleFile(files[0]);
+            const validation = validateFiles(files);
+            
+            if (!validation.valid) {
+                showValidationError(validation.error);
+                // Clear the input to allow selecting the same file again
+                event.target.value = '';
+                return;
             }
+            
+            // Validation passed - handle the single file
+            handleFile(files[0]);
         }
 
         // ========================================
@@ -3106,8 +3121,8 @@
                 prevSessionBtn.disabled = (currentSessionIndex === 0);
                 nextSessionBtn.disabled = false; // Peut toujours aller vers session vide
                 
-                // Activer export toggle
-                exportToggle.disabled = false;
+                // Activer export toggle seulement si pas d'erreurs de compilation
+                exportToggle.disabled = hasCompilationError;
             }
         }
         
@@ -3169,7 +3184,9 @@
             document.getElementById('upload-content').style.display = 'block';
             fileContent.style.display = 'none';
             svgViewer.style.display = 'none';
-            errorMessage.style.display = 'none';
+            
+            // Hide error message using the same method as hideError()
+            hideError();
             
             // Reset button state
             updateButtonState(); // Will determine correct state based on selectedFile being null
@@ -3188,14 +3205,13 @@
                 currentSessionIndex = allSessions.findIndex(session => session.sha1 === currentSha1);
             }
             
-            // Update session navigation display
-            updateSessionNavigation();
-            
-            // Load session content first
+            // 1. FIRST: Load session content to detect errors
             await loadSessionContent();
             
-            // Now that content is loaded, determine the appropriate view
-            // If session has compilation errors, force DSP view
+            // 2. THEN: Update session navigation with knowledge of error state
+            updateSessionNavigation();
+            
+            // 3. FINALLY: Configure views based on error state
             let targetView = currentView;
             if (hasCompilationError) {
                 targetView = 'dsp';
