@@ -507,6 +507,58 @@
             margin-bottom: 15px;
             color: #3498db;
         }
+
+        /* Progress overlay */
+        .progress-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(3px);
+        }
+
+        .progress-content {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            text-align: center;
+            min-width: 300px;
+        }
+
+        .progress-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-message {
+            font-size: 18px;
+            font-weight: 500;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .progress-timer {
+            font-size: 16px;
+            color: #7f8c8d;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
     </style>
 </head>
 <body>
@@ -583,6 +635,15 @@
             <div class="global-drag-icon">📁</div>
             <div>Drop your Faust file anywhere!</div>
             <div style="font-size: 14px; margin-top: 8px; color: #666;">Supports .dsp files and archives</div>
+        </div>
+    </div>
+
+    <!-- Progress Overlay -->
+    <div class="progress-overlay" id="progress-overlay" style="display: none;">
+        <div class="progress-content">
+            <div class="progress-spinner"></div>
+            <div class="progress-message" id="progress-message">Loading...</div>
+            <div class="progress-timer" id="progress-timer">0.0s</div>
         </div>
     </div>
 
@@ -668,6 +729,12 @@
         let previousScrollInfo = null;  // Store scroll position info for C++ view
         let compilationErrors = null;  // Store compilation error messages
         
+        // Progress overlay variables
+        let progressOverlay = null;
+        let progressDelayTimer = null;
+        let progressUpdateTimer = null;
+        let progressStartTime = 0;
+        
         // Session navigation variables
         let allSessions = [];
         let currentSessionIndex = 0; // Starts at 0 (empty session when allSessions.length = 0)
@@ -703,6 +770,11 @@
         const nextSessionBtn = document.getElementById('next-session-btn');
         const currentShaSpan = document.getElementById('current-sha');
         const currentFilenameSpan = document.getElementById('current-filename');
+
+        // Progress overlay elements
+        progressOverlay = document.getElementById('progress-overlay');
+        const progressMessage = document.getElementById('progress-message');
+        const progressTimer = document.getElementById('progress-timer');
 
         // Upload zone events (only drag and drop, no click)
         uploadZone.addEventListener('dragover', handleDragOver);
@@ -1060,6 +1132,75 @@
                 cacheEntry.downloaded = true;
                 updateButtonState(); // Will go to state 6
             }
+        }
+
+        // ========================================
+        // PROGRESS OVERLAY MANAGEMENT
+        // ========================================
+
+        // Messages spécialisés par type de vue
+        const PROGRESS_MESSAGES = {
+            'signals': 'Analyzing signal flow...',
+            'task': 'Computing task dependencies...',
+            'diagram': 'Generating block diagrams...',
+            'svg': 'Generating block diagrams...',
+            'webapp': 'Compiling WebAssembly application...'
+        };
+
+        /**
+         * Démarre un suivi de progression avec délai de déclenchement
+         */
+        function startProgressTracking(viewType, delayMs = 1000) {
+            progressStartTime = Date.now();
+            
+            // Programmer l'affichage de l'overlay avec délai
+            progressDelayTimer = setTimeout(() => {
+                showProgressOverlay(viewType);
+            }, delayMs);
+        }
+
+        /**
+         * Affiche l'overlay de progression
+         */
+        function showProgressOverlay(viewType) {
+            const message = PROGRESS_MESSAGES[viewType] || 'Loading...';
+            progressMessage.textContent = message;
+            progressTimer.textContent = '0.0s';
+            progressOverlay.style.display = 'flex';
+            
+            // Démarrer la mise à jour du timer
+            progressUpdateTimer = setInterval(updateProgressTimer, 100);
+        }
+
+        /**
+         * Met à jour le timer de progression
+         */
+        function updateProgressTimer() {
+            if (progressStartTime > 0) {
+                const elapsed = (Date.now() - progressStartTime) / 1000;
+                progressTimer.textContent = elapsed.toFixed(1) + 's';
+            }
+        }
+
+        /**
+         * Cache l'overlay de progression
+         */
+        function hideProgressOverlay() {
+            // Annuler le timer de délai s'il est encore en attente
+            if (progressDelayTimer) {
+                clearTimeout(progressDelayTimer);
+                progressDelayTimer = null;
+            }
+            
+            // Arrêter la mise à jour du timer
+            if (progressUpdateTimer) {
+                clearInterval(progressUpdateTimer);
+                progressUpdateTimer = null;
+            }
+            
+            // Cacher l'overlay
+            progressOverlay.style.display = 'none';
+            progressStartTime = 0;
         }
 
         // ========================================
@@ -2058,6 +2199,9 @@
             // Hide file content when displaying SVG
             fileContent.style.display = 'none';
             
+            // Démarrer le suivi de progression
+            startProgressTracking('diagram');
+            
             try {
                 // Try to load the main process.svg file
                 const response = await fetch(`/${currentSha1}/svg/process.svg`);
@@ -2068,6 +2212,9 @@
                     
                     // Add click interceptors for SVG links
                     addSvgLinkInterceptors();
+                    
+                    // Cacher l'overlay dès que l'opération réussit
+                    hideProgressOverlay();
                 } else {
                     // If process.svg doesn't exist, show a message
                     svgContainer.innerHTML = `
@@ -2078,9 +2225,15 @@
                         </div>
                     `;
                     svgViewer.style.display = 'flex';
+                    
+                    // Cacher l'overlay même si pas de contenu
+                    hideProgressOverlay();
                 }
             } catch (error) {
                 showViewError('Error loading SVG diagrams: ' + error.message);
+            } finally {
+                // Cacher l'overlay dans tous les cas
+                hideProgressOverlay();
             }
         }
 
@@ -2089,6 +2242,9 @@
             
             // Hide file content when displaying SVG
             fileContent.style.display = 'none';
+            
+            // Démarrer le suivi de progression
+            startProgressTracking('signals');
             
             try {
                 // Try to load the signals.svg file
@@ -2100,6 +2256,9 @@
                     
                     // Add click interceptors for SVG links
                     addSvgLinkInterceptors();
+                    
+                    // Cacher l'overlay dès que l'opération réussit
+                    hideProgressOverlay();
                 } else {
                     // If signals.svg doesn't exist, show a message
                     svgContainer.innerHTML = `
@@ -2110,9 +2269,14 @@
                         </div>
                     `;
                     svgViewer.style.display = 'flex';
+                    
+                    // Cacher l'overlay même si pas de contenu
+                    hideProgressOverlay();
                 }
             } catch (error) {
                 showViewError('Error loading signal diagram: ' + error.message);
+            } finally {
+                hideProgressOverlay();
             }
         }
 
@@ -2121,6 +2285,9 @@
             
             // Hide file content when displaying SVG
             fileContent.style.display = 'none';
+            
+            // Démarrer le suivi de progression
+            startProgressTracking('task');
             
             try {
                 // Try to load the tasks.svg file
@@ -2132,6 +2299,9 @@
                     
                     // Add click interceptors for SVG links
                     addSvgLinkInterceptors();
+                    
+                    // Cacher l'overlay dès que l'opération réussit
+                    hideProgressOverlay();
                 } else {
                     // If tasks.svg doesn't exist, show a message
                     svgContainer.innerHTML = `
@@ -2142,6 +2312,9 @@
                         </div>
                     `;
                     svgViewer.style.display = 'flex';
+                    
+                    // Cacher l'overlay même si pas de contenu
+                    hideProgressOverlay();
                 }
             } catch (error) {
                 showViewError('Error loading task diagram: ' + error.message);
@@ -2278,6 +2451,9 @@
             // Hide file content when displaying webapp
             fileContent.style.display = 'none';
             
+            // Démarrer le suivi de progression
+            startProgressTracking('webapp');
+            
             try {
                 // Create iframe to load the web application with audio control overlay
                 svgContainer.innerHTML = `
@@ -2325,8 +2501,12 @@
                     </div>
                 `;
                 svgViewer.style.display = 'flex';
+                
+                // Cacher l'overlay dès que l'iframe est créée (elle continuera à charger)
+                hideProgressOverlay();
             } catch (error) {
                 showViewError('Error loading web application: ' + error.message);
+                hideProgressOverlay();
             }
         }
 
