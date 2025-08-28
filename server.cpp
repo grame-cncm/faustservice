@@ -327,6 +327,101 @@ static bool create_svg_zip(const fs::path& svg_dir, const fs::path& zip_path)
     return true;
 }
 
+/*
+ * Creates a ZIP file containing all files from a webapp directory recursively
+ */
+static bool create_webapp_zip(const fs::path& webapp_dir, const fs::path& zip_path)
+{
+    if (gVerbosity >= 2) {
+        std::cerr << "Creating webapp ZIP: " << webapp_dir << " -> " << zip_path << std::endl;
+    }
+
+    struct archive* archive = archive_write_new();
+    if (!archive) {
+        std::cerr << "Error: Could not create archive" << std::endl;
+        return false;
+    }
+
+    // Set ZIP format
+    archive_write_set_format_zip(archive);
+    archive_write_add_filter_none(archive);
+
+    // Open the output file
+    if (archive_write_open_filename(archive, zip_path.string().c_str()) != ARCHIVE_OK) {
+        std::cerr << "Error: Could not open ZIP file: " << archive_error_string(archive) << std::endl;
+        archive_write_free(archive);
+        return false;
+    }
+
+    try {
+        // Recursively iterate through all files in the webapp directory
+        for (const auto& entry : fs::recursive_directory_iterator(webapp_dir)) {
+            if (entry.is_regular_file()) {
+                fs::path file_path = entry.path();
+                
+                // Get relative path from webapp_dir for ZIP entry name
+                fs::path relative_path = fs::relative(file_path, webapp_dir);
+                std::string zip_entry_name = relative_path.string();
+                
+                if (gVerbosity >= 2) {
+                    std::cerr << "Adding to webapp ZIP: " << zip_entry_name << std::endl;
+                }
+
+                // Create archive entry
+                struct archive_entry* entry_archive = archive_entry_new();
+                archive_entry_set_pathname(entry_archive, zip_entry_name.c_str());
+                archive_entry_set_filetype(entry_archive, AE_IFREG);
+                archive_entry_set_perm(entry_archive, 0644);
+                
+                // Get file size
+                std::uintmax_t file_size = fs::file_size(file_path);
+                archive_entry_set_size(entry_archive, file_size);
+
+                // Write header
+                if (archive_write_header(archive, entry_archive) != ARCHIVE_OK) {
+                    std::cerr << "Error writing header for " << zip_entry_name << ": " 
+                              << archive_error_string(archive) << std::endl;
+                    archive_entry_free(entry_archive);
+                    continue;
+                }
+
+                // Read and write file content
+                std::ifstream file(file_path, std::ios::binary);
+                if (file.is_open()) {
+                    char buffer[8192];
+                    while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
+                        ssize_t bytes_written = archive_write_data(archive, buffer, file.gcount());
+                        if (bytes_written < 0) {
+                            std::cerr << "Error writing data for " << zip_entry_name << ": " 
+                                      << archive_error_string(archive) << std::endl;
+                            break;
+                        }
+                    }
+                    file.close();
+                } else {
+                    std::cerr << "Error: Could not open file " << file_path << std::endl;
+                }
+
+                archive_entry_free(entry_archive);
+            }
+        }
+    } catch (const fs::filesystem_error& e) {
+        std::cerr << "Filesystem error while creating webapp ZIP: " << e.what() << std::endl;
+        archive_write_close(archive);
+        archive_write_free(archive);
+        return false;
+    }
+
+    archive_write_close(archive);
+    archive_write_free(archive);
+
+    if (gVerbosity >= 2) {
+        std::cerr << "Webapp ZIP created successfully: " << zip_path << std::endl;
+    }
+
+    return true;
+}
+
 // Legacy function - kept for compatibility but now calls create_basic_session
 void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefile_directory)
 {
@@ -883,6 +978,10 @@ static bool isValidTarget(const fs::path& target, const char*& mimetype)
         mimetype = "application/zip";
         return true;
 
+    } else if (target == "webapp.zip") {
+        mimetype = "application/zip";
+        return true;
+
     } else if (target == "mdoc.zip") {
         mimetype = "application/zip";
         return true;
@@ -1185,6 +1284,43 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         std::string error_msg = "No SVG diagrams found or could not create ZIP";
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
 
+    } else if (matchURL(url, "/*/webapp.zip")) {
+        // Create and serve a ZIP file containing all webapp files
+        std::vector<std::string> U = decomposeURL(url);
+        if (U.size() >= 2) {
+            std::string sha1 = U[1];
+            std::string error_msg;
+            
+            // Ensure webapp exists, generate if needed
+            if (!ensure_webapp_exists(sha1, error_msg)) {
+                int status_code = (error_msg.find("Session not found") != std::string::npos || 
+                                  error_msg.find("No DSP file found") != std::string::npos) ? 
+                                 MHD_HTTP_NOT_FOUND : MHD_HTTP_INTERNAL_SERVER_ERROR;
+                return send_page(connection, error_msg.c_str(), error_msg.size(), status_code, "text/plain");
+            }
+            
+            fs::path webapp_dir = fDirectory / sha1 / "webapp";
+            if (fs::exists(webapp_dir) && fs::is_directory(webapp_dir)) {
+                // Create temporary ZIP file
+                fs::path temp_zip = fDirectory / sha1 / "temp_webapp.zip";
+
+                if (create_webapp_zip(webapp_dir, temp_zip)) {
+                    // Send the ZIP file and then delete it
+                    int result = send_file(connection, temp_zip, "application/zip");
+                    try {
+                        fs::remove(temp_zip);
+                    } catch (const fs::filesystem_error& e) {
+                        if (gVerbosity >= 1) {
+                            std::cerr << "Warning: Could not remove temp webapp ZIP: " << e.code().message() << std::endl;
+                        }
+                    }
+                    return result;
+                }
+            }
+        }
+        std::string error_msg = "No webapp files found or could not create ZIP";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+
     } else if (matchURL(url, "/*/svg/*") && matchExtension(url, ".svg")) {
         // Serve SVG files from the svg/ directory created by validate_faust
         std::vector<std::string> U = decomposeURL(url);
@@ -1205,7 +1341,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/*/signals.svg")) {
         return serveSignalsSvg(connection, url);
 
-    } else if (matchURL(url, "/*/task.svg")) {
+    } else if (matchURL(url, "/*/tasks.svg")) {
         return serveTaskSvg(connection, url);
 
     } else if (matchURL(url, "/*/webapp")) {
@@ -1867,28 +2003,28 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
 {
     std::vector<std::string> U = decomposeURL(url);
     if (U.size() < 2) {
-        std::string error_msg = "Invalid URL format for task.svg";
+        std::string error_msg = "Invalid URL format for tasks.svg";
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
     }
 
     std::string sha1           = U[1];
     fs::path    session_dir    = fDirectory / sha1;
-    fs::path    task_svg_path  = session_dir / "task.svg";
+    fs::path    task_svg_path  = session_dir / "tasks.svg";
     fs::path    sourcecode_dir = session_dir / "sourcecode";
 
     if (gVerbosity >= 2) {
-        std::cerr << "Request for task.svg: " << sha1 << std::endl;
+        std::cerr << "Request for tasks.svg: " << sha1 << std::endl;
     }
 
-    // Check if task.svg already exists
+    // Check if tasks.svg already exists
     if (fs::exists(task_svg_path)) {
         if (gVerbosity >= 2) {
-            std::cerr << "Serving existing task.svg" << std::endl;
+            std::cerr << "Serving existing tasks.svg" << std::endl;
         }
         return send_file(connection, task_svg_path, "image/svg+xml");
     }
 
-    // Generate task.svg if it doesn't exist
+    // Generate tasks.svg if it doesn't exist
     if (!fs::exists(sourcecode_dir) || !fs::is_directory(sourcecode_dir)) {
         std::string error_msg = "Source code directory not found for session: " + sha1;
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
@@ -1909,14 +2045,14 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
     }
 
     if (gVerbosity >= 2) {
-        std::cerr << "Generating task.svg for " << main_dsp_file << " in session " << sha1 << std::endl;
+        std::cerr << "Generating tasks.svg for " << main_dsp_file << " in session " << sha1 << std::endl;
     }
 
     // Generate task diagram
     std::string options_str = readFaustOptions(session_dir);
     std::string dot_file     = main_dsp_file + ".dot";
     std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust " + options_str + (options_str.empty() ? "" : " ") + "-vec -tg " + main_dsp_file +
-                               " -o /dev/null" + " && dot -Tsvg " + dot_file + " -o ../task.svg" + " && rm " + dot_file;
+                               " -o /dev/null" + " && dot -Tsvg " + dot_file + " -o ../tasks.svg" + " && rm " + dot_file;
 
     if (gVerbosity >= 2) {
         std::cerr << "Executing: " << generate_cmd << std::endl;
@@ -1925,7 +2061,7 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
     int result = system(generate_cmd.c_str());
     if (result != 0) {
         if (gVerbosity >= 1) {
-            std::cerr << "Failed to generate task.svg for session " << sha1 << " (exit code: " << result << ")"
+            std::cerr << "Failed to generate tasks.svg for session " << sha1 << " (exit code: " << result << ")"
                       << std::endl;
         }
         std::string error_msg = "Failed to generate task diagram";
@@ -1935,12 +2071,12 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
     // Check if generation was successful
     if (fs::exists(task_svg_path)) {
         if (gVerbosity >= 2) {
-            std::cerr << "Successfully generated task.svg" << std::endl;
+            std::cerr << "Successfully generated tasks.svg" << std::endl;
         }
         return send_file(connection, task_svg_path, "image/svg+xml");
     } else {
         if (gVerbosity >= 1) {
-            std::cerr << "task.svg was not created despite successful command execution" << std::endl;
+            std::cerr << "tasks.svg was not created despite successful command execution" << std::endl;
         }
         std::string error_msg = "Task diagram generation completed but file not found";
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
@@ -1948,22 +2084,32 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
 }
 
 //------------------------------------------------------------------
-// Generate and serve web application
+// Helper function to generate webapp if it doesn't exist
+// Returns true if webapp exists or was successfully generated, false otherwise
 //
-int FaustServer::generate_webapp_view(struct MHD_Connection* connection, const std::string& sha1)
+bool FaustServer::ensure_webapp_exists(const std::string& sha1, std::string& error_msg)
 {
-    if (gVerbosity >= 2) {
-        std::cerr << "Generating webapp for " << sha1 << std::endl;
-    }
-
     auto session_dir = fDirectory / sha1;
     if (!fs::exists(session_dir)) {
-        std::string error_msg = "Session not found: " + sha1;
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        error_msg = "Session not found: " + sha1;
+        return false;
     }
 
     auto sourcecode_dir = session_dir / "sourcecode";
     auto webapp_dir = session_dir / "webapp";
+    
+    // Check if webapp already exists
+    auto index_html_path = webapp_dir / "index.html";
+    if (fs::exists(index_html_path)) {
+        if (gVerbosity >= 2) {
+            std::cerr << "Webapp already exists for session " << sha1 << std::endl;
+        }
+        return true;
+    }
+    
+    if (gVerbosity >= 2) {
+        std::cerr << "Generating webapp for " << sha1 << std::endl;
+    }
     
     // Get the main DSP file name
     std::string main_dsp_file;
@@ -1975,8 +2121,8 @@ int FaustServer::generate_webapp_view(struct MHD_Connection* connection, const s
     }
     
     if (main_dsp_file.empty()) {
-        std::string error_msg = "No DSP file found in session";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        error_msg = "No DSP file found in session";
+        return false;
     }
 
     if (gVerbosity >= 2) {
@@ -1996,24 +2142,42 @@ int FaustServer::generate_webapp_view(struct MHD_Connection* connection, const s
             std::cerr << "Failed to generate webapp for session " << sha1 << " (exit code: " << result << ")"
                       << std::endl;
         }
-        std::string error_msg = "Failed to generate web application";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+        error_msg = "Failed to generate web application";
+        return false;
     }
 
     // Check if generation was successful
-    auto index_html_path = webapp_dir / "index.html";
     if (fs::exists(index_html_path)) {
         if (gVerbosity >= 2) {
             std::cerr << "Successfully generated webapp" << std::endl;
         }
-        return send_file(connection, index_html_path, "text/html");
+        return true;
     } else {
         if (gVerbosity >= 1) {
             std::cerr << "webapp was not created despite successful command execution" << std::endl;
         }
-        std::string error_msg = "Web application generation completed but index.html not found";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+        error_msg = "Web application generation completed but index.html not found";
+        return false;
     }
+}
+
+//------------------------------------------------------------------
+// Generate and serve web application
+//
+int FaustServer::generate_webapp_view(struct MHD_Connection* connection, const std::string& sha1)
+{
+    std::string error_msg;
+    if (!ensure_webapp_exists(sha1, error_msg)) {
+        int status_code = (error_msg.find("Session not found") != std::string::npos || 
+                          error_msg.find("No DSP file found") != std::string::npos) ? 
+                         MHD_HTTP_NOT_FOUND : MHD_HTTP_INTERNAL_SERVER_ERROR;
+        return send_page(connection, error_msg.c_str(), error_msg.size(), status_code, "text/plain");
+    }
+    
+    // Webapp exists, serve index.html
+    auto webapp_dir = fDirectory / sha1 / "webapp";
+    auto index_html_path = webapp_dir / "index.html";
+    return send_file(connection, index_html_path, "text/html");
 }
 
 //------------------------------------------------------------------

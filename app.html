@@ -1104,6 +1104,29 @@
                     } else {
                         throw new Error('Could not fetch C++ code');
                     }
+                } else if (currentView === 'webapp') {
+                    // Download webapp as ZIP
+                    const webappResponse = await fetch(`/${currentSha1}/webapp.zip`);
+                    if (webappResponse.ok) {
+                        const blob = await webappResponse.blob();
+                        
+                        // Get original filename for naming
+                        const filenameResponse = await fetch(`/${currentSha1}/filename`);
+                        if (filenameResponse.ok) {
+                            const originalName = (await filenameResponse.text()).trim();
+                            const baseName = originalName.replace(/\.[^/.]+$/, "");
+                            filename = baseName + '_webapp.zip';
+                        } else {
+                            filename = 'webapp.zip';
+                        }
+                        
+                        triggerDownload({ blob, isBlob: true }, filename, 'application/zip');
+                        return; // Early return for blob download
+                    } else {
+                        throw new Error('Could not fetch webapp');
+                    }
+                } else {
+                    throw new Error(`Download not supported for view: ${currentView}`);
                 }
                 
                 triggerDownload(content, filename, mimeType);
@@ -1121,29 +1144,52 @@
             if (!currentSha1) return;
             
             try {
-                const zipResponse = await fetch(`/${currentSha1}/svg.zip`);
-                if (zipResponse.ok) {
-                    const blob = await zipResponse.blob();
-                    
-                    // Get original filename and create ZIP name
-                    const filenameResponse = await fetch(`/${currentSha1}/filename`);
-                    let filename;
-                    if (filenameResponse.ok) {
-                        const originalName = (await filenameResponse.text()).trim();
-                        const baseName = originalName.replace(/\.[^/.]+$/, "");
-                        filename = baseName + '_diagrams.zip';
-                    } else {
-                        filename = 'diagrams.zip';
-                    }
-                    
-                    triggerDownload({ blob, isBlob: true }, filename, 'application/zip');
+                let url, filename, mimeType, baseName;
+                
+                // Get original filename for naming
+                const filenameResponse = await fetch(`/${currentSha1}/filename`);
+                if (filenameResponse.ok) {
+                    const originalName = (await filenameResponse.text()).trim();
+                    baseName = originalName.replace(/\.[^/.]+$/, "");
                 } else {
-                    throw new Error('Could not fetch SVG ZIP');
+                    baseName = 'output';
+                }
+                
+                // Determine what to download based on current view
+                switch(currentView) {
+                    case 'svg':
+                        // Block diagrams ZIP
+                        url = `/${currentSha1}/svg.zip`;
+                        filename = baseName + '_diagrams.zip';
+                        mimeType = 'application/zip';
+                        break;
+                    case 'signals':
+                        // Signals SVG
+                        url = `/${currentSha1}/signals.svg`;
+                        filename = baseName + '_signals.svg';
+                        mimeType = 'image/svg+xml';
+                        break;
+                    case 'task':
+                        // Tasks SVG
+                        url = `/${currentSha1}/tasks.svg`;
+                        filename = baseName + '_tasks.svg';
+                        mimeType = 'image/svg+xml';
+                        break;
+                    default:
+                        throw new Error(`Download not supported for view: ${currentView}`);
+                }
+                
+                const response = await fetch(url);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    triggerDownload({ blob, isBlob: true }, filename, mimeType);
+                } else {
+                    throw new Error(`Could not fetch ${currentView} content`);
                 }
                 
             } catch (error) {
-                console.error('Error downloading SVG ZIP:', error);
-                alert('Error downloading SVG diagrams: ' + error.message);
+                console.error(`Error downloading ${currentView} content:`, error);
+                alert(`Error downloading ${currentView} content: ` + error.message);
             }
         }
 
@@ -1176,20 +1222,39 @@
                     fileContent.addEventListener('dragstart', handleCodeDragStart);
                     fileContent.addEventListener('dragend', handleDragEnd);
                     codeDownloadBtn.style.display = 'flex';
+                    codeDownloadBtn.innerHTML = '💾 Download';
                     break;
                 case 'cpp':
                     fileContent.draggable = true;
                     fileContent.addEventListener('dragstart', handleCodeDragStart);
                     fileContent.addEventListener('dragend', handleDragEnd);
                     codeDownloadBtn.style.display = 'flex';
+                    codeDownloadBtn.innerHTML = '💾 Download';
                     break;
                 case 'svg':
+                    svgContainer.draggable = true;
+                    svgContainer.addEventListener('dragstart', handleSvgDragStart);
+                    svgContainer.addEventListener('dragend', handleDragEnd);
+                    svgDownloadBtn.style.display = 'flex';
+                    svgDownloadBtn.innerHTML = '📦 Download ZIP';
+                    break;
                 case 'signals':
+                    svgContainer.draggable = true;
+                    svgContainer.addEventListener('dragstart', handleSvgDragStart);
+                    svgContainer.addEventListener('dragend', handleDragEnd);
+                    svgDownloadBtn.style.display = 'flex';
+                    svgDownloadBtn.innerHTML = '📊 Download SVG';
+                    break;
                 case 'task':
                     svgContainer.draggable = true;
                     svgContainer.addEventListener('dragstart', handleSvgDragStart);
                     svgContainer.addEventListener('dragend', handleDragEnd);
                     svgDownloadBtn.style.display = 'flex';
+                    svgDownloadBtn.innerHTML = '📋 Download SVG';
+                    break;
+                case 'webapp':
+                    // For webapp view, download button is embedded in the iframe
+                    // No need to show the standard buttons here
                     break;
             }
         }
@@ -2058,8 +2123,8 @@
             fileContent.style.display = 'none';
             
             try {
-                // Try to load the task.svg file
-                const response = await fetch(`/${currentSha1}/task.svg`);
+                // Try to load the tasks.svg file
+                const response = await fetch(`/${currentSha1}/tasks.svg`);
                 if (response.ok) {
                     const svgContent = await response.text();
                     svgContainer.innerHTML = svgContent;
@@ -2068,7 +2133,7 @@
                     // Add click interceptors for SVG links
                     addSvgLinkInterceptors();
                 } else {
-                    // If task.svg doesn't exist, show a message
+                    // If tasks.svg doesn't exist, show a message
                     svgContainer.innerHTML = `
                         <div style="text-align: center; padding: 40px; color: #666;">
                             <h3>Task Diagram</h3>
@@ -2229,7 +2294,7 @@
                         <button 
                             id="audio-toggle"
                             onclick="toggleAudio()"
-                            style="position: absolute; top: 12px; right: 12px; z-index: 1000; 
+                            style="position: absolute; top: 12px; left: 12px; z-index: 1000; 
                                    background: #3498db; border: none; border-radius: 50%; 
                                    width: 44px; height: 44px; cursor: pointer; 
                                    display: flex; align-items: center; justify-content: center;
@@ -2241,6 +2306,21 @@
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                 <path d="M5 3v10l8-5z" fill="white"/>
                             </svg>
+                        </button>
+                        <button 
+                            class="download-button" 
+                            id="webapp-download-btn"
+                            onclick="handleCodeDownload()"
+                            style="position: absolute; top: 12px; right: 12px; z-index: 1000;
+                                   background: #3498db; color: white; border: none; 
+                                   padding: 8px 12px; border-radius: 6px; cursor: pointer;
+                                   font-size: 12px; display: flex; align-items: center; gap: 4px;
+                                   box-shadow: 0 2px 12px rgba(52, 152, 219, 0.3);
+                                   transition: all 0.3s ease; outline: none;"
+                            onmouseover="this.style.background='#2980b9'; this.style.transform='translateY(-1px)'"
+                            onmouseout="this.style.background='#3498db'; this.style.transform='translateY(0)'"
+                            title="Download Webapp ZIP">
+                            📦 Download ZIP
                         </button>
                     </div>
                 `;

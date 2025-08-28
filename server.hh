@@ -121,6 +121,7 @@ class FaustServer {
     int serveSignalsSvg(struct MHD_Connection* connection, const std::string& url);
     int serveTaskSvg(struct MHD_Connection* connection, const std::string& url);
     int serveSessionsList(struct MHD_Connection* connection);
+    bool ensure_webapp_exists(const std::string& sha1, std::string& error_msg);
     int generate_webapp_view(struct MHD_Connection* connection, const std::string& sha1);
 
     int makeAndSendResourceFile(struct MHD_Connection* connection, const string& raw_url);
