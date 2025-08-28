@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cstring>
 #include <ctime>
 #include <filesystem>
@@ -637,14 +638,49 @@ static int validate_faust(connection_info_struct* con_info)
                 return 1;
             }
 
-            // First pass: extract all files and collect DSP filenames
+            // Extract all files with multiple protections against zip bombs
+            const size_t MAX_EXTRACTED_SIZE = 102400; // 100KB limit
+            const size_t MAX_ENTRIES = 100; // 100 files max
+            const auto MAX_EXTRACTION_TIME = std::chrono::seconds(5); // 5 seconds max
+            
+            size_t total_extracted = 0;
+            size_t entry_count = 0;
+            auto start_time = std::chrono::steady_clock::now();
+            bool size_limit_exceeded = false;
+            bool time_limit_exceeded = false;
+            bool entries_limit_exceeded = false;
+            
             while (archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
+                // Check time limit
+                auto current_time = std::chrono::steady_clock::now();
+                if (current_time - start_time > MAX_EXTRACTION_TIME) {
+                    if (gVerbosity >= 1) std::cerr << "Extraction time limit exceeded - stopping after " << entry_count << " entries" << std::endl;
+                    time_limit_exceeded = true;
+                    break;
+                }
+                
+                // Check entries limit  
+                if (++entry_count > MAX_ENTRIES) {
+                    if (gVerbosity >= 1) std::cerr << "Too many entries - stopping at " << MAX_ENTRIES << " files" << std::endl;
+                    entries_limit_exceeded = true;
+                    break;
+                }
+                
                 fs::path entry_path = fs::path(archive_entry_pathname(entry));
 
                 // Skip system files
                 if (entry_path.string().substr(0, 8) == "__MACOSX") {
                     if (gVerbosity >= 1) std::cerr << "Ignoring: " << entry_path << std::endl;
+                    entry_count--; // Don't count ignored files
                     continue;
+                }
+
+                // Check extraction size limit before processing
+                size_t entry_size = archive_entry_size(entry);
+                if (total_extracted + entry_size > MAX_EXTRACTED_SIZE) {
+                    if (gVerbosity >= 1) std::cerr << "Extraction size limit exceeded - stopping at " << total_extracted << " bytes" << std::endl;
+                    size_limit_exceeded = true;
+                    break;
                 }
 
                 // Collect DSP files
@@ -660,12 +696,62 @@ static int validate_faust(connection_info_struct* con_info)
                 fs::create_directories(dest_path.parent_path());
                 archive_entry_set_pathname(entry, dest_path.string().c_str());
                 archive_read_extract(archive, entry, ARCHIVE_EXTRACT_PERM);
+                
+                total_extracted += entry_size;
             }
 
             archive_read_free(archive);
             
-            // Handle multiple DSP files case
-            if (dsp_files.size() > 1) {
+            // Handle time limit exceeded case
+            if (time_limit_exceeded) {
+                if (gVerbosity >= 1) std::cerr << "Archive extraction timeout - creating toolong.dsp" << std::endl;
+                
+                // Clear sourcecode directory
+                fs::remove_all(sourcecode_path);
+                fs::create_directories(sourcecode_path);
+                
+                // Create toolong.dsp with error message
+                main_dsp_filename = "toolong.dsp";
+                fs::path toolong_dsp_path = sourcecode_path / main_dsp_filename;
+                std::ofstream toolong_file(toolong_dsp_path);
+                toolong_file << "// archive took too long to decompress\n";
+                toolong_file << "// maximum allowed: 5 seconds\n";
+                toolong_file.close();
+            }
+            // Handle too many entries case
+            else if (entries_limit_exceeded) {
+                if (gVerbosity >= 1) std::cerr << "Too many entries - creating toomanyentries.dsp" << std::endl;
+                
+                // Clear sourcecode directory
+                fs::remove_all(sourcecode_path);
+                fs::create_directories(sourcecode_path);
+                
+                // Create toomanyentries.dsp with error message
+                main_dsp_filename = "toomanyentries.dsp";
+                fs::path toomanyentries_dsp_path = sourcecode_path / main_dsp_filename;
+                std::ofstream toomanyentries_file(toomanyentries_dsp_path);
+                toomanyentries_file << "// too many files in archive\n";
+                toomanyentries_file << "// maximum allowed: 100 files\n";
+                toomanyentries_file.close();
+            }
+            // Handle size limit exceeded case
+            else if (size_limit_exceeded) {
+                if (gVerbosity >= 1) std::cerr << "Archive too large - creating toobig.dsp" << std::endl;
+                
+                // Clear sourcecode directory
+                fs::remove_all(sourcecode_path);
+                fs::create_directories(sourcecode_path);
+                
+                // Create toobig.dsp with error message
+                main_dsp_filename = "toobig.dsp";
+                fs::path toobig_dsp_path = sourcecode_path / main_dsp_filename;
+                std::ofstream toobig_file(toobig_dsp_path);
+                toobig_file << "// archive too large when decompressed\n";
+                toobig_file << "// maximum allowed: 100KB\n";
+                toobig_file.close();
+            }
+            // Handle multiple DSP files case  
+            else if (dsp_files.size() > 1) {
                 if (gVerbosity >= 1) std::cerr << "Multiple DSP files found (" << dsp_files.size() << ") - creating multi.dsp" << std::endl;
                 
                 // Clear sourcecode directory
