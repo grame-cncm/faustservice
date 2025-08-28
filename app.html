@@ -616,6 +616,11 @@
             justify-content: center;
             backdrop-filter: blur(2px);
         }
+        
+        .global-drag-overlay.error {
+            background: rgba(220, 53, 69, 0.15);
+            border-color: #dc3545;
+        }
 
         .global-drag-overlay.show {
             display: flex;
@@ -630,6 +635,52 @@
             font-size: 18px;
             color: #3498db;
             font-weight: 500;
+        }
+        
+        .global-drag-overlay.error .global-drag-message {
+            color: #dc3545;
+            border: 2px solid #dc3545;
+        }
+        
+        /* Overlay temporaire d'erreur de validation */
+        .validation-error-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(220, 53, 69, 0.15);
+            backdrop-filter: blur(3px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1500;
+            animation: fadeInOut 3s ease-in-out;
+        }
+        
+        .validation-error-overlay.show {
+            display: flex;
+        }
+        
+        .validation-error-message {
+            background: white;
+            border: 3px solid #dc3545;
+            border-radius: 15px;
+            padding: 30px 40px;
+            box-shadow: 0 15px 35px rgba(220, 53, 69, 0.3);
+            text-align: center;
+            font-size: 16px;
+            color: #dc3545;
+            font-weight: 500;
+            max-width: 400px;
+            white-space: pre-line;
+        }
+        
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: scale(0.9); }
+            20% { opacity: 1; transform: scale(1); }
+            80% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.9); }
         }
 
         /* Download button for content areas */
@@ -838,6 +889,13 @@
             <div style="font-size: 14px; margin-top: 8px; color: #666;">Supports .dsp files and archives</div>
         </div>
     </div>
+    
+    <!-- Validation Error Overlay (temporaire) -->
+    <div class="validation-error-overlay" id="validation-error-overlay">
+        <div class="validation-error-message" id="validation-error-message">
+            <!-- Message d'erreur sera injecté ici -->
+        </div>
+    </div>
 
     <!-- Progress Overlay -->
     <div class="progress-overlay" id="progress-overlay" style="display: none;">
@@ -1044,6 +1102,44 @@
 
         // Get the global drag overlay element
         const globalDragOverlay = document.getElementById('global-drag-overlay');
+        
+        // Get validation error overlay elements
+        const validationErrorOverlay = document.getElementById('validation-error-overlay');
+        const validationErrorMessage = document.getElementById('validation-error-message');
+        
+        // Function to show temporary validation error
+        function showValidationError(message) {
+            validationErrorMessage.textContent = message;
+            validationErrorOverlay.classList.add('show');
+            
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                validationErrorOverlay.classList.remove('show');
+            }, 3000);
+        }
+        
+        // File validation function
+        function validateFile(file) {
+            const allowedExtensions = ['.dsp', '.lib', '.zip'];
+            const extension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            const maxSize = 102400; // 100KB
+            
+            if (!allowedExtensions.includes(extension)) {
+                return { 
+                    valid: false, 
+                    error: `❌ Invalid file type\n\n🔒 Only .dsp, .lib and .zip files are allowed\n📁 Your file: ${file.name}` 
+                };
+            }
+            
+            if (file.size > maxSize) {
+                return { 
+                    valid: false, 
+                    error: `❌ File too large\n\n📊 Size: ${(file.size/1024).toFixed(1)}KB\n⚖️ Maximum: 100KB` 
+                };
+            }
+            
+            return { valid: true };
+        }
 
         // Global drag and drop handlers for better UX
         function handleGlobalDragEnter(e) {
@@ -1058,7 +1154,7 @@
 
         function handleGlobalDragOver(e) {
             e.preventDefault();
-            // Must call preventDefault to allow drop
+            // Note: File validation will happen on drop - during dragover files aren't fully accessible
         }
 
         function handleGlobalDragLeave(e) {
@@ -1068,6 +1164,7 @@
             // Only hide overlay when completely leaving the window
             if (dragCounter === 0) {
                 globalDragOverlay.classList.remove('show');
+                globalDragOverlay.classList.remove('error');
             }
         }
 
@@ -1075,10 +1172,19 @@
             e.preventDefault();
             dragCounter = 0;
             globalDragOverlay.classList.remove('show');
+            globalDragOverlay.classList.remove('error');
             
-            // Handle the dropped files
+            // Handle the dropped files with validation
             const files = e.dataTransfer.files;
             if (files.length > 0) {
+                const validation = validateFile(files[0]);
+                
+                if (!validation.valid) {
+                    // Show temporary validation error overlay
+                    showValidationError(validation.error);
+                    return;
+                }
+                
                 handleFile(files[0]);
             }
         }
@@ -1099,6 +1205,13 @@
             uploadZone.classList.remove('dragover');
             const files = e.dataTransfer.files;
             if (files.length > 0) {
+                const validation = validateFile(files[0]);
+                
+                if (!validation.valid) {
+                    showValidationError(validation.error);
+                    return;
+                }
+                
                 handleFile(files[0]);
             }
         }
@@ -1137,6 +1250,15 @@
         function handleFileInputChange(event) {
             const files = event.target.files;
             if (files.length > 0) {
+                const validation = validateFile(files[0]);
+                
+                if (!validation.valid) {
+                    showValidationError(validation.error);
+                    // Clear the input to allow selecting the same file again
+                    event.target.value = '';
+                    return;
+                }
+                
                 handleFile(files[0]);
             }
         }
@@ -3073,9 +3195,9 @@
             await loadSessionContent();
             
             // Now that content is loaded, determine the appropriate view
-            // If current view is not available (e.g., C++ with compilation errors), fall back to DSP
+            // If session has compilation errors, force DSP view
             let targetView = currentView;
-            if (hasCompilationError && (currentView === 'cpp' || currentView === 'svg' || currentView === 'signals' || currentView === 'task')) {
+            if (hasCompilationError) {
                 targetView = 'dsp';
             }
             
@@ -3112,10 +3234,19 @@
                             if (errorsContent.trim()) {
                                 hasCompilationError = true;
                                 compilationErrors = errorsContent;
+                                // Show the error message when loading session with errors
+                                showError(errorsContent);
+                            } else {
+                                // No errors - hide any existing error message
+                                hideError();
                             }
+                        } else {
+                            // No errors.log file - hide error message
+                            hideError();
                         }
                     } catch (e) {
                         console.log('No errors.log found (normal for successful compilations)');
+                        hideError();
                     }
                     
                     // Update UI state
