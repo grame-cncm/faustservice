@@ -624,6 +624,7 @@ static int validate_faust(connection_info_struct* con_info)
             // Archive: extract to sourcecode/ and find main DSP file
             struct archive*       archive;
             struct archive_entry* entry;
+            std::vector<std::string> dsp_files;
 
             archive = archive_read_new();
             archive_read_support_filter_all(archive);
@@ -636,6 +637,7 @@ static int validate_faust(connection_info_struct* con_info)
                 return 1;
             }
 
+            // First pass: extract all files and collect DSP filenames
             while (archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
                 fs::path entry_path = fs::path(archive_entry_pathname(entry));
 
@@ -645,15 +647,12 @@ static int validate_faust(connection_info_struct* con_info)
                     continue;
                 }
 
-                // Check for DSP file
+                // Collect DSP files
                 if (entry_path.extension() == ".dsp") {
-                    if (!main_dsp_filename.empty()) {
-                        con_info->answerstring = completebutmorethanoneDSPfile;
-                        std::cerr << "ERROR: multiple DSP files found" << std::endl;
-                        archive_read_free(archive);
-                        return 1;
+                    dsp_files.push_back(entry_path.filename().string());
+                    if (main_dsp_filename.empty()) {
+                        main_dsp_filename = entry_path.filename().string();
                     }
-                    main_dsp_filename = entry_path.filename().string();
                 }
 
                 // Extract file to sourcecode/
@@ -664,13 +663,39 @@ static int validate_faust(connection_info_struct* con_info)
             }
 
             archive_read_free(archive);
+            
+            // Handle multiple DSP files case
+            if (dsp_files.size() > 1) {
+                if (gVerbosity >= 1) std::cerr << "Multiple DSP files found (" << dsp_files.size() << ") - creating multi.dsp" << std::endl;
+                
+                // Clear sourcecode directory
+                fs::remove_all(sourcecode_path);
+                fs::create_directories(sourcecode_path);
+                
+                // Create multi.dsp with error message
+                main_dsp_filename = "multi.dsp";
+                fs::path multi_dsp_path = sourcecode_path / main_dsp_filename;
+                std::ofstream multi_file(multi_dsp_path);
+                multi_file << "// more than one DSP file in your archive\n";
+                multi_file << "// Found files: ";
+                for (size_t i = 0; i < dsp_files.size(); ++i) {
+                    if (i > 0) multi_file << ", ";
+                    multi_file << dsp_files[i];
+                }
+                multi_file << "\n";
+                multi_file.close();
+            }
         }
 
         // Verify we found a main DSP file
         if (main_dsp_filename.empty()) {
-            con_info->answerstring = completebutnoDSPfile;
-            if (gVerbosity >= 1) std::cerr << "EXIT validate_faust: no DSP file found" << std::endl;
-            return 1;
+            // Create empty.dsp with error message instead of failing
+            main_dsp_filename = "empty.dsp";
+            fs::path empty_dsp_path = sourcecode_path / main_dsp_filename;
+            std::ofstream empty_file(empty_dsp_path);
+            empty_file << "// no dsp file was provided\n";
+            empty_file.close();
+            if (gVerbosity >= 1) std::cerr << "No DSP file found - created empty.dsp with error message" << std::endl;
         }
 
         // SINGLE COMPILATION: Copy main DSP file and compile in one step
