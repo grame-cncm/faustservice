@@ -1136,19 +1136,67 @@
             return validateFile(files[0]);
         }
         
-        // Single file validation function
-        function validateFile(file) {
-            const allowedExtensions = ['.dsp', '.lib', '.zip'];
-            const extension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-            const maxSize = 102400; // 100KB
-            
-            if (!allowedExtensions.includes(extension)) {
+        // Secure filename validation function
+        // Only allows: alphanumeric, dot, dash
+        // Rejects: path traversal, shell metacharacters, Unicode, spaces
+        // Maximum length: 100 characters
+        // Required extensions: .dsp or .zip
+        function isSecureFilename(filename) {
+            // Check length limits
+            if (!filename || filename.length === 0 || filename.length > 100) {
                 return { 
                     valid: false, 
-                    error: `❌ Invalid file type\n\n🔒 Only .dsp, .lib and .zip files are allowed\n📁 Your file: ${file.name}` 
+                    error: `❌ Invalid filename length\n\n📏 Length: ${filename ? filename.length : 0} characters\n⚖️ Maximum: 100 characters` 
                 };
             }
             
+            // Check for hidden files (starting with .)
+            if (filename.startsWith('.')) {
+                return { 
+                    valid: false, 
+                    error: `❌ Hidden files not allowed\n\n🔒 Filename cannot start with a dot\n📁 Your file: ${filename}` 
+                };
+            }
+            
+            // Check valid extensions (case insensitive)
+            const lowerName = filename.toLowerCase();
+            if (!lowerName.endsWith('.dsp') && !lowerName.endsWith('.zip')) {
+                return { 
+                    valid: false, 
+                    error: `❌ Invalid file extension\n\n🔒 Only .dsp and .zip files are allowed\n📁 Your file: ${filename}` 
+                };
+            }
+            
+            // Check characters - only alphanumeric, dot, dash allowed
+            const allowedChars = /^[a-zA-Z0-9.\-]+$/;
+            if (!allowedChars.test(filename)) {
+                return { 
+                    valid: false, 
+                    error: `❌ Invalid characters in filename\n\n🔒 Only letters, numbers, dots and dashes allowed\n📁 Your file: ${filename}\n\n✅ Example: my-synth.dsp` 
+                };
+            }
+            
+            // Check for path traversal attempts
+            if (filename.includes('..')) {
+                return { 
+                    valid: false, 
+                    error: `❌ Path traversal not allowed\n\n🔒 Filename cannot contain '..'\n📁 Your file: ${filename}` 
+                };
+            }
+            
+            return { valid: true };
+        }
+
+        // Single file validation function
+        function validateFile(file) {
+            // First check secure filename
+            const filenameCheck = isSecureFilename(file.name);
+            if (!filenameCheck.valid) {
+                return filenameCheck;
+            }
+            
+            // Check file size
+            const maxSize = 102400; // 100KB
             if (file.size > maxSize) {
                 return { 
                     valid: false, 

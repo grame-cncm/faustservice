@@ -475,6 +475,69 @@ static std::set<std::string> g_safe_numeric_options;
 static bool g_options_initialized = false;
 
 /**
+ * Validate filename for security
+ * Only allows: alphanumeric, dot, dash
+ * Rejects: path traversal, shell metacharacters, Unicode, spaces
+ * Maximum length: 100 characters
+ * Required extensions: .dsp or .zip
+ */
+static bool isSecureFilename(const std::string& filename) {
+    // Check length limits
+    if (filename.empty() || filename.length() > 100) {
+        if (gVerbosity >= 2) {
+            std::cerr << "Filename length invalid: " << filename.length() << " characters" << std::endl;
+        }
+        return false;
+    }
+    
+    // Check for hidden files (starting with .)
+    if (filename[0] == '.') {
+        if (gVerbosity >= 2) {
+            std::cerr << "Hidden files not allowed: " << filename << std::endl;
+        }
+        return false;
+    }
+    
+    // Check valid extensions
+    bool has_valid_ext = false;
+    if (filename.length() >= 4) {
+        std::string ext = filename.substr(filename.length() - 4);
+        if (ext == ".dsp" || ext == ".zip") {
+            has_valid_ext = true;
+        }
+    }
+    if (!has_valid_ext) {
+        if (gVerbosity >= 2) {
+            std::cerr << "Invalid file extension: " << filename << std::endl;
+        }
+        return false;
+    }
+    
+    // Check characters - only alphanumeric, dot, dash allowed
+    for (char c : filename) {
+        if (!std::isalnum(c) && c != '.' && c != '-') {
+            if (gVerbosity >= 2) {
+                std::cerr << "Invalid character in filename '" << filename << "': '" << c << "' (ASCII " << (int)c << ")" << std::endl;
+            }
+            return false;
+        }
+    }
+    
+    // Additional security checks
+    if (filename.find("..") != std::string::npos) {
+        if (gVerbosity >= 1) {
+            std::cerr << "Path traversal attempt in filename: " << filename << std::endl;
+        }
+        return false;
+    }
+    
+    if (gVerbosity >= 3) {
+        std::cerr << "Filename validation passed: " << filename << std::endl;
+    }
+    return true;
+}
+
+/**
  * Initialize Faust options by parsing 'faust -h' output
  * Called once at server startup for future-proof option filtering
  */
@@ -909,6 +972,16 @@ static int validate_faust(connection_info_struct* con_info)
                 }
                 
                 fs::path entry_path = fs::path(archive_entry_pathname(entry));
+
+                // SECURITY: Skip files with unsafe names (silent removal)
+                std::string entry_filename = entry_path.filename().string();
+                if (!entry_filename.empty() && !isSecureFilename(entry_filename)) {
+                    if (gVerbosity >= 2) {
+                        std::cerr << "SECURITY: Silently removing unsafe file from ZIP: " << entry_filename << std::endl;
+                    }
+                    entry_count--; // Don't count removed files
+                    continue;
+                }
 
                 // Skip system files
                 if (entry_path.string().substr(0, 8) == "__MACOSX") {
@@ -2132,6 +2205,17 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
                   //<< ", transfer_encoding: " << transfer_encoding
                   << ", data pointer: " << (void*)data << ", size: " << size << ")" << std::endl;
     }
+    
+    // SECURITY: Validate filename before processing
+    if (!isSecureFilename(std::string(filename))) {
+        if (gVerbosity >= 1) {
+            std::cerr << "SECURITY: Rejecting unsafe filename: " << filename << std::endl;
+        }
+        con_info->answerstring = errorpage;
+        con_info->answercode = MHD_HTTP_BAD_REQUEST;
+        return MHD_NO;
+    }
+    
     if (con_info->tmppath.empty()) {
         con_info->filename = filename;
         // Generate unique path using random number
