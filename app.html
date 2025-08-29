@@ -3327,6 +3327,12 @@
                     // Update button state (will be determined by file validity and target selection)
                     updateButtonState();
                     
+                    // BUGFIX: Display the loaded DSP code in the editor
+                    // This was missing and caused the editor to show old code after session switch
+                    if (currentView === 'dsp' || !currentView) {
+                        displayCodeWithLineNumbers(originalDspCode, 'faust');
+                    }
+                    
                 } else {
                     console.error('Failed to load session content for', currentSha1);
                 }
@@ -3490,6 +3496,10 @@
                     }
                     updateSessionNavigation();
                     
+                    // BUGFIX: Load the NEW DSP code from the server for the new session
+                    // This was missing - we were using the old originalDspCode from previous file
+                    await loadSessionContent();
+                    
                     // Hide upload content and show file content (exit empty session state)
                     document.getElementById('upload-content').style.display = 'none';
                     fileContent.style.display = 'flex';
@@ -3519,10 +3529,8 @@
                                 // Enable drag-and-drop export
                                 enableDragExport();
                                 
-                                // Display the DSP code with errors at the top
-                                if (originalDspCode) {
-                                    displayCodeWithLineNumbers(originalDspCode, 'faust');
-                                }
+                                // Note: DSP code display is now handled by loadSessionContent() above
+                                // so we don't need to call displayCodeWithLineNumbers() here anymore
                                 fileContent.style.display = 'flex';
                                 
                                 // Show the actual error content in the traditional error area
