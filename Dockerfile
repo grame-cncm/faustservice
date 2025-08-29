@@ -51,10 +51,19 @@ RUN echo "process=+;" > tmp.dsp; \
 ########################################################################
 EXPOSE 80
 WORKDIR /faustservice
-RUN cp ./bin/dockerOSX /usr/local/bin/; \ 
+RUN cp ./bin/dockerOSX /usr/local/bin/; \
     rm -rf makefiles/osx; \
     mv makefiles/dockerosx makefiles/osx; \
     rm -rf makefiles/windows64 makefiles/ros makefiles/unity/all makefiles/unity/osx
+
+# Create a non-root user 'faustuser' and group 'faustgroup'
+# And give ownership of the application directory to the new user
+RUN groupadd -r faustgroup && \
+    useradd -r -g faustgroup -d /faustservice -s /sbin/nologin faustuser && \
+    chown -R faustuser:faustgroup /faustservice
+
+# Switch to the non-root user before starting the application
+USER faustuser
 
 CMD ./faustweb --port 80 --sessions-dir /tmp/sessions
 
