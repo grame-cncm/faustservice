@@ -1134,9 +1134,9 @@ static int validate_faust(connection_info_struct* con_info)
         // SECURITY: Protect against stack overflow and resource exhaustion
         // - ulimit -s 8192: Limit stack size to 8MB (default is often 8MB on macOS, can be much larger on Linux)
         // - ulimit -t 30: Limit CPU time to 30 seconds
-        // - ulimit -v 512000: Limit virtual memory to ~500MB
+        // Note: ulimit -v (virtual memory) not supported on macOS, removed for compatibility
         std::string faust_cmd = "cd " + sourcecode_path.string() + 
-                                " && (ulimit -s 8192; ulimit -t 30; ulimit -v 512000; faust " + options_str + (options_str.empty() ? "" : " ") + main_dsp_filename + " -o ../generated.cpp -svg 2> ../errors.log)";
+                                " && (ulimit -s 8192; ulimit -t 30; faust " + options_str + (options_str.empty() ? "" : " ") + main_dsp_filename + " -o ../generated.cpp -svg 2> ../errors.log)";
 
         if (gVerbosity >= 2) std::cerr << "Executing compilation: " << faust_cmd << std::endl;
 
@@ -2408,9 +2408,10 @@ int FaustServer::serveSignalsSvg(struct MHD_Connection* connection, const std::s
     // SECURITY: Separate protections for faust vs dot commands
     // Faust -sg: strict limits (30s, stack protection) - same DSP as main compilation
     // dot: generous timeout (180s = 3min) but no stack limit - can be legitimately slow
+    // Note: ulimit -v (virtual memory) not supported on macOS, removed for compatibility
     std::string generate_cmd = "cd " + sourcecode_dir.string() + 
-                               " && (ulimit -s 8192; ulimit -t 30; ulimit -v 512000; faust " + options_str + (options_str.empty() ? "" : " ") + "-sg " + main_dsp_file + " -o /dev/null)" +
-                               " && (ulimit -t 180; ulimit -v 512000; dot -Tsvg " + dot_file + " -o ../signals.svg)" +
+                               " && (ulimit -s 8192; ulimit -t 30; faust " + options_str + (options_str.empty() ? "" : " ") + "-sg " + main_dsp_file + " -o /dev/null)" +
+                               " && (ulimit -t 180; dot -Tsvg " + dot_file + " -o ../signals.svg)" +
                                " && rm " + dot_file;
 
     if (gVerbosity >= 2) {
