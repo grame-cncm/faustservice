@@ -343,8 +343,9 @@
         .code-content {
             flex: 1;
             padding: 20px; /* Garder padding pour lisibilité */
-            white-space: pre-wrap;
+            white-space: pre;
             overflow-y: auto;
+            overflow-x: auto;
             user-select: text;
         }
 
@@ -2419,21 +2420,22 @@
         function updateViewSelectorOptions() {
             const options = viewSelect.querySelectorAll('option');
             
-            options.forEach(option => {
-                switch(option.value) {
-                    case 'dsp':
-                        // DSP view is always enabled
-                        option.disabled = false;
-                        break;
-                    case 'cpp':
-                    case 'svg':
-                    case 'signals':
-                    case 'task':
-                        // C++ and SVG views only enabled when no compilation errors
-                        option.disabled = hasCompilationError;
-                        break;
+            if (hasCompilationError) {
+                // When there are compilation errors: disable all views, then enable only DSP
+                options.forEach(option => {
+                    option.disabled = true;
+                });
+                // Enable only DSP view
+                const dspOption = Array.from(options).find(opt => opt.value === 'dsp');
+                if (dspOption) {
+                    dspOption.disabled = false;
                 }
-            });
+            } else {
+                // When no compilation errors: enable all views
+                options.forEach(option => {
+                    option.disabled = false;
+                });
+            }
         }
 
         function handleViewChange() {
