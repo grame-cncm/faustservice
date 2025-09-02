@@ -359,11 +359,11 @@ static bool create_webapp_zip(const fs::path& webapp_dir, const fs::path& zip_pa
         for (const auto& entry : fs::recursive_directory_iterator(webapp_dir)) {
             if (entry.is_regular_file()) {
                 fs::path file_path = entry.path();
-                
+
                 // Get relative path from webapp_dir for ZIP entry name
-                fs::path relative_path = fs::relative(file_path, webapp_dir);
+                fs::path    relative_path  = fs::relative(file_path, webapp_dir);
                 std::string zip_entry_name = relative_path.string();
-                
+
                 if (gVerbosity >= 2) {
                     std::cerr << "Adding to webapp ZIP: " << zip_entry_name << std::endl;
                 }
@@ -373,15 +373,15 @@ static bool create_webapp_zip(const fs::path& webapp_dir, const fs::path& zip_pa
                 archive_entry_set_pathname(entry_archive, zip_entry_name.c_str());
                 archive_entry_set_filetype(entry_archive, AE_IFREG);
                 archive_entry_set_perm(entry_archive, 0644);
-                
+
                 // Get file size
                 std::uintmax_t file_size = fs::file_size(file_path);
                 archive_entry_set_size(entry_archive, file_size);
 
                 // Write header
                 if (archive_write_header(archive, entry_archive) != ARCHIVE_OK) {
-                    std::cerr << "Error writing header for " << zip_entry_name << ": " 
-                              << archive_error_string(archive) << std::endl;
+                    std::cerr << "Error writing header for " << zip_entry_name << ": " << archive_error_string(archive)
+                              << std::endl;
                     archive_entry_free(entry_archive);
                     continue;
                 }
@@ -393,7 +393,7 @@ static bool create_webapp_zip(const fs::path& webapp_dir, const fs::path& zip_pa
                     while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
                         ssize_t bytes_written = archive_write_data(archive, buffer, file.gcount());
                         if (bytes_written < 0) {
-                            std::cerr << "Error writing data for " << zip_entry_name << ": " 
+                            std::cerr << "Error writing data for " << zip_entry_name << ": "
                                       << archive_error_string(archive) << std::endl;
                             break;
                         }
@@ -470,9 +470,9 @@ void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefile_dire
 
 // Global sets for intelligent option filtering (populated at startup)
 static std::set<std::string> g_code_generation_options;
-static std::set<std::string> g_safe_enum_options; 
+static std::set<std::string> g_safe_enum_options;
 static std::set<std::string> g_safe_numeric_options;
-static bool g_options_initialized = false;
+static bool                  g_options_initialized = false;
 
 /**
  * Validate filename for security
@@ -481,7 +481,8 @@ static bool g_options_initialized = false;
  * Maximum length: 100 characters
  * Required extensions: .dsp or .zip
  */
-static bool isSecureFilename(const std::string& filename) {
+static bool isSecureFilename(const std::string& filename)
+{
     // Check length limits
     if (filename.empty() || filename.length() > 100) {
         if (gVerbosity >= 2) {
@@ -489,7 +490,7 @@ static bool isSecureFilename(const std::string& filename) {
         }
         return false;
     }
-    
+
     // Check for hidden files (starting with .)
     if (filename[0] == '.') {
         if (gVerbosity >= 2) {
@@ -497,7 +498,7 @@ static bool isSecureFilename(const std::string& filename) {
         }
         return false;
     }
-    
+
     // Check valid extensions
     bool has_valid_ext = false;
     if (filename.length() >= 4) {
@@ -512,17 +513,18 @@ static bool isSecureFilename(const std::string& filename) {
         }
         return false;
     }
-    
+
     // Check characters - only alphanumeric, dot, dash allowed
     for (char c : filename) {
         if (!std::isalnum(c) && c != '.' && c != '-') {
             if (gVerbosity >= 2) {
-                std::cerr << "Invalid character in filename '" << filename << "': '" << c << "' (ASCII " << (int)c << ")" << std::endl;
+                std::cerr << "Invalid character in filename '" << filename << "': '" << c << "' (ASCII " << (int)c
+                          << ")" << std::endl;
             }
             return false;
         }
     }
-    
+
     // Additional security checks
     if (filename.find("..") != std::string::npos) {
         if (gVerbosity >= 1) {
@@ -530,7 +532,7 @@ static bool isSecureFilename(const std::string& filename) {
         }
         return false;
     }
-    
+
     if (gVerbosity >= 3) {
         std::cerr << "Filename validation passed: " << filename << std::endl;
     }
@@ -541,50 +543,50 @@ static bool isSecureFilename(const std::string& filename) {
  * Initialize Faust options by parsing 'faust -h' output
  * Called once at server startup for future-proof option filtering
  */
-static bool initializeFaustOptions() {
+static bool initializeFaustOptions()
+{
     if (g_options_initialized) return true;
-    
+
     if (gVerbosity >= 2) {
         std::cerr << "Initializing Faust options from faust -h..." << std::endl;
     }
-    
+
     // Run faust -h and capture output
     FILE* faust_help = popen("faust -h 2>/dev/null", "r");
     if (!faust_help) {
         std::cerr << "Warning: Cannot run 'faust -h' for option initialization" << std::endl;
         return false;
     }
-    
+
     std::string line;
-    char buffer[1024];
-    bool in_code_generation_section = false;
-    
+    char        buffer[1024];
+    bool        in_code_generation_section = false;
+
     while (fgets(buffer, sizeof(buffer), faust_help)) {
         line = buffer;
-        
+
         // Detect Code generation options section
         if (line.find("Code generation options:") != std::string::npos) {
             in_code_generation_section = true;
             continue;
         }
-        
+
         // Stop when we hit the next section
-        if (in_code_generation_section && line.find("options:") != std::string::npos && 
+        if (in_code_generation_section && line.find("options:") != std::string::npos &&
             line.find("Code generation") == std::string::npos) {
             in_code_generation_section = false;
         }
-        
+
         // Parse options in Code generation section
         if (in_code_generation_section && line.find("  -") == 0) {
             // Extract option name (first word after spaces)
             std::istringstream iss(line);
-            std::string token;
-            iss >> token; // Skip leading spaces, get option
-            
+            std::string        token;
+            iss >> token;  // Skip leading spaces, get option
+
             if (!token.empty() && token[0] == '-') {
                 // Handle options with parameters
-                if (line.find(" <n>") != std::string::npos || 
-                    line.find(" <sec>") != std::string::npos ||
+                if (line.find(" <n>") != std::string::npos || line.find(" <sec>") != std::string::npos ||
                     line.find(" <file>") != std::string::npos) {
                     g_safe_numeric_options.insert(token);
                 } else if (line.find(" <lang>") != std::string::npos) {
@@ -596,15 +598,14 @@ static bool initializeFaustOptions() {
                     // Simple flag options - safe
                     g_code_generation_options.insert(token);
                 }
-                
+
                 // Also handle long versions
                 if (line.find("--") != std::string::npos) {
                     size_t long_start = line.find("--");
-                    size_t long_end = line.find_first_of(" \t", long_start);
+                    size_t long_end   = line.find_first_of(" \t", long_start);
                     if (long_end != std::string::npos) {
                         std::string long_option = line.substr(long_start, long_end - long_start);
-                        if (line.find(" <n>") != std::string::npos || 
-                            line.find(" <sec>") != std::string::npos ||
+                        if (line.find(" <n>") != std::string::npos || line.find(" <sec>") != std::string::npos ||
                             line.find(" <file>") != std::string::npos) {
                             g_safe_numeric_options.insert(long_option);
                         } else if (line.find(" <lang>") != std::string::npos) {
@@ -617,16 +618,15 @@ static bool initializeFaustOptions() {
             }
         }
     }
-    
+
     pclose(faust_help);
-    
+
     if (gVerbosity >= 2) {
-        std::cerr << "Initialized " << g_code_generation_options.size() 
-                  << " code generation options, " << g_safe_numeric_options.size()
-                  << " numeric options, " << g_safe_enum_options.size() 
+        std::cerr << "Initialized " << g_code_generation_options.size() << " code generation options, "
+                  << g_safe_numeric_options.size() << " numeric options, " << g_safe_enum_options.size()
                   << " enum options" << std::endl;
     }
-    
+
     g_options_initialized = true;
     return true;
 }
@@ -636,42 +636,37 @@ static bool initializeFaustOptions() {
  * Level 1: Block all shell injection attempts
  * Level 2: Allow only code generation options (parsed from faust -h)
  */
-static std::string filterFaustOptions(const std::string& options) {
+static std::string filterFaustOptions(const std::string& options)
+{
     // Initialize options from faust -h if not done yet
     if (!initializeFaustOptions()) {
         if (gVerbosity >= 1) {
             std::cerr << "Warning: Faust options not initialized, using fallback filtering" << std::endl;
         }
     }
-    
+
     if (gVerbosity >= 2) {
         std::cerr << "Intelligent filtering of Faust options: '" << options << "'" << std::endl;
     }
-    
-    std::istringstream iss(options);
-    std::string token;
+
+    std::istringstream       iss(options);
+    std::string              token;
     std::vector<std::string> filtered_options;
-    
+
     while (iss >> token) {
         // LEVEL 1: Check for shell injection in the token itself
-        if (token.find(';') != std::string::npos ||
-            token.find('|') != std::string::npos ||
-            token.find('&') != std::string::npos ||
-            token.find('`') != std::string::npos ||
-            token.find('$') != std::string::npos ||
-            token.find('(') != std::string::npos ||
-            token.find(')') != std::string::npos ||
-            token.find('<') != std::string::npos ||
-            token.find('>') != std::string::npos ||
-            token.find('"') != std::string::npos ||
-            token.find('\'') != std::string::npos ||
-            token.find('\\') != std::string::npos) {
+        if (token.find(';') != std::string::npos || token.find('|') != std::string::npos ||
+            token.find('&') != std::string::npos || token.find('`') != std::string::npos ||
+            token.find('$') != std::string::npos || token.find('(') != std::string::npos ||
+            token.find(')') != std::string::npos || token.find('<') != std::string::npos ||
+            token.find('>') != std::string::npos || token.find('"') != std::string::npos ||
+            token.find('\'') != std::string::npos || token.find('\\') != std::string::npos) {
             if (gVerbosity >= 1) {
                 std::cerr << "SECURITY: Shell metacharacters detected in option: " << token << std::endl;
             }
-            continue; // Skip this dangerous token
+            continue;  // Skip this dangerous token
         }
-        
+
         // LEVEL 2: Check if it's a safe code generation option
         if (g_code_generation_options.count(token)) {
             // Simple flag option - safe to include
@@ -679,27 +674,24 @@ static std::string filterFaustOptions(const std::string& options) {
             if (gVerbosity >= 2) {
                 std::cerr << "Accepted safe flag option: " << token << std::endl;
             }
-            
+
         } else if (g_safe_numeric_options.count(token)) {
             // Numeric parameter option - validate parameter
             filtered_options.push_back(token);
-            
+
             std::string param;
             if (iss >> param) {
                 // LEVEL 1: Check parameter for shell injection
-                if (param.find(';') != std::string::npos ||
-                    param.find('|') != std::string::npos ||
-                    param.find('&') != std::string::npos ||
-                    param.find('`') != std::string::npos ||
-                    param.find('$') != std::string::npos ||
-                    param.find('(') != std::string::npos) {
+                if (param.find(';') != std::string::npos || param.find('|') != std::string::npos ||
+                    param.find('&') != std::string::npos || param.find('`') != std::string::npos ||
+                    param.find('$') != std::string::npos || param.find('(') != std::string::npos) {
                     if (gVerbosity >= 1) {
                         std::cerr << "SECURITY: Dangerous parameter for " << token << ": " << param << std::endl;
                     }
-                    filtered_options.pop_back(); // Remove the option too
+                    filtered_options.pop_back();  // Remove the option too
                     continue;
                 }
-                
+
                 // Validate numeric parameter
                 bool valid_number = true;
                 for (char c : param) {
@@ -708,7 +700,7 @@ static std::string filterFaustOptions(const std::string& options) {
                         break;
                     }
                 }
-                
+
                 if (valid_number && param.length() <= 20) {
                     filtered_options.push_back(param);
                     if (gVerbosity >= 2) {
@@ -718,29 +710,27 @@ static std::string filterFaustOptions(const std::string& options) {
                     if (gVerbosity >= 1) {
                         std::cerr << "Invalid numeric parameter filtered: " << param << std::endl;
                     }
-                    filtered_options.pop_back(); // Remove the option too
+                    filtered_options.pop_back();  // Remove the option too
                 }
             }
-            
+
         } else if (g_safe_enum_options.count(token)) {
             // Enum parameter option (like -lang) - validate parameter
             filtered_options.push_back(token);
-            
+
             std::string param;
             if (iss >> param) {
                 // LEVEL 1: Check parameter for shell injection
-                if (param.find(';') != std::string::npos ||
-                    param.find('|') != std::string::npos ||
-                    param.find('&') != std::string::npos ||
-                    param.find('`') != std::string::npos ||
+                if (param.find(';') != std::string::npos || param.find('|') != std::string::npos ||
+                    param.find('&') != std::string::npos || param.find('`') != std::string::npos ||
                     param.find('$') != std::string::npos) {
                     if (gVerbosity >= 1) {
                         std::cerr << "SECURITY: Dangerous parameter for " << token << ": " << param << std::endl;
                     }
-                    filtered_options.pop_back(); // Remove the option too
+                    filtered_options.pop_back();  // Remove the option too
                     continue;
                 }
-                
+
                 // Validate enum parameter (alphanumeric only)
                 bool valid_enum = true;
                 for (char c : param) {
@@ -749,7 +739,7 @@ static std::string filterFaustOptions(const std::string& options) {
                         break;
                     }
                 }
-                
+
                 if (valid_enum && param.length() <= 50) {
                     filtered_options.push_back(param);
                     if (gVerbosity >= 2) {
@@ -759,10 +749,10 @@ static std::string filterFaustOptions(const std::string& options) {
                     if (gVerbosity >= 1) {
                         std::cerr << "Invalid enum parameter filtered: " << param << std::endl;
                     }
-                    filtered_options.pop_back(); // Remove the option too
+                    filtered_options.pop_back();  // Remove the option too
                 }
             }
-            
+
         } else {
             // Unknown option - reject for security
             if (gVerbosity >= 2) {
@@ -770,27 +760,28 @@ static std::string filterFaustOptions(const std::string& options) {
             }
         }
     }
-    
+
     // Join filtered options back into a string
     std::ostringstream result;
     for (size_t i = 0; i < filtered_options.size(); ++i) {
         if (i > 0) result << " ";
         result << filtered_options[i];
     }
-    
+
     std::string final_result = result.str();
     if (gVerbosity >= 1) {
         std::cerr << "Intelligent filtering result: '" << final_result << "'" << std::endl;
     }
-    
+
     return final_result;
 }
 
-static std::string readFaustOptions(const fs::path& session_dir) {
+static std::string readFaustOptions(const fs::path& session_dir)
+{
     fs::path options_file = session_dir / "faustoptions.txt";
     if (fs::exists(options_file)) {
         std::ifstream file(options_file);
-        std::string options;
+        std::string   options;
         std::getline(file, options);
         if (!options.empty()) {
             if (gVerbosity >= 2) {
@@ -807,10 +798,11 @@ static std::string readFaustOptions(const fs::path& session_dir) {
  * Looks for: declare faustoptions "options";
  * Enhanced security: limits file size, validates content, prevents malicious patterns
  */
-static std::string extractFaustOptions(const fs::path& dsp_file) {
+static std::string extractFaustOptions(const fs::path& dsp_file)
+{
     // Security check: limit file size to prevent DoS
-    const size_t MAX_FILE_SIZE = 1024 * 1024; // 1MB max
-    
+    const size_t MAX_FILE_SIZE = 1024 * 1024;  // 1MB max
+
     std::ifstream file(dsp_file, std::ios::binary);
     if (!file.is_open()) {
         if (gVerbosity >= 2) {
@@ -818,7 +810,7 @@ static std::string extractFaustOptions(const fs::path& dsp_file) {
         }
         return "";
     }
-    
+
     // Check file size
     file.seekg(0, std::ios::end);
     size_t file_size = file.tellg();
@@ -829,59 +821,58 @@ static std::string extractFaustOptions(const fs::path& dsp_file) {
         return "";
     }
     file.seekg(0, std::ios::beg);
-    
-    std::string line;
-    size_t line_count = 0;
-    const size_t MAX_LINES_TO_CHECK = 100; // Only check first 100 lines for performance
-    
+
+    std::string  line;
+    size_t       line_count         = 0;
+    const size_t MAX_LINES_TO_CHECK = 100;  // Only check first 100 lines for performance
+
     // More restrictive regex pattern to prevent injection
-    std::regex pattern(R"###(^\s*declare\s+faustoptions\s+"([^"]{0,500})"\s*;\s*$)###");
+    std::regex  pattern(R"###(^\s*declare\s+faustoptions\s+"([^"]{0,500})"\s*;\s*$)###");
     std::smatch match;
-    
+
     while (std::getline(file, line) && line_count < MAX_LINES_TO_CHECK) {
         line_count++;
-        
+
         // Security: skip very long lines that could be malicious
         if (line.length() > 1000) {
             continue;
         }
-        
+
         // Security: check for suspicious patterns in the line
-        if (line.find("system(") != std::string::npos ||
-            line.find("popen(") != std::string::npos ||
-            line.find("exec") != std::string::npos ||
-            line.find("sh -c") != std::string::npos) {
+        if (line.find("system(") != std::string::npos || line.find("popen(") != std::string::npos ||
+            line.find("exec") != std::string::npos || line.find("sh -c") != std::string::npos) {
             if (gVerbosity >= 1) {
                 std::cerr << "Suspicious pattern detected in DSP file, skipping line" << std::endl;
             }
             continue;
         }
-        
+
         if (std::regex_match(line, match, pattern)) {
             std::string options = match[1].str();
-            
+
             // LEVEL 1 SECURITY: Character-level filtering - keep only safe characters
             std::string safe_options;
             safe_options.reserve(options.length());
-            
+
             for (char c : options) {
                 // Allow only: alphanumeric, dot, space, dash, double quote
                 if (std::isalnum(c) || c == '.' || c == ' ' || c == '-' || c == '"') {
                     safe_options += c;
                 } else {
                     if (gVerbosity >= 2) {
-                        std::cerr << "Filtered dangerous character: '" << c << "' (ASCII " << (int)c << ")" << std::endl;
+                        std::cerr << "Filtered dangerous character: '" << c << "' (ASCII " << (int)c << ")"
+                                  << std::endl;
                     }
                 }
             }
-            
+
             if (gVerbosity >= 2) {
                 std::cerr << "Character-filtered faustoptions: '" << safe_options << "'" << std::endl;
             }
             return safe_options;
         }
     }
-    
+
     if (gVerbosity >= 2) {
         std::cerr << "No valid faustoptions declaration found in first " << line_count << " lines" << std::endl;
     }
@@ -928,8 +919,8 @@ static int validate_faust(connection_info_struct* con_info)
             if (gVerbosity >= 1) std::cerr << "Copied DSP file: " << main_dsp_filename << std::endl;
         } else {
             // Archive: extract to sourcecode/ and find main DSP file
-            struct archive*       archive;
-            struct archive_entry* entry;
+            struct archive*          archive;
+            struct archive_entry*    entry;
             std::vector<std::string> dsp_files;
 
             archive = archive_read_new();
@@ -944,56 +935,62 @@ static int validate_faust(connection_info_struct* con_info)
             }
 
             // Extract all files with multiple protections against zip bombs
-            const size_t MAX_EXTRACTED_SIZE = 102400; // 100KB limit
-            const size_t MAX_ENTRIES = 100; // 100 files max
-            const auto MAX_EXTRACTION_TIME = std::chrono::seconds(5); // 5 seconds max
-            
-            size_t total_extracted = 0;
-            size_t entry_count = 0;
-            auto start_time = std::chrono::steady_clock::now();
-            bool size_limit_exceeded = false;
-            bool time_limit_exceeded = false;
-            bool entries_limit_exceeded = false;
-            
+            const size_t MAX_EXTRACTED_SIZE  = 102400;                   // 100KB limit
+            const size_t MAX_ENTRIES         = 100;                      // 100 files max
+            const auto   MAX_EXTRACTION_TIME = std::chrono::seconds(5);  // 5 seconds max
+
+            size_t total_extracted        = 0;
+            size_t entry_count            = 0;
+            auto   start_time             = std::chrono::steady_clock::now();
+            bool   size_limit_exceeded    = false;
+            bool   time_limit_exceeded    = false;
+            bool   entries_limit_exceeded = false;
+
             while (archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
                 // Check time limit
                 auto current_time = std::chrono::steady_clock::now();
                 if (current_time - start_time > MAX_EXTRACTION_TIME) {
-                    if (gVerbosity >= 1) std::cerr << "Extraction time limit exceeded - stopping after " << entry_count << " entries" << std::endl;
+                    if (gVerbosity >= 1)
+                        std::cerr << "Extraction time limit exceeded - stopping after " << entry_count << " entries"
+                                  << std::endl;
                     time_limit_exceeded = true;
                     break;
                 }
-                
-                // Check entries limit  
+
+                // Check entries limit
                 if (++entry_count > MAX_ENTRIES) {
-                    if (gVerbosity >= 1) std::cerr << "Too many entries - stopping at " << MAX_ENTRIES << " files" << std::endl;
+                    if (gVerbosity >= 1)
+                        std::cerr << "Too many entries - stopping at " << MAX_ENTRIES << " files" << std::endl;
                     entries_limit_exceeded = true;
                     break;
                 }
-                
+
                 fs::path entry_path = fs::path(archive_entry_pathname(entry));
 
                 // SECURITY: Skip files with unsafe names (silent removal)
                 std::string entry_filename = entry_path.filename().string();
                 if (!entry_filename.empty() && !isSecureFilename(entry_filename)) {
                     if (gVerbosity >= 2) {
-                        std::cerr << "SECURITY: Silently removing unsafe file from ZIP: " << entry_filename << std::endl;
+                        std::cerr << "SECURITY: Silently removing unsafe file from ZIP: " << entry_filename
+                                  << std::endl;
                     }
-                    entry_count--; // Don't count removed files
+                    entry_count--;  // Don't count removed files
                     continue;
                 }
 
                 // Skip system files
                 if (entry_path.string().substr(0, 8) == "__MACOSX") {
                     if (gVerbosity >= 1) std::cerr << "Ignoring: " << entry_path << std::endl;
-                    entry_count--; // Don't count ignored files
+                    entry_count--;  // Don't count ignored files
                     continue;
                 }
 
                 // Check extraction size limit before processing
                 size_t entry_size = archive_entry_size(entry);
                 if (total_extracted + entry_size > MAX_EXTRACTED_SIZE) {
-                    if (gVerbosity >= 1) std::cerr << "Extraction size limit exceeded - stopping at " << total_extracted << " bytes" << std::endl;
+                    if (gVerbosity >= 1)
+                        std::cerr << "Extraction size limit exceeded - stopping at " << total_extracted << " bytes"
+                                  << std::endl;
                     size_limit_exceeded = true;
                     break;
                 }
@@ -1011,23 +1008,23 @@ static int validate_faust(connection_info_struct* con_info)
                 fs::create_directories(dest_path.parent_path());
                 archive_entry_set_pathname(entry, dest_path.string().c_str());
                 archive_read_extract(archive, entry, ARCHIVE_EXTRACT_PERM);
-                
+
                 total_extracted += entry_size;
             }
 
             archive_read_free(archive);
-            
+
             // Handle time limit exceeded case
             if (time_limit_exceeded) {
                 if (gVerbosity >= 1) std::cerr << "Archive extraction timeout - creating toolong.dsp" << std::endl;
-                
+
                 // Clear sourcecode directory
                 fs::remove_all(sourcecode_path);
                 fs::create_directories(sourcecode_path);
-                
+
                 // Create toolong.dsp with error message
-                main_dsp_filename = "toolong.dsp";
-                fs::path toolong_dsp_path = sourcecode_path / main_dsp_filename;
+                main_dsp_filename              = "toolong.dsp";
+                fs::path      toolong_dsp_path = sourcecode_path / main_dsp_filename;
                 std::ofstream toolong_file(toolong_dsp_path);
                 toolong_file << "// archive took too long to decompress\n";
                 toolong_file << "// maximum allowed: 5 seconds\n";
@@ -1036,14 +1033,14 @@ static int validate_faust(connection_info_struct* con_info)
             // Handle too many entries case
             else if (entries_limit_exceeded) {
                 if (gVerbosity >= 1) std::cerr << "Too many entries - creating toomanyentries.dsp" << std::endl;
-                
+
                 // Clear sourcecode directory
                 fs::remove_all(sourcecode_path);
                 fs::create_directories(sourcecode_path);
-                
+
                 // Create toomanyentries.dsp with error message
-                main_dsp_filename = "toomanyentries.dsp";
-                fs::path toomanyentries_dsp_path = sourcecode_path / main_dsp_filename;
+                main_dsp_filename                     = "toomanyentries.dsp";
+                fs::path      toomanyentries_dsp_path = sourcecode_path / main_dsp_filename;
                 std::ofstream toomanyentries_file(toomanyentries_dsp_path);
                 toomanyentries_file << "// too many files in archive\n";
                 toomanyentries_file << "// maximum allowed: 100 files\n";
@@ -1052,30 +1049,32 @@ static int validate_faust(connection_info_struct* con_info)
             // Handle size limit exceeded case
             else if (size_limit_exceeded) {
                 if (gVerbosity >= 1) std::cerr << "Archive too large - creating toobig.dsp" << std::endl;
-                
+
                 // Clear sourcecode directory
                 fs::remove_all(sourcecode_path);
                 fs::create_directories(sourcecode_path);
-                
+
                 // Create toobig.dsp with error message
-                main_dsp_filename = "toobig.dsp";
-                fs::path toobig_dsp_path = sourcecode_path / main_dsp_filename;
+                main_dsp_filename             = "toobig.dsp";
+                fs::path      toobig_dsp_path = sourcecode_path / main_dsp_filename;
                 std::ofstream toobig_file(toobig_dsp_path);
                 toobig_file << "// archive too large when decompressed\n";
                 toobig_file << "// maximum allowed: 100KB\n";
                 toobig_file.close();
             }
-            // Handle multiple DSP files case  
+            // Handle multiple DSP files case
             else if (dsp_files.size() > 1) {
-                if (gVerbosity >= 1) std::cerr << "Multiple DSP files found (" << dsp_files.size() << ") - creating multi.dsp" << std::endl;
-                
+                if (gVerbosity >= 1)
+                    std::cerr << "Multiple DSP files found (" << dsp_files.size() << ") - creating multi.dsp"
+                              << std::endl;
+
                 // Clear sourcecode directory
                 fs::remove_all(sourcecode_path);
                 fs::create_directories(sourcecode_path);
-                
+
                 // Create multi.dsp with error message
-                main_dsp_filename = "multi.dsp";
-                fs::path multi_dsp_path = sourcecode_path / main_dsp_filename;
+                main_dsp_filename            = "multi.dsp";
+                fs::path      multi_dsp_path = sourcecode_path / main_dsp_filename;
                 std::ofstream multi_file(multi_dsp_path);
                 multi_file << "// more than one DSP file in your archive\n";
                 multi_file << "// Found files: ";
@@ -1091,8 +1090,8 @@ static int validate_faust(connection_info_struct* con_info)
         // Verify we found a main DSP file
         if (main_dsp_filename.empty()) {
             // Create empty.dsp with error message instead of failing
-            main_dsp_filename = "empty.dsp";
-            fs::path empty_dsp_path = sourcecode_path / main_dsp_filename;
+            main_dsp_filename            = "empty.dsp";
+            fs::path      empty_dsp_path = sourcecode_path / main_dsp_filename;
             std::ofstream empty_file(empty_dsp_path);
             empty_file << "// no dsp file was provided\n";
             empty_file.close();
@@ -1105,21 +1104,21 @@ static int validate_faust(connection_info_struct* con_info)
         // First, copy the DSP file
         std::string copy_cmd = "cd " + sourcecode_path.string() + " && cp " + main_dsp_filename + " ../user_code.dsp";
         if (gVerbosity >= 2) std::cerr << "Executing copy: " << copy_cmd << std::endl;
-        
+
         int copy_result = system(copy_cmd.c_str());
         if (copy_result != 0) {
             if (gVerbosity >= 1) std::cerr << "Failed to copy DSP file" << std::endl;
             con_info->answerstring = completebutnopipe;
             return 1;
         }
-        
+
         // Extract and process faustoptions
-        fs::path user_dsp_file = session_path / "user_code.dsp";
-        std::string raw_options = extractFaustOptions(user_dsp_file);
+        fs::path    user_dsp_file    = session_path / "user_code.dsp";
+        std::string raw_options      = extractFaustOptions(user_dsp_file);
         std::string filtered_options = filterFaustOptions(raw_options);
-        
+
         // Create faustoptions.txt file
-        fs::path faustoptions_file = session_path / "faustoptions.txt";
+        fs::path      faustoptions_file = session_path / "faustoptions.txt";
         std::ofstream options_out(faustoptions_file);
         if (options_out.is_open()) {
             options_out << filtered_options;
@@ -1128,15 +1127,16 @@ static int validate_faust(connection_info_struct* con_info)
                 std::cerr << "Created faustoptions.txt with: '" << filtered_options << "'" << std::endl;
             }
         }
-        
+
         // Now compile using the extracted options
         std::string options_str = readFaustOptions(session_path);
         // SECURITY: Protect against stack overflow and resource exhaustion
         // - ulimit -s 8192: Limit stack size to 8MB (default is often 8MB on macOS, can be much larger on Linux)
         // - ulimit -t 30: Limit CPU time to 30 seconds
         // Note: ulimit -v (virtual memory) not supported on macOS, removed for compatibility
-        std::string faust_cmd = "cd " + sourcecode_path.string() + 
-                                " && (ulimit -s 8192; ulimit -t 30; faust " + options_str + (options_str.empty() ? "" : " ") + main_dsp_filename + " -o ../generated.cpp -svg 2> ../errors.log)";
+        std::string faust_cmd = "cd " + sourcecode_path.string() + " && (ulimit -s 8192; ulimit -t 30; faust " +
+                                options_str + (options_str.empty() ? "" : " ") + main_dsp_filename +
+                                " -o ../generated.cpp -svg 2> ../errors.log)";
 
         if (gVerbosity >= 2) std::cerr << "Executing compilation: " << faust_cmd << std::endl;
 
@@ -1175,7 +1175,7 @@ static int validate_faust(connection_info_struct* con_info)
                 if (entry.is_regular_file() && entry.path().extension() == ".svg") {
                     fs::path svg_file = svg_path / entry.path().filename();
                     fs::rename(entry.path(), svg_file);
-                    if (gVerbosity >= 1) {
+                    if (gVerbosity >= 2) {
                         std::cerr << "Moved SVG: \"" << entry.path().filename().string() << "\" to svg/" << std::endl;
                     }
                 }
@@ -1578,7 +1578,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     // MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
     if (gVerbosity >= 2) std::cerr << "ANSWER GET CONNECTION " << url << std::endl;
 
-    if (matchExtension(url, ".php") || (url.length() > 100 && url.find("/webapp/") == std::string::npos) /*matchExtension(url, ".js")*/) {
+    if (matchExtension(url, ".php") ||
+        (url.length() > 100 && url.find("/webapp/") == std::string::npos) /*matchExtension(url, ".js")*/) {
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
 
     } else if (matchURL(url, "/")) {
@@ -1720,15 +1721,16 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         if (U.size() >= 2) {
             std::string sha1 = U[1];
             std::string error_msg;
-            
+
             // Ensure webapp exists, generate if needed
             if (!ensure_webapp_exists(sha1, error_msg)) {
-                int status_code = (error_msg.find("Session not found") != std::string::npos || 
-                                  error_msg.find("No DSP file found") != std::string::npos) ? 
-                                 MHD_HTTP_NOT_FOUND : MHD_HTTP_INTERNAL_SERVER_ERROR;
+                int status_code = (error_msg.find("Session not found") != std::string::npos ||
+                                   error_msg.find("No DSP file found") != std::string::npos)
+                                      ? MHD_HTTP_NOT_FOUND
+                                      : MHD_HTTP_INTERNAL_SERVER_ERROR;
                 return send_page(connection, error_msg.c_str(), error_msg.size(), status_code, "text/plain");
             }
-            
+
             fs::path webapp_dir = fDirectory / sha1 / "webapp";
             if (fs::exists(webapp_dir) && fs::is_directory(webapp_dir)) {
                 // Create temporary ZIP file
@@ -1741,7 +1743,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
                         fs::remove(temp_zip);
                     } catch (const fs::filesystem_error& e) {
                         if (gVerbosity >= 1) {
-                            std::cerr << "Warning: Could not remove temp webapp ZIP: " << e.code().message() << std::endl;
+                            std::cerr << "Warning: Could not remove temp webapp ZIP: " << e.code().message()
+                                      << std::endl;
                         }
                     }
                     return result;
@@ -1785,44 +1788,51 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         if (gVerbosity >= 2) {
             std::cerr << "DEBUG: Processing webapp asset URL: " << url << std::endl;
         }
-        
+
         // Find the position of "/webapp/"
         size_t webapp_pos = url.find("/webapp/");
         if (webapp_pos != std::string::npos) {
             // Extract SHA (everything before /webapp/)
             std::string sha1 = url.substr(1, webapp_pos - 1);  // Skip leading '/'
-            
+
             // Extract asset path (everything after /webapp/)
             std::string asset_path = url.substr(webapp_pos + 8);  // Skip "/webapp/"
-            
+
             if (!sha1.empty() && !asset_path.empty()) {
                 auto session_dir = fDirectory / sha1;
                 auto webapp_file = session_dir / "webapp" / asset_path;
-                
+
                 if (fs::exists(webapp_file)) {
                     // Determine MIME type based on file extension
-                    std::string ext = webapp_file.extension().string();
+                    std::string ext       = webapp_file.extension().string();
                     const char* mime_type = "application/octet-stream";
-                    if (ext == ".html") mime_type = "text/html";
-                    else if (ext == ".js") mime_type = "application/javascript";
-                    else if (ext == ".css") mime_type = "text/css";
-                    else if (ext == ".wasm") mime_type = "application/wasm";
-                    else if (ext == ".json") mime_type = "application/json";
-                    else if (ext == ".png") mime_type = "image/png";
-                    else if (ext == ".svg") mime_type = "image/svg+xml";
-                    
+                    if (ext == ".html")
+                        mime_type = "text/html";
+                    else if (ext == ".js")
+                        mime_type = "application/javascript";
+                    else if (ext == ".css")
+                        mime_type = "text/css";
+                    else if (ext == ".wasm")
+                        mime_type = "application/wasm";
+                    else if (ext == ".json")
+                        mime_type = "application/json";
+                    else if (ext == ".png")
+                        mime_type = "image/png";
+                    else if (ext == ".svg")
+                        mime_type = "image/svg+xml";
+
                     return send_file(connection, webapp_file, mime_type);
                 }
             }
         }
-        
+
         if (gVerbosity >= 2) {
             std::cerr << "DEBUG: Webapp asset not found for URL: " << url << std::endl;
         }
         std::string error_msg = "Webapp asset not found";
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
 
-    } else if (url.find(".js") != std::string::npos || url.find(".wasm") != std::string::npos || 
+    } else if (url.find(".js") != std::string::npos || url.find(".wasm") != std::string::npos ||
                url.find(".css") != std::string::npos || url.find(".json") != std::string::npos ||
                url.find(".png") != std::string::npos) {
         // Handle webapp asset requests that come as direct paths (for iframe compatibility)
@@ -1830,41 +1840,48 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         std::vector<std::string> parts = decomposeURL(url);
         if (parts.size() >= 2) {
             std::string sha1 = parts[1];
-            
+
             // Reconstruct the full asset path (everything after /<sha>/)
             std::string asset_path = "";
             for (size_t i = 2; i < parts.size(); i++) {
                 if (!asset_path.empty()) asset_path += "/";
                 asset_path += parts[i];
             }
-            
+
             auto session_dir = fDirectory / sha1;
             auto webapp_file = session_dir / "webapp" / asset_path;
-            
+
             if (fs::exists(webapp_file)) {
                 // Determine MIME type based on file extension
-                std::string ext = webapp_file.extension().string();
+                std::string ext       = webapp_file.extension().string();
                 const char* mime_type = "application/octet-stream";
-                if (ext == ".html") mime_type = "text/html";
-                else if (ext == ".js") mime_type = "application/javascript";
-                else if (ext == ".css") mime_type = "text/css";
-                else if (ext == ".wasm") mime_type = "application/wasm";
-                else if (ext == ".json") mime_type = "application/json";
-                else if (ext == ".png") mime_type = "image/png";
-                else if (ext == ".svg") mime_type = "image/svg+xml";
-                
+                if (ext == ".html")
+                    mime_type = "text/html";
+                else if (ext == ".js")
+                    mime_type = "application/javascript";
+                else if (ext == ".css")
+                    mime_type = "text/css";
+                else if (ext == ".wasm")
+                    mime_type = "application/wasm";
+                else if (ext == ".json")
+                    mime_type = "application/json";
+                else if (ext == ".png")
+                    mime_type = "image/png";
+                else if (ext == ".svg")
+                    mime_type = "image/svg+xml";
+
                 if (gVerbosity >= 2) {
                     std::cerr << "Serving webapp asset: " << webapp_file << " as " << mime_type << std::endl;
                 }
-                
+
                 return send_file(connection, webapp_file, mime_type);
             }
         }
-        
+
         // If not found as webapp asset, return 404
         std::string error_msg = "Webapp asset not found: " + url;
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
-        
+
     } else if (matchURL(url, "/sessions/list")) {
         return serveSessionsList(connection);
 
@@ -1945,7 +1962,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     } else {
         fulldir = getDirectory() / url_parent;
     }
-    fs::path    target;
+    fs::path target;
     // For web/pwa URLs, target includes the relative path after pwa/pwa-poly
     if (U.size() >= 4 && U[2] == "web" && (U[3] == "pwa" || U[3] == "pwa-poly")) {
         // Reconstruct path from segment 4 onwards: /{sha}/web/pwa/js/app.js -> js/app.js
@@ -1973,7 +1990,7 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 
     // Check if we need to create the target directory on demand
     // URL format: /{sha1}/{platform}/{architecture}/{target} or /{sha1}/web/pwa/{asset}
-    if (U.size() >= 4 && !fs::exists(makefile) && 
+    if (U.size() >= 4 && !fs::exists(makefile) &&
         (U[2] != "web" || (U[2] == "web" && (U[3] == "pwa" || U[3] == "pwa-poly")))) {
         std::string platform     = U[2];
         std::string architecture = U[3];
@@ -2209,17 +2226,17 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
                   //<< ", transfer_encoding: " << transfer_encoding
                   << ", data pointer: " << (void*)data << ", size: " << size << ")" << std::endl;
     }
-    
+
     // SECURITY: Validate filename before processing
     if (!isSecureFilename(std::string(filename))) {
         if (gVerbosity >= 1) {
             std::cerr << "SECURITY: Rejecting unsafe filename: " << filename << std::endl;
         }
         con_info->answerstring = errorpage;
-        con_info->answercode = MHD_HTTP_BAD_REQUEST;
+        con_info->answercode   = MHD_HTTP_BAD_REQUEST;
         return MHD_NO;
     }
-    
+
     if (con_info->tmppath.empty()) {
         con_info->filename = filename;
         // Generate unique path using random number
@@ -2404,14 +2421,14 @@ int FaustServer::serveSignalsSvg(struct MHD_Connection* connection, const std::s
 
     // Generate signals diagram
     std::string options_str = readFaustOptions(session_dir);
-    std::string dot_file     = main_dsp_file + "-sig.dot";
+    std::string dot_file    = main_dsp_file + "-sig.dot";
     // SECURITY: Separate protections for faust vs dot commands
     // Faust -sg: strict limits (30s, stack protection) - same DSP as main compilation
     // dot: generous timeout (180s = 3min) but no stack limit - can be legitimately slow
     // Note: ulimit -v (virtual memory) not supported on macOS, removed for compatibility
-    std::string generate_cmd = "cd " + sourcecode_dir.string() + 
-                               " && (ulimit -s 8192; ulimit -t 30; faust " + options_str + (options_str.empty() ? "" : " ") + "-sg " + main_dsp_file + " -o /dev/null)" +
-                               " && (ulimit -t 180; dot -Tsvg " + dot_file + " -o ../signals.svg)" +
+    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && (ulimit -s 8192; ulimit -t 30; faust " +
+                               options_str + (options_str.empty() ? "" : " ") + "-sg " + main_dsp_file +
+                               " -o /dev/null)" + " && (ulimit -t 180; dot -Tsvg " + dot_file + " -o ../signals.svg)" +
                                " && rm " + dot_file;
 
     if (gVerbosity >= 2) {
@@ -2496,10 +2513,11 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
     }
 
     // Generate task diagram
-    std::string options_str = readFaustOptions(session_dir);
+    std::string options_str  = readFaustOptions(session_dir);
     std::string dot_file     = main_dsp_file + ".dot";
-    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust " + options_str + (options_str.empty() ? "" : " ") + "-vec -tg " + main_dsp_file +
-                               " -o /dev/null" + " && dot -Tsvg " + dot_file + " -o ../tasks.svg" + " && rm " + dot_file;
+    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust " + options_str +
+                               (options_str.empty() ? "" : " ") + "-vec -tg " + main_dsp_file + " -o /dev/null" +
+                               " && dot -Tsvg " + dot_file + " -o ../tasks.svg" + " && rm " + dot_file;
 
     if (gVerbosity >= 2) {
         std::cerr << "Executing: " << generate_cmd << std::endl;
@@ -2536,6 +2554,10 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
 //
 bool FaustServer::ensure_webapp_exists(const std::string& sha1, std::string& error_msg)
 {
+    if (gVerbosity >= 1) {
+        std::cerr << "ENSURE WEBAPP EXISTS for " << sha1 << std::endl;
+    }
+
     auto session_dir = fDirectory / sha1;
     if (!fs::exists(session_dir)) {
         error_msg = "Session not found: " + sha1;
@@ -2543,8 +2565,8 @@ bool FaustServer::ensure_webapp_exists(const std::string& sha1, std::string& err
     }
 
     auto sourcecode_dir = session_dir / "sourcecode";
-    auto webapp_dir = session_dir / "webapp";
-    
+    auto webapp_dir     = session_dir / "webapp";
+
     // Check if webapp already exists
     auto index_html_path = webapp_dir / "index.html";
     if (fs::exists(index_html_path)) {
@@ -2553,11 +2575,11 @@ bool FaustServer::ensure_webapp_exists(const std::string& sha1, std::string& err
         }
         return true;
     }
-    
+
     if (gVerbosity >= 2) {
         std::cerr << "Generating webapp for " << sha1 << std::endl;
     }
-    
+
     // Get the main DSP file name
     std::string main_dsp_file;
     for (const auto& entry : fs::directory_iterator(sourcecode_dir)) {
@@ -2566,7 +2588,7 @@ bool FaustServer::ensure_webapp_exists(const std::string& sha1, std::string& err
             break;
         }
     }
-    
+
     if (main_dsp_file.empty()) {
         error_msg = "No DSP file found in session";
         return false;
@@ -2577,7 +2599,8 @@ bool FaustServer::ensure_webapp_exists(const std::string& sha1, std::string& err
     }
 
     // Generate web application using faust2wasm-ts
-    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust2wasm-ts " + main_dsp_file + " ../webapp -pwa 2> ../errors.log";
+    std::string generate_cmd =
+        "cd " + sourcecode_dir.string() + " && faust2wasm-ts " + main_dsp_file + " ../webapp -pwa 2> ../errors.log";
 
     if (gVerbosity >= 2) {
         std::cerr << "Executing: " << generate_cmd << std::endl;
@@ -2615,14 +2638,15 @@ int FaustServer::generate_webapp_view(struct MHD_Connection* connection, const s
 {
     std::string error_msg;
     if (!ensure_webapp_exists(sha1, error_msg)) {
-        int status_code = (error_msg.find("Session not found") != std::string::npos || 
-                          error_msg.find("No DSP file found") != std::string::npos) ? 
-                         MHD_HTTP_NOT_FOUND : MHD_HTTP_INTERNAL_SERVER_ERROR;
+        int status_code = (error_msg.find("Session not found") != std::string::npos ||
+                           error_msg.find("No DSP file found") != std::string::npos)
+                              ? MHD_HTTP_NOT_FOUND
+                              : MHD_HTTP_INTERNAL_SERVER_ERROR;
         return send_page(connection, error_msg.c_str(), error_msg.size(), status_code, "text/plain");
     }
-    
+
     // Webapp exists, serve index.html
-    auto webapp_dir = fDirectory / sha1 / "webapp";
+    auto webapp_dir      = fDirectory / sha1 / "webapp";
     auto index_html_path = webapp_dir / "index.html";
     return send_file(connection, index_html_path, "text/html");
 }
@@ -2644,13 +2668,13 @@ int FaustServer::serveSessionsList(struct MHD_Connection* connection)
         // Iterate through all session directories
         if (fs::exists(fDirectory) && fs::is_directory(fDirectory)) {
             std::vector<std::pair<fs::path, std::time_t>> sessions;
-            
+
             // Collect all sessions with their modification times
             for (const auto& entry : fs::directory_iterator(fDirectory)) {
                 if (entry.is_directory()) {
-                    fs::path session_dir = entry.path();
+                    fs::path session_dir   = entry.path();
                     fs::path filename_file = session_dir / "filename.txt";
-                    
+
                     // Only include sessions that have a filename.txt file
                     if (fs::exists(filename_file)) {
                         std::time_t mod_time = fs::last_write_time(session_dir).time_since_epoch().count();
@@ -2658,16 +2682,16 @@ int FaustServer::serveSessionsList(struct MHD_Connection* connection)
                     }
                 }
             }
-            
+
             // Sort sessions by modification time (oldest first)
-            std::sort(sessions.begin(), sessions.end(), 
-                     [](const auto& a, const auto& b) { return a.second < b.second; });
-            
+            std::sort(sessions.begin(), sessions.end(),
+                      [](const auto& a, const auto& b) { return a.second < b.second; });
+
             // Generate JSON for each session
             for (const auto& [session_dir, mod_time] : sessions) {
-                std::string sha1 = session_dir.filename().string();
-                fs::path filename_file = session_dir / "filename.txt";
-                
+                std::string sha1          = session_dir.filename().string();
+                fs::path    filename_file = session_dir / "filename.txt";
+
                 // Read the original filename
                 std::string filename = "unknown.dsp";
                 try {
@@ -2680,15 +2704,16 @@ int FaustServer::serveSessionsList(struct MHD_Connection* connection)
                     }
                 } catch (const std::exception& e) {
                     if (gVerbosity >= 1) {
-                        std::cerr << "Warning: Could not read filename for session " << sha1 << ": " << e.what() << std::endl;
+                        std::cerr << "Warning: Could not read filename for session " << sha1 << ": " << e.what()
+                                  << std::endl;
                     }
                 }
-                
+
                 if (!first) {
                     json << ",\n";
                 }
                 first = false;
-                
+
                 json << "    {\n";
                 json << "      \"sha1\": \"" << sha1 << "\",\n";
                 json << "      \"filename\": \"" << filename << "\",\n";
@@ -2705,11 +2730,11 @@ int FaustServer::serveSessionsList(struct MHD_Connection* connection)
     }
 
     json << "\n  ]\n}";
-    
+
     std::string json_str = json.str();
     if (gVerbosity >= 2) {
         std::cerr << "Returning " << (first ? 0 : json_str.length()) << " bytes of sessions data" << std::endl;
     }
-    
+
     return send_page(connection, json_str.c_str(), json_str.size(), MHD_HTTP_OK, "application/json");
 }
