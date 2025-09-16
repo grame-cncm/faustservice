@@ -2229,30 +2229,8 @@
             platformSelect.innerHTML = '<option value="">Select a platform...</option>';
             console.log('Cleared platform select');
             
-            // Platform names without emojis
-            const platformNames = {
-                'osx': 'macOS',
-                'linux': 'Linux', 
-                'web': 'Web',
-                'ios': 'iOS',
-                'android': 'Android',
-                'unity': 'Unity',
-                'juce': 'JUCE',
-                'windows64': 'Windows 64-bit',
-                'windows32': 'Windows 32-bit',
-                'vcvrack': 'VCV Rack',
-                'bela': 'Bela',
-                'source': 'Source Code',
-                'misc': 'Misc',
-                'jsfx': 'JSFX',
-                'rnbo': 'RNBO',
-                'ros': 'ROS'
-            };
-            
-            // Sort platforms for better UX (popular ones first)
-            const popularPlatforms = ['osx', 'linux', 'web', 'ios', 'android', 'unity', 'juce'];
-            const otherPlatforms = Object.keys(availableTargets).filter(p => !popularPlatforms.includes(p)).sort();
-            const sortedPlatforms = [...popularPlatforms.filter(p => availableTargets[p]), ...otherPlatforms];
+            // Sort platforms alphabetically
+            const sortedPlatforms = Object.keys(availableTargets).sort();
             
             console.log('Sorted platforms:', sortedPlatforms);
             
@@ -2261,10 +2239,10 @@
                 if (availableTargets[platform] && availableTargets[platform].length > 0) {
                     const option = document.createElement('option');
                     option.value = platform;
-                    option.textContent = platformNames[platform] || platform;
+                    option.textContent = platform;
                     platformSelect.appendChild(option);
                     optionsAdded++;
-                    console.log(`Added platform: ${platform} (${platformNames[platform] || platform})`);
+                    console.log(`Added platform: ${platform}`);
                 }
             });
             
