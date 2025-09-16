@@ -1989,9 +1989,8 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     if (gVerbosity >= 2) std::cerr << "makefile : " << makefile << std::endl;
 
     // Check if we need to create the target directory on demand
-    // URL format: /{sha1}/{platform}/{architecture}/{target} or /{sha1}/web/pwa/{asset}
-    if (U.size() >= 4 && !fs::exists(makefile) &&
-        (U[2] != "web" || (U[2] == "web" && (U[3] == "pwa" || U[3] == "pwa-poly")))) {
+    // URL format: /{sha1}/{platform}/{architecture}/{target} or /{sha1}/web/{architecture}/{asset}
+    if (U.size() >= 4 && !fs::exists(makefile)) {
         std::string platform     = U[2];
         std::string architecture = U[3];
         fs::path    session_dir  = getDirectory() / U[1];
