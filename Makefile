@@ -20,10 +20,12 @@ CXXFLAGS = -Wall -Wextra -O3
 STD=c++17
 endif
 
+SOURCES = htmlPages.cpp LRUSessionsCache.cpp main.cpp match.cpp server.cpp utilities.cpp
+
 all : faustweb
 
-faustweb : *.cpp *.hh
-	$(CXX) -std=$(STD) $(CXXFLAGS) *.cpp $(LDFLAGS) \
+faustweb : $(SOURCES) *.hh
+	$(CXX) -std=$(STD) $(CXXFLAGS) $(SOURCES) $(LDFLAGS) \
 	-lmicrohttpd \
 	-larchive -lcrypto -lm \
 	-o faustweb
