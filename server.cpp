@@ -83,7 +83,6 @@ static std::string generate_sha1(connection_info_struct* con_info)
     int length = myFile.tellg();
     myFile.seekg(0, std::ios::beg);
 
-    // char content[length];
     char* content = (char*)malloc(length);
     if (content == 0) {
         return "malloc-error";
@@ -91,19 +90,8 @@ static std::string generate_sha1(connection_info_struct* con_info)
     myFile.read(content, length);
     myFile.close();
 
-    // compute SHA1 key
-    unsigned char obuf[20];
-    SHA1((const unsigned char*)content, length, obuf);
-
-    // convert SHA1 key into hexadecimal string
-    std::string sha1key;
-    for (int i = 0; i < 20; i++) {
-        const char* H  = "0123456789ABCDEF";
-        char        c1 = H[(obuf[i] >> 4)];
-        char        c2 = H[(obuf[i] & 15)];
-        sha1key += tolower(c1);
-        sha1key += tolower(c2);
-    }
+    // Use new SHA1 calculation that handles both ZIP and DSP files consistently
+    std::string sha1key = calculateContentSHA(content, length);
     free(content);
 
     return sha1key;

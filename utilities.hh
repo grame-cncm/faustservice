@@ -39,4 +39,11 @@ using namespace std;
 
 typedef map<string, string> TArgs;
 
+// Calculate SHA1 from content, handling both raw DSP files and ZIP archives
+// For ZIPs, extracts and normalizes content to ensure reproducible hashes
+std::string calculateContentSHA(const char* data, size_t size);
+
+// Calculate SHA1 from a file path
+std::string calculateFileSHA(const std::string& filepath);
+
 #endif
