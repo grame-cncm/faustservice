@@ -53,3 +53,16 @@ void LRUSessionsCache::dispose(const fs::path& s)
         std::cerr << "ERROR REMOVING CACHE ENTRY " << s << " : " << e.code().message() << std::endl;
     }
 }
+
+// remove all sessions from the cache
+void LRUSessionsCache::clear()
+{
+    if (gVerbosity >= 1) std::cerr << "CLEARING SESSIONS CACHE " << std::endl;
+    try {
+        for (const auto& entry : fs::directory_iterator(fSessionsDir)) {
+            fs::remove_all(entry.path());
+        }
+    } catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "ERROR REMOVING CACHE SESSIONS " << " : " << e.code().message() << std::endl;
+    }
+}

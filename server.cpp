@@ -2330,6 +2330,9 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
     }
     ss << std::endl << "}";
     fTargets = ss.str();
+
+    // Clear cache before running the server
+    fSessionCache.clear();
 }
 
 //------------------------------------------------------------------

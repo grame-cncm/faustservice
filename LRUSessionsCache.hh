@@ -19,4 +19,5 @@ class LRUSessionsCache {
 
     void refer(const fs::path& aSession);    // refer to a session in the cache
     void dispose(const fs::path& aSession);  // LRU session is removed from the cache
+    void clear();  // Clear the cache, all LRU sessions are removed
 };
