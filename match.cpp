@@ -75,12 +75,12 @@ bool matchURL(const std::string& url, const std::string& pat)
 {
     std::vector<std::string> ignore;
     bool           r = matchURL(url, pat, ignore);
-    if (gVerbosity >= 2) {
-        if (r)
-            std::cout << "PATTERN " << pat << " MATCHES URL " << url << std::endl;
-        else
-            std::cout << "PATTERN " << pat << " DOES NOT MATCH URL " << url << std::endl;
-    }
+
+    if (r && (gVerbosity >= 1))
+        std::cout << "PATTERN " << pat << " MATCHES URL " << url << std::endl;
+    if (!r && (gVerbosity >= 2))
+        std::cout << "PATTERN " << pat << " DOES NOT MATCH URL " << url << std::endl;
+    
     return r;
 }
 

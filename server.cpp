@@ -503,7 +503,7 @@ static bool isSecureFilename(const std::string& filename)
     bool has_valid_ext = false;
     if (filename.length() >= 4) {
         std::string ext = filename.substr(filename.length() - 4);
-        if (ext == ".dsp" || ext == ".zip") {
+        if (ext == ".dsp" || ext == ".lib" || ext == ".zip"|| ext == ".wav") {
             has_valid_ext = true;
         }
     }
@@ -891,7 +891,7 @@ static int validate_faust(connection_info_struct* con_info)
     fs::path    session_path    = fs::path(con_info->directory) / fs::path(sha1);
     fs::path    sourcecode_path = session_path / "sourcecode";
 
-    if (gVerbosity >= 2) std::cerr << "Session creation for: " << sha1 << std::endl;
+    if (gVerbosity >= 1) std::cerr << "Session creation for: " << sha1 << std::endl;
 
     // Create session structure
     if (!fs::is_directory(session_path)) {
@@ -970,7 +970,7 @@ static int validate_faust(connection_info_struct* con_info)
                 // SECURITY: Skip files with unsafe names (silent removal)
                 std::string entry_filename = entry_path.filename().string();
                 if (!entry_filename.empty() && !isSecureFilename(entry_filename)) {
-                    if (gVerbosity >= 2) {
+                    if (gVerbosity >= 1) {
                         std::cerr << "SECURITY: Silently removing unsafe file from ZIP: " << entry_filename
                                   << std::endl;
                     }
