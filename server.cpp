@@ -516,7 +516,7 @@ static bool isSecureFilename(const std::string& filename)
 
     // Check characters - only alphanumeric, dot, dash allowed
     for (char c : filename) {
-        if (!std::isalnum(c) && c != '.' && c != '-') {
+        if (!std::isalnum(c) && c != '_' && c != '.' && c != '-') {
             if (gVerbosity >= 2) {
                 std::cerr << "Invalid character in filename '" << filename << "': '" << c << "' (ASCII " << (int)c
                           << ")" << std::endl;
@@ -2128,11 +2128,13 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
         struct connection_info_struct* con_info = (connection_info_struct*)*con_cls;
 
         if (0 != *upload_data_size) {
+            // Still data to upload
             if (gVerbosity >= 2) std::cerr << "POST processing, we have data to upload !" << std::endl;
             int result        = MHD_post_process(con_info->postprocessor, upload_data, *upload_data_size);
             *upload_data_size = 0;
             return result;
         } else {
+            // No more data to upload, we can close the file
             if (gVerbosity >= 2) std::cerr << "POST processing, NO MORE data to upload !" << std::endl;
             // need to close the file before request_completed
             // so that it can be opened by the methods below
