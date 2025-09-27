@@ -1438,14 +1438,10 @@
                 isCompiling = true;
                 updateButtonState();
                 
-                // Use direct compilation API
-                const formData = new FormData();
-                formData.append('file', selectedFile);
-                
-                const url = `/compile/${selectedTarget.platform}/${selectedTarget.arch}/binary.zip`;
+                // Use GET with existing session SHA1 instead of re-posting file
+                const url = `/${currentSha1}/${selectedTarget.platform}/${selectedTarget.arch}/binary.zip`;
                 const response = await fetch(url, {
-                    method: 'POST',
-                    body: formData
+                    method: 'GET'
                 });
                 
                 if (response.ok) {
