@@ -1651,7 +1651,17 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         return makeAndSendResourceFile(connection, url);
 
     } else if (matchURL(url, "/*/diagram/*") && matchExtension(url, ".svg")) {
-        return makeAndSendResourceFile(connection, url);
+        // Legacy redirection: /sha/diagram/foo.svg -> /sha/svg/foo.svg
+        std::vector<std::string> U = decomposeURL(url);
+        if (U.size() >= 4) {
+            // URL format: /sha1/diagram/filename.svg -> serve from /sha1/svg/filename.svg
+            fs::path filepath = fDirectory / U[1] / "svg" / U[3];
+            if (fs::exists(filepath)) {
+                return send_file(connection, filepath, "image/svg+xml");
+            }
+        }
+        std::string error_msg = "SVG diagram not found";
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "image/svg+xml");
 
     } else if (matchURL(url, "/*/generated.cpp")) {
         // Serve the generated C++ file from validate_faust
