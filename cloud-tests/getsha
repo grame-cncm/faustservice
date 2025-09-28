@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# USAGE: getsha <url> <fichier> -> <sha>
+# Upload un fichier DSP et retourne son SHA1
+
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <url> <fichier>"
+    echo "Exemple: $0 http://localhost:8888 kisana.dsp"
+    exit 1
+fi
+
+URL="$1"
+FILE="$2"
+
+if [ ! -f "$FILE" ]; then
+    echo "Erreur: fichier '$FILE' introuvable" >&2
+    exit 1
+fi
+
+# Upload du fichier et récupération du SHA
+response=$(curl -s -F"file=@\"$FILE\";filename=\"$FILE\"" "$URL/")
+
+# Extraction du SHA (40 caractères hexadécimaux)
+sha=$(echo "$response" | grep -oE '[a-f0-9]{40}' | head -1)
+
+if [ -n "$sha" ]; then
+    echo "$sha"
+    exit 0
+else
+    echo "Erreur: impossible d'obtenir le SHA" >&2
+    echo "Réponse du serveur:" >&2
+    echo "$response" | head -c 500 >&2
+    exit 1
+fi

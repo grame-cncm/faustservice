@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# USAGE: getfile <url> <sha> <endpoint> [output_file]
+# Récupère un fichier et le sauvegarde automatiquement
+
+if [ "$#" -lt 3 ]; then
+    echo "Usage: $0 <url> <sha> <endpoint> [output_file]"
+    echo "Exemple: $0 http://localhost:8888 abc123 linux/alsa-gtk/binary.zip"
+    echo "         $0 http://localhost:8888 abc123 generated.cpp mycode.cpp"
+    exit 1
+fi
+
+URL="$1"
+SHA="$2"
+ENDPOINT="$3"
+OUTPUT_FILE="$4"
+
+# Si pas de nom de fichier spécifié, utiliser le nom du endpoint
+if [ -z "$OUTPUT_FILE" ]; then
+    OUTPUT_FILE=$(basename "$ENDPOINT")
+fi
+
+# Forge l'URL complète
+ENDPOINT_CLEAN=$(echo "$ENDPOINT" | sed 's|^/||')
+FULL_URL="$URL/$SHA/$ENDPOINT_CLEAN"
+
+echo "GET $FULL_URL"
+echo "Sauvegarde vers: $OUTPUT_FILE"
+
+# Télécharge et sauvegarde
+if curl -s -f "$FULL_URL" -o "$OUTPUT_FILE"; then
+    echo "✓ Fichier téléchargé: $OUTPUT_FILE ($(du -h "$OUTPUT_FILE" | cut -f1))"
+
+    # Affiche le type de fichier
+    file_type=$(file -b "$OUTPUT_FILE")
+    echo "Type: $file_type"
+else
+    echo "✗ Erreur lors du téléchargement"
+    rm -f "$OUTPUT_FILE"  # Nettoie le fichier vide en cas d'erreur
+    exit 1
+fi

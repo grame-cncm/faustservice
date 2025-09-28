@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# USAGE: getshacontent <url> <sha> <endpoint>
+# Fait un GET sur <url>/<sha>/<endpoint>
+
+if [ "$#" -ne 3 ]; then
+    echo "Usage: $0 <url> <sha> <endpoint>"
+    echo "Exemple: $0 http://localhost:8888 abc123def456 generated.cpp"
+    echo "         $0 http://localhost:8888 abc123def456 errors.log"
+    echo "         $0 http://localhost:8888 abc123def456 svg/process.svg"
+    exit 1
+fi
+
+URL="$1"
+SHA="$2"
+ENDPOINT="$3"
+
+# Forge l'URL complète (enlève le / au début de ENDPOINT si présent)
+ENDPOINT_CLEAN=$(echo "$ENDPOINT" | sed 's|^/||')
+FULL_URL="$URL/$SHA/$ENDPOINT_CLEAN"
+
+echo "GET $FULL_URL" >&2
+
+# Fait le GET et retourne le contenu avec le code de statut
+response=$(curl -s -w "\n%{http_code}" "$FULL_URL")
+status_code=$(echo "$response" | tail -n1)
+content=$(echo "$response" | head -n -1)
+
+echo "Status: $status_code" >&2
+
+if [ "$status_code" = "200" ]; then
+    echo "$content"
+else
+    echo "Erreur HTTP $status_code" >&2
+    echo "$content" >&2
+    exit 1
+fi
