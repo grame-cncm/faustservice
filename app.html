@@ -1168,12 +1168,12 @@
                 };
             }
             
-            // Check characters - only alphanumeric, dot, dash allowed
-            const allowedChars = /^[a-zA-Z0-9.\-]+$/;
+            // Check characters - only alphanumeric, underscore, dot, dash allowed (match server validation)
+            const allowedChars = /^[a-zA-Z0-9._\-]+$/;
             if (!allowedChars.test(filename)) {
                 return { 
                     valid: false, 
-                    error: `❌ Invalid characters in filename\n\n🔒 Only letters, numbers, dots and dashes allowed\n📁 Your file: ${filename}\n\n✅ Example: my-synth.dsp` 
+                    error: `❌ Invalid characters in filename\n\n🔒 Only letters, numbers, underscores, dots and dashes allowed\n📁 Your file: ${filename}\n\n✅ Examples: my-synth.dsp, my_effect.dsp` 
                 };
             }
             
