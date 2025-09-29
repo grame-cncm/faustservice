@@ -78,299 +78,7 @@ static std::string generate_sha1(connection_info_struct* con_info)
 {
     fs::path filepath = fs::path(con_info->tmppath) / fs::path(con_info->filename);
 
-    // read file content
-    std::ifstream myFile(filepath.string().c_str(), std::ios::in | std::ios::binary);
-    myFile.seekg(0, std::ios::end);
-    int length = myFile.tellg();
-    myFile.seekg(0, std::ios::beg);
-
-    // char content[length];
-    char* content = (char*)malloc(length);
-    if (content == 0) {
-        return "malloc-error";
-    }
-    myFile.read(content, length);
-    myFile.close();
-
-    // compute SHA1 key
-    unsigned char obuf[20];
-    SHA1((const unsigned char*)content, length, obuf);
-
-    // convert SHA1 key into hexadecimal string
-    std::string sha1key;
-    for (int i = 0; i < 20; i++) {
-        const char* H  = "0123456789ABCDEF";
-        char        c1 = H[(obuf[i] >> 4)];
-        char        c2 = H[(obuf[i] & 15)];
-        sha1key += tolower(c1);
-        sha1key += tolower(c2);
-    }
-    free(content);
-
-    return sha1key;
-}
-
-/*
- * Creates an arboreal structure in root with the appropriate makefiles.
- */
-
-// Create a specific target directory on demand
-static bool create_target_directory(fs::path srcdir, fs::path sha1path, fs::path makefile_directory,
-                                    const std::string& platform, const std::string& architecture)
-{
-    if (gVerbosity >= 2) {
-        std::cerr << "ENTER create_target_directory(" << sha1path << ", platform=" << platform
-                  << ", arch=" << architecture << ")" << std::endl;
-    }
-
-    // First, ensure the base Makefile.none is copied for non-architecture-specific targets
-    // Only if it doesn't already exist
-    fs::path base_makefile        = fs::path(makefile_directory) / "Makefile.none";
-    fs::path target_base_makefile = sha1path / "Makefile";
-    if (fs::exists(base_makefile) && !fs::exists(target_base_makefile)) {
-        fs::copy_file(base_makefile, target_base_makefile);
-        copyFaustOrAudioFiles(srcdir, sha1path);
-    }
-
-    // Look for the specific makefile
-    fs::path platform_dir = makefile_directory / platform;
-    if (!fs::exists(platform_dir) || !fs::is_directory(platform_dir)) {
-        if (gVerbosity >= 1) {
-            std::cerr << "Platform directory not found: " << platform_dir << std::endl;
-        }
-        return false;
-    }
-
-    fs::path makefile_path = platform_dir / ("Makefile." + architecture);
-    if (!fs::exists(makefile_path)) {
-        if (gVerbosity >= 1) {
-            std::cerr << "Makefile not found: " << makefile_path << std::endl;
-        }
-        return false;
-    }
-
-    // Create the target directory
-    fs::path target_dir = sha1path / "targets" / platform / architecture;
-    try {
-        fs::create_directories(target_dir);
-        fs::copy_file(makefile_path, target_dir / "Makefile", fs::copy_options::overwrite_existing);
-        copyFaustOrAudioFiles(srcdir / "sourcecode", target_dir);
-
-        if (gVerbosity >= 2) {
-            std::cerr << "Created target directory: " << target_dir << std::endl;
-        }
-        return true;
-    } catch (const fs::filesystem_error& e) {
-        std::cerr << "Error creating target directory " << target_dir << ": " << e.what() << std::endl;
-        return false;
-    }
-}
-
-// Create only basic session structure (no platform-specific directories)
-static void create_basic_session(fs::path srcdir, fs::path sha1path, fs::path makefile_directory)
-{
-    if (gVerbosity >= 2) {
-        std::cerr << "ENTER create_basic_session(" << sha1path << ", " << makefile_directory << ")" << std::endl;
-    }
-
-    // Only copy makefile.none to handle non-architecture-specific targets like mdoc.zip, etc
-    fs::path base_makefile = fs::path(makefile_directory) / "Makefile.none";
-    if (fs::exists(base_makefile)) {
-        fs::copy_file(base_makefile, sha1path / "Makefile", fs::copy_options::overwrite_existing);
-        copyFaustOrAudioFiles(srcdir, sha1path);
-    }
-
-    if (gVerbosity >= 2) {
-        std::cerr << "Created basic session structure in: " << sha1path << std::endl;
-    }
-}
-
-/*
- * Creates a ZIP file containing all SVG files from a directory
- */
-static bool create_svg_zip(const fs::path& svg_dir, const fs::path& zip_path)
-{
-    if (gVerbosity >= 2) {
-        std::cerr << "Creating SVG ZIP: " << svg_dir << " -> " << zip_path << std::endl;
-    }
-
-    struct archive* archive = archive_write_new();
-    if (!archive) {
-        std::cerr << "Error: Could not create archive" << std::endl;
-        return false;
-    }
-
-    // Set ZIP format
-    archive_write_set_format_zip(archive);
-    archive_write_add_filter_none(archive);
-
-    // Open the output file
-    if (archive_write_open_filename(archive, zip_path.string().c_str()) != ARCHIVE_OK) {
-        std::cerr << "Error: Could not open ZIP file: " << archive_error_string(archive) << std::endl;
-        archive_write_free(archive);
-        return false;
-    }
-
-    try {
-        // Iterate through all SVG files in the directory
-        for (const auto& entry : fs::directory_iterator(svg_dir)) {
-            if (entry.is_regular_file() && entry.path().extension() == ".svg") {
-                fs::path    svg_file = entry.path();
-                std::string filename = svg_file.filename().string();
-
-                // Read the SVG file
-                std::ifstream file(svg_file, std::ios::binary);
-                if (!file) {
-                    std::cerr << "Warning: Could not read SVG file: " << svg_file << std::endl;
-                    continue;
-                }
-
-                // Get file size
-                file.seekg(0, std::ios::end);
-                size_t file_size = file.tellg();
-                file.seekg(0, std::ios::beg);
-
-                // Read file content
-                std::vector<char> content(file_size);
-                file.read(content.data(), file_size);
-                file.close();
-
-                // Create archive entry
-                struct archive_entry* entry_hdr = archive_entry_new();
-                archive_entry_set_pathname(entry_hdr, filename.c_str());
-                archive_entry_set_size(entry_hdr, file_size);
-                archive_entry_set_filetype(entry_hdr, AE_IFREG);
-                archive_entry_set_perm(entry_hdr, 0644);
-
-                // Write header and data
-                if (archive_write_header(archive, entry_hdr) == ARCHIVE_OK) {
-                    archive_write_data(archive, content.data(), file_size);
-                }
-
-                archive_entry_free(entry_hdr);
-
-                if (gVerbosity >= 2) {
-                    std::cerr << "Added to ZIP: " << filename << " (" << file_size << " bytes)" << std::endl;
-                }
-            }
-        }
-    } catch (const fs::filesystem_error& e) {
-        std::cerr << "Error accessing SVG directory: " << e.what() << std::endl;
-        archive_write_free(archive);
-        return false;
-    }
-
-    // Close the archive
-    archive_write_close(archive);
-    archive_write_free(archive);
-
-    if (gVerbosity >= 2) {
-        std::cerr << "SVG ZIP created successfully: " << zip_path << std::endl;
-    }
-
-    return true;
-}
-
-/*
- * Creates a ZIP file containing all files from a webapp directory recursively
- */
-static bool create_webapp_zip(const fs::path& webapp_dir, const fs::path& zip_path)
-{
-    if (gVerbosity >= 2) {
-        std::cerr << "Creating webapp ZIP: " << webapp_dir << " -> " << zip_path << std::endl;
-    }
-
-    struct archive* archive = archive_write_new();
-    if (!archive) {
-        std::cerr << "Error: Could not create archive" << std::endl;
-        return false;
-    }
-
-    // Set ZIP format
-    archive_write_set_format_zip(archive);
-    archive_write_add_filter_none(archive);
-
-    // Open the output file
-    if (archive_write_open_filename(archive, zip_path.string().c_str()) != ARCHIVE_OK) {
-        std::cerr << "Error: Could not open ZIP file: " << archive_error_string(archive) << std::endl;
-        archive_write_free(archive);
-        return false;
-    }
-
-    try {
-        // Recursively iterate through all files in the webapp directory
-        for (const auto& entry : fs::recursive_directory_iterator(webapp_dir)) {
-            if (entry.is_regular_file()) {
-                fs::path file_path = entry.path();
-
-                // Get relative path from webapp_dir for ZIP entry name
-                fs::path    relative_path  = fs::relative(file_path, webapp_dir);
-                std::string zip_entry_name = relative_path.string();
-
-                if (gVerbosity >= 2) {
-                    std::cerr << "Adding to webapp ZIP: " << zip_entry_name << std::endl;
-                }
-
-                // Create archive entry
-                struct archive_entry* entry_archive = archive_entry_new();
-                archive_entry_set_pathname(entry_archive, zip_entry_name.c_str());
-                archive_entry_set_filetype(entry_archive, AE_IFREG);
-                archive_entry_set_perm(entry_archive, 0644);
-
-                // Get file size
-                std::uintmax_t file_size = fs::file_size(file_path);
-                archive_entry_set_size(entry_archive, file_size);
-
-                // Write header
-                if (archive_write_header(archive, entry_archive) != ARCHIVE_OK) {
-                    std::cerr << "Error writing header for " << zip_entry_name << ": " << archive_error_string(archive)
-                              << std::endl;
-                    archive_entry_free(entry_archive);
-                    continue;
-                }
-
-                // Read and write file content
-                std::ifstream file(file_path, std::ios::binary);
-                if (file.is_open()) {
-                    char buffer[8192];
-                    while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
-                        ssize_t bytes_written = archive_write_data(archive, buffer, file.gcount());
-                        if (bytes_written < 0) {
-                            std::cerr << "Error writing data for " << zip_entry_name << ": "
-                                      << archive_error_string(archive) << std::endl;
-                            break;
-                        }
-                    }
-                    file.close();
-                } else {
-                    std::cerr << "Error: Could not open file " << file_path << std::endl;
-                }
-
-                archive_entry_free(entry_archive);
-            }
-        }
-    } catch (const fs::filesystem_error& e) {
-        std::cerr << "Filesystem error while creating webapp ZIP: " << e.what() << std::endl;
-        archive_write_close(archive);
-        archive_write_free(archive);
-        return false;
-    }
-
-    archive_write_close(archive);
-    archive_write_free(archive);
-
-    if (gVerbosity >= 2) {
-        std::cerr << "Webapp ZIP created successfully: " << zip_path << std::endl;
-    }
-
-    return true;
-}
-
-// Legacy function - kept for compatibility but now calls create_basic_session
-void create_file_tree(fs::path srcdir, fs::path sha1path, fs::path makefile_directory)
-{
-    // Changed to only create basic structure instead of all directories
-    create_basic_session(srcdir, sha1path, makefile_directory);
+    return generateFileSHA1(filepath);
 }
 
 /*
@@ -418,77 +126,14 @@ static std::set<std::string> g_safe_numeric_options;
 static bool                  g_options_initialized = false;
 
 /**
- * Validate filename for security
- * Only allows: alphanumeric, dot, dash
- * Rejects: path traversal, shell metacharacters, Unicode, spaces
- * Maximum length: 100 characters
- * Required extensions: .dsp or .zip
- */
-static bool isSecureFilename(const std::string& filename)
-{
-    // Check length limits
-    if (filename.empty() || filename.length() > 100) {
-        if (gVerbosity >= 2) {
-            std::cerr << "Filename length invalid: " << filename.length() << " characters" << std::endl;
-        }
-        return false;
-    }
-
-    // Check for hidden files (starting with .)
-    if (filename[0] == '.') {
-        if (gVerbosity >= 2) {
-            std::cerr << "Hidden files not allowed: " << filename << std::endl;
-        }
-        return false;
-    }
-
-    // Check valid extensions
-    bool has_valid_ext = false;
-    if (filename.length() >= 4) {
-        std::string ext = filename.substr(filename.length() - 4);
-        if (ext == ".dsp" || ext == ".lib" || ext == ".zip" || ext == ".wav") {
-            has_valid_ext = true;
-        }
-    }
-    if (!has_valid_ext) {
-        if (gVerbosity >= 2) {
-            std::cerr << "Invalid file extension: " << filename << std::endl;
-        }
-        return false;
-    }
-
-    // Check characters - only alphanumeric, dot, dash allowed
-    for (char c : filename) {
-        if (!std::isalnum(c) && c != '_' && c != '.' && c != '-') {
-            if (gVerbosity >= 2) {
-                std::cerr << "Invalid character in filename '" << filename << "': '" << c << "' (ASCII " << (int)c
-                          << ")" << std::endl;
-            }
-            return false;
-        }
-    }
-
-    // Additional security checks
-    if (filename.find("..") != std::string::npos) {
-        if (gVerbosity >= 1) {
-            std::cerr << "Path traversal attempt in filename: " << filename << std::endl;
-        }
-        return false;
-    }
-
-    if (gVerbosity >= 3) {
-        std::cerr << "Filename validation passed: " << filename << std::endl;
-    }
-    return true;
-}
-
-/**
  * Initialize Faust options by parsing 'faust -h' output
  * Called once at server startup for future-proof option filtering
  */
 static bool initializeFaustOptions()
 {
-    if (g_options_initialized) return true;
+    if (g_options_initialized) {
+        return true;
+    }
 
     if (gVerbosity >= 2) {
         std::cerr << "Initializing Faust options from faust -h..." << std::endl;
@@ -529,7 +174,8 @@ static bool initializeFaustOptions()
 
             if (!token.empty() && token[0] == '-') {
                 // Handle options with parameters
-                if (line.find(" <n>") != std::string::npos || line.find(" <sec>") != std::string::npos ||
+                if (line.find(" <n>") != std::string::npos ||
+                    line.find(" <sec>") != std::string::npos ||
                     line.find(" <file>") != std::string::npos) {
                     g_safe_numeric_options.insert(token);
                 } else if (line.find(" <lang>") != std::string::npos) {
@@ -548,7 +194,8 @@ static bool initializeFaustOptions()
                     size_t long_end   = line.find_first_of(" \t", long_start);
                     if (long_end != std::string::npos) {
                         std::string long_option = line.substr(long_start, long_end - long_start);
-                        if (line.find(" <n>") != std::string::npos || line.find(" <sec>") != std::string::npos ||
+                        if (line.find(" <n>") != std::string::npos ||
+                            line.find(" <sec>") != std::string::npos ||
                             line.find(" <file>") != std::string::npos) {
                             g_safe_numeric_options.insert(long_option);
                         } else if (line.find(" <lang>") != std::string::npos) {
@@ -565,9 +212,10 @@ static bool initializeFaustOptions()
     pclose(faust_help);
 
     if (gVerbosity >= 2) {
-        std::cerr << "Initialized " << g_code_generation_options.size() << " code generation options, "
-                  << g_safe_numeric_options.size() << " numeric options, " << g_safe_enum_options.size()
-                  << " enum options" << std::endl;
+        std::cerr << "Initialized " << g_code_generation_options.size()
+                  << " code generation options, " << g_safe_numeric_options.size()
+                  << " numeric options, " << g_safe_enum_options.size() << " enum options"
+                  << std::endl;
     }
 
     g_options_initialized = true;
@@ -584,7 +232,8 @@ static std::string filterFaustOptions(const std::string& options)
     // Initialize options from faust -h if not done yet
     if (!initializeFaustOptions()) {
         if (gVerbosity >= 1) {
-            std::cerr << "Warning: Faust options not initialized, using fallback filtering" << std::endl;
+            std::cerr << "Warning: Faust options not initialized, using fallback filtering"
+                      << std::endl;
         }
     }
 
@@ -605,7 +254,8 @@ static std::string filterFaustOptions(const std::string& options)
             token.find('>') != std::string::npos || token.find('"') != std::string::npos ||
             token.find('\'') != std::string::npos || token.find('\\') != std::string::npos) {
             if (gVerbosity >= 1) {
-                std::cerr << "SECURITY: Shell metacharacters detected in option: " << token << std::endl;
+                std::cerr << "SECURITY: Shell metacharacters detected in option: " << token
+                          << std::endl;
             }
             continue;  // Skip this dangerous token
         }
@@ -629,7 +279,8 @@ static std::string filterFaustOptions(const std::string& options)
                     param.find('&') != std::string::npos || param.find('`') != std::string::npos ||
                     param.find('$') != std::string::npos || param.find('(') != std::string::npos) {
                     if (gVerbosity >= 1) {
-                        std::cerr << "SECURITY: Dangerous parameter for " << token << ": " << param << std::endl;
+                        std::cerr << "SECURITY: Dangerous parameter for " << token << ": " << param
+                                  << std::endl;
                     }
                     filtered_options.pop_back();  // Remove the option too
                     continue;
@@ -647,7 +298,8 @@ static std::string filterFaustOptions(const std::string& options)
                 if (valid_number && param.length() <= 20) {
                     filtered_options.push_back(param);
                     if (gVerbosity >= 2) {
-                        std::cerr << "Accepted numeric option: " << token << " " << param << std::endl;
+                        std::cerr << "Accepted numeric option: " << token << " " << param
+                                  << std::endl;
                     }
                 } else {
                     if (gVerbosity >= 1) {
@@ -668,7 +320,8 @@ static std::string filterFaustOptions(const std::string& options)
                     param.find('&') != std::string::npos || param.find('`') != std::string::npos ||
                     param.find('$') != std::string::npos) {
                     if (gVerbosity >= 1) {
-                        std::cerr << "SECURITY: Dangerous parameter for " << token << ": " << param << std::endl;
+                        std::cerr << "SECURITY: Dangerous parameter for " << token << ": " << param
+                                  << std::endl;
                     }
                     filtered_options.pop_back();  // Remove the option too
                     continue;
@@ -707,7 +360,9 @@ static std::string filterFaustOptions(const std::string& options)
     // Join filtered options back into a string
     std::ostringstream result;
     for (size_t i = 0; i < filtered_options.size(); ++i) {
-        if (i > 0) result << " ";
+        if (i > 0) {
+            result << " ";
+        }
         result << filtered_options[i];
     }
 
@@ -759,7 +414,8 @@ static std::string extractFaustOptions(const fs::path& dsp_file)
     size_t file_size = file.tellg();
     if (file_size > MAX_FILE_SIZE) {
         if (gVerbosity >= 1) {
-            std::cerr << "DSP file too large for options extraction: " << file_size << " bytes" << std::endl;
+            std::cerr << "DSP file too large for options extraction: " << file_size << " bytes"
+                      << std::endl;
         }
         return "";
     }
@@ -803,21 +459,23 @@ static std::string extractFaustOptions(const fs::path& dsp_file)
                     safe_options += c;
                 } else {
                     if (gVerbosity >= 2) {
-                        std::cerr << "Filtered dangerous character: '" << c << "' (ASCII " << (int)c << ")"
-                                  << std::endl;
+                        std::cerr << "Filtered dangerous character: '" << c << "' (ASCII " << (int)c
+                                  << ")" << std::endl;
                     }
                 }
             }
 
             if (gVerbosity >= 2) {
-                std::cerr << "Character-filtered faustoptions: '" << safe_options << "'" << std::endl;
+                std::cerr << "Character-filtered faustoptions: '" << safe_options << "'"
+                          << std::endl;
             }
             return safe_options;
         }
     }
 
     if (gVerbosity >= 2) {
-        std::cerr << "No valid faustoptions declaration found in first " << line_count << " lines" << std::endl;
+        std::cerr << "No valid faustoptions declaration found in first " << line_count << " lines"
+                  << std::endl;
     }
     return "";
 }
@@ -827,21 +485,26 @@ static int validate_faust(connection_info_struct* con_info)
     fs::path filename      = fs::path(con_info->filename);
     fs::path uploaded_file = fs::path(con_info->tmppath) / filename;
 
-    if (gVerbosity >= 1) std::cerr << "\nENTER validate_faust for file: " << uploaded_file << std::endl;
+    if (gVerbosity >= 1) {
+        std::cerr << "\nENTER validate_faust for file: " << uploaded_file << std::endl;
+    }
 
     // Generate SHA1 for session directory
     std::string sha1            = generate_sha1(con_info);
     fs::path    session_path    = fs::path(con_info->directory) / fs::path(sha1);
     fs::path    sourcecode_path = session_path / "sourcecode";
 
-    if (gVerbosity >= 1) std::cerr << "Session creation for: " << sha1 << std::endl;
+    if (gVerbosity >= 1) {
+        std::cerr << "Session creation for: " << sha1 << std::endl;
+    }
 
     // Create session structure
     if (!fs::is_directory(session_path)) {
         try {
             fs::create_directories(sourcecode_path);
         } catch (const fs::filesystem_error& e) {
-            std::cerr << "Error: can't create directory " << sourcecode_path << ": " << e.code().message() << std::endl;
+            std::cerr << "Error: can't create directory " << sourcecode_path << ": "
+                      << e.code().message() << std::endl;
             con_info->answerstring = completebuterrorpage;
             return 1;
         }
@@ -851,7 +514,10 @@ static int validate_faust(connection_info_struct* con_info)
         // Handle file upload: simple DSP file or archive
         if (!fs::is_regular_file(uploaded_file)) {
             con_info->answerstring = completebuterrorpage;
-            if (gVerbosity >= 1) std::cerr << "EXIT validate_faust: not regular file: " << uploaded_file << std::endl;
+            if (gVerbosity >= 1) {
+                std::cerr << "EXIT validate_faust: not regular file: " << uploaded_file
+                          << std::endl;
+            }
             return 1;
         }
 
@@ -859,7 +525,9 @@ static int validate_faust(connection_info_struct* con_info)
             // Simple DSP file: copy to sourcecode/ with original name
             main_dsp_filename = filename.filename().string();
             fs::copy_file(uploaded_file, sourcecode_path / main_dsp_filename);
-            if (gVerbosity >= 1) std::cerr << "Copied DSP file: " << main_dsp_filename << std::endl;
+            if (gVerbosity >= 1) {
+                std::cerr << "Copied DSP file: " << main_dsp_filename << std::endl;
+            }
         } else {
             // Archive: extract to sourcecode/ and find main DSP file
             struct archive*          archive;
@@ -893,17 +561,20 @@ static int validate_faust(connection_info_struct* con_info)
                 // Check time limit
                 auto current_time = std::chrono::steady_clock::now();
                 if (current_time - start_time > MAX_EXTRACTION_TIME) {
-                    if (gVerbosity >= 1)
-                        std::cerr << "Extraction time limit exceeded - stopping after " << entry_count << " entries"
-                                  << std::endl;
+                    if (gVerbosity >= 1) {
+                        std::cerr << "Extraction time limit exceeded - stopping after "
+                                  << entry_count << " entries" << std::endl;
+                    }
                     time_limit_exceeded = true;
                     break;
                 }
 
                 // Check entries limit
                 if (++entry_count > MAX_ENTRIES) {
-                    if (gVerbosity >= 1)
-                        std::cerr << "Too many entries - stopping at " << MAX_ENTRIES << " files" << std::endl;
+                    if (gVerbosity >= 1) {
+                        std::cerr << "Too many entries - stopping at " << MAX_ENTRIES << " files"
+                                  << std::endl;
+                    }
                     entries_limit_exceeded = true;
                     break;
                 }
@@ -914,8 +585,8 @@ static int validate_faust(connection_info_struct* con_info)
                 std::string entry_filename = entry_path.filename().string();
                 if (!entry_filename.empty() && !isSecureFilename(entry_filename)) {
                     if (gVerbosity >= 1) {
-                        std::cerr << "SECURITY: Silently removing unsafe file from ZIP: " << entry_filename
-                                  << std::endl;
+                        std::cerr << "SECURITY: Silently removing unsafe file from ZIP: "
+                                  << entry_filename << std::endl;
                     }
                     entry_count--;  // Don't count removed files
                     continue;
@@ -923,7 +594,9 @@ static int validate_faust(connection_info_struct* con_info)
 
                 // Skip system files
                 if (entry_path.string().substr(0, 8) == "__MACOSX") {
-                    if (gVerbosity >= 1) std::cerr << "Ignoring: " << entry_path << std::endl;
+                    if (gVerbosity >= 1) {
+                        std::cerr << "Ignoring: " << entry_path << std::endl;
+                    }
                     entry_count--;  // Don't count ignored files
                     continue;
                 }
@@ -931,9 +604,10 @@ static int validate_faust(connection_info_struct* con_info)
                 // Check extraction size limit before processing
                 size_t entry_size = archive_entry_size(entry);
                 if (total_extracted + entry_size > MAX_EXTRACTED_SIZE) {
-                    if (gVerbosity >= 1)
-                        std::cerr << "Extraction size limit exceeded - stopping at " << total_extracted << " bytes"
-                                  << std::endl;
+                    if (gVerbosity >= 1) {
+                        std::cerr << "Extraction size limit exceeded - stopping at "
+                                  << total_extracted << " bytes" << std::endl;
+                    }
                     size_limit_exceeded = true;
                     break;
                 }
@@ -959,7 +633,9 @@ static int validate_faust(connection_info_struct* con_info)
 
             // Handle time limit exceeded case
             if (time_limit_exceeded) {
-                if (gVerbosity >= 1) std::cerr << "Archive extraction timeout - creating toolong.dsp" << std::endl;
+                if (gVerbosity >= 1) {
+                    std::cerr << "Archive extraction timeout - creating toolong.dsp" << std::endl;
+                }
 
                 // Clear sourcecode directory
                 fs::remove_all(sourcecode_path);
@@ -975,7 +651,9 @@ static int validate_faust(connection_info_struct* con_info)
             }
             // Handle too many entries case
             else if (entries_limit_exceeded) {
-                if (gVerbosity >= 1) std::cerr << "Too many entries - creating toomanyentries.dsp" << std::endl;
+                if (gVerbosity >= 1) {
+                    std::cerr << "Too many entries - creating toomanyentries.dsp" << std::endl;
+                }
 
                 // Clear sourcecode directory
                 fs::remove_all(sourcecode_path);
@@ -991,7 +669,9 @@ static int validate_faust(connection_info_struct* con_info)
             }
             // Handle size limit exceeded case
             else if (size_limit_exceeded) {
-                if (gVerbosity >= 1) std::cerr << "Archive too large - creating toobig.dsp" << std::endl;
+                if (gVerbosity >= 1) {
+                    std::cerr << "Archive too large - creating toobig.dsp" << std::endl;
+                }
 
                 // Clear sourcecode directory
                 fs::remove_all(sourcecode_path);
@@ -1007,9 +687,10 @@ static int validate_faust(connection_info_struct* con_info)
             }
             // Handle multiple DSP files case
             else if (dsp_files.size() > 1) {
-                if (gVerbosity >= 1)
-                    std::cerr << "Multiple DSP files found (" << dsp_files.size() << ") - creating multi.dsp"
-                              << std::endl;
+                if (gVerbosity >= 1) {
+                    std::cerr << "Multiple DSP files found (" << dsp_files.size()
+                              << ") - creating multi.dsp" << std::endl;
+                }
 
                 // Clear sourcecode directory
                 fs::remove_all(sourcecode_path);
@@ -1022,7 +703,9 @@ static int validate_faust(connection_info_struct* con_info)
                 multi_file << "// more than one DSP file in your archive\n";
                 multi_file << "// Found files: ";
                 for (size_t i = 0; i < dsp_files.size(); ++i) {
-                    if (i > 0) multi_file << ", ";
+                    if (i > 0) {
+                        multi_file << ", ";
+                    }
                     multi_file << dsp_files[i];
                 }
                 multi_file << "\n";
@@ -1038,19 +721,29 @@ static int validate_faust(connection_info_struct* con_info)
             std::ofstream empty_file(empty_dsp_path);
             empty_file << "// no dsp file was provided\n";
             empty_file.close();
-            if (gVerbosity >= 1) std::cerr << "No DSP file found - created empty.dsp with error message" << std::endl;
+            if (gVerbosity >= 1) {
+                std::cerr << "No DSP file found - created empty.dsp with error message"
+                          << std::endl;
+            }
         }
 
         // SINGLE COMPILATION: Copy main DSP file and compile in one step
-        if (gVerbosity >= 2) std::cerr << "SINGLE COMPILATION validate_faust" << std::endl;
+        if (gVerbosity >= 2) {
+            std::cerr << "SINGLE COMPILATION validate_faust" << std::endl;
+        }
 
         // First, copy the DSP file
-        std::string copy_cmd = "cd " + sourcecode_path.string() + " && cp " + main_dsp_filename + " ../user_code.dsp";
-        if (gVerbosity >= 2) std::cerr << "Executing copy: " << copy_cmd << std::endl;
+        std::string copy_cmd =
+            "cd " + sourcecode_path.string() + " && cp " + main_dsp_filename + " ../user_code.dsp";
+        if (gVerbosity >= 2) {
+            std::cerr << "Executing copy: " << copy_cmd << std::endl;
+        }
 
         int copy_result = system(copy_cmd.c_str());
         if (copy_result != 0) {
-            if (gVerbosity >= 1) std::cerr << "Failed to copy DSP file" << std::endl;
+            if (gVerbosity >= 1) {
+                std::cerr << "Failed to copy DSP file" << std::endl;
+            }
             con_info->answerstring = completebutnopipe;
             return 1;
         }
@@ -1067,26 +760,33 @@ static int validate_faust(connection_info_struct* con_info)
             options_out << filtered_options;
             options_out.close();
             if (gVerbosity >= 2) {
-                std::cerr << "Created faustoptions.txt with: '" << filtered_options << "'" << std::endl;
+                std::cerr << "Created faustoptions.txt with: '" << filtered_options << "'"
+                          << std::endl;
             }
         }
 
         // Now compile using the extracted options
         std::string options_str = readFaustOptions(session_path);
         // SECURITY: Protect against stack overflow and resource exhaustion
-        // - ulimit -s 8192: Limit stack size to 8MB (default is often 8MB on macOS, can be much larger on Linux)
+        // - ulimit -s 8192: Limit stack size to 8MB (default is often 8MB on macOS, can be much
+        // larger on Linux)
         // - ulimit -t 30: Limit CPU time to 30 seconds
         // Note: ulimit -v (virtual memory) not supported on macOS, removed for compatibility
-        std::string faust_cmd = "cd " + sourcecode_path.string() + " && (ulimit -s 8192; ulimit -t 30; faust " +
-                                options_str + (options_str.empty() ? "" : " ") + main_dsp_filename +
+        std::string faust_cmd = "cd " + sourcecode_path.string() +
+                                " && (ulimit -s 8192; ulimit -t 30; faust " + options_str +
+                                (options_str.empty() ? "" : " ") + main_dsp_filename +
                                 " -o ../generated.cpp -svg 2> ../errors.log)";
 
-        if (gVerbosity >= 2) std::cerr << "Executing compilation: " << faust_cmd << std::endl;
+        if (gVerbosity >= 2) {
+            std::cerr << "Executing compilation: " << faust_cmd << std::endl;
+        }
 
         // Execute Faust compilation
         FILE* faust_process = popen(faust_cmd.c_str(), "r");
         if (!faust_process) {
-            if (gVerbosity >= 1) std::cerr << "Cannot launch faust command" << std::endl;
+            if (gVerbosity >= 1) {
+                std::cerr << "Cannot launch faust command" << std::endl;
+            }
             con_info->answerstring = completebutnopipe;
             return 1;
         }
@@ -1104,8 +804,8 @@ static int validate_faust(connection_info_struct* con_info)
                 std::cerr << "Faust compilation failed with code " << return_code << std::endl;
                 std::cerr << "Output: " << compilation_output << std::endl;
             }
-            // Continue processing even with compilation errors - errors.log will contain the details
-            // Client will check errors.log to determine if there were compilation errors
+            // Continue processing even with compilation errors - errors.log will contain the
+            // details Client will check errors.log to determine if there were compilation errors
         }
 
         // Move generated SVG files to dedicated svg/ directory
@@ -1119,26 +819,29 @@ static int validate_faust(connection_info_struct* con_info)
                     fs::path svg_file = svg_path / entry.path().filename();
                     fs::rename(entry.path(), svg_file);
                     if (gVerbosity >= 2) {
-                        std::cerr << "Moved SVG: \"" << entry.path().filename().string() << "\" to svg/" << std::endl;
+                        std::cerr << "Moved SVG: \"" << entry.path().filename().string()
+                                  << "\" to svg/" << std::endl;
                     }
                 }
             }
 
             // Clean up empty SVG directories in sourcecode/
             for (const auto& entry : fs::directory_iterator(sourcecode_path)) {
-                if (entry.is_directory() && entry.path().filename().string().find("-svg") != std::string::npos) {
+                if (entry.is_directory() &&
+                    entry.path().filename().string().find("-svg") != std::string::npos) {
                     if (fs::is_empty(entry.path())) {
                         fs::remove(entry.path());
                         if (gVerbosity >= 1) {
-                            std::cerr << "Removed empty SVG directory: " << entry.path().filename().string()
-                                      << std::endl;
+                            std::cerr << "Removed empty SVG directory: "
+                                      << entry.path().filename().string() << std::endl;
                         }
                     }
                 }
             }
         } catch (const fs::filesystem_error& e) {
             if (gVerbosity >= 1) {
-                std::cerr << "Warning: Could not organize SVG files: " << e.code().message() << std::endl;
+                std::cerr << "Warning: Could not organize SVG files: " << e.code().message()
+                          << std::endl;
             }
         }
 
@@ -1162,7 +865,8 @@ static int validate_faust(connection_info_struct* con_info)
             metadata.close();
         } catch (const fs::filesystem_error& e) {
             if (gVerbosity >= 1) {
-                std::cerr << "Warning: Could not create metadata file: " << e.code().message() << std::endl;
+                std::cerr << "Warning: Could not create metadata file: " << e.code().message()
+                          << std::endl;
             }
         }
 
@@ -1172,22 +876,29 @@ static int validate_faust(connection_info_struct* con_info)
             std::ofstream filename_file(filename_path);
             filename_file << con_info->filename << std::endl;
             filename_file.close();
-            if (gVerbosity >= 2) std::cerr << "Saved original filename: " << con_info->filename << std::endl;
+            if (gVerbosity >= 2) {
+                std::cerr << "Saved original filename: " << con_info->filename << std::endl;
+            }
         } catch (const fs::filesystem_error& e) {
             if (gVerbosity >= 1) {
-                std::cerr << "Warning: Could not save filename: " << e.code().message() << std::endl;
+                std::cerr << "Warning: Could not save filename: " << e.code().message()
+                          << std::endl;
             }
         }
 
         // Create backward-compatible makefile structure
         create_basic_session(sourcecode_path, session_path, fs::path(con_info->makefile_directory));
 
-        if (gVerbosity >= 2) std::cerr << "Session structure created successfully for: " << sha1 << std::endl;
+        if (gVerbosity >= 2) {
+            std::cerr << "Session structure created successfully for: " << sha1 << std::endl;
+        }
     }
 
     con_info->answerstring = sha1;
 
-    if (gVerbosity >= 2) std::cerr << "EXIT validate_faust OK" << std::endl;
+    if (gVerbosity >= 2) {
+        std::cerr << "EXIT validate_faust OK" << std::endl;
+    }
     return 0;
 }
 
@@ -1204,14 +915,20 @@ static fs::path make(const fs::path& dir, const fs::path& target)
     std::stringstream ss;
     ss << "make -C " << dir << " " << target;
 
-    if (gVerbosity >= 2) std::cerr << "ENTER MAKE " << ss.str() << std::endl;
+    if (gVerbosity >= 2) {
+        std::cerr << "ENTER MAKE " << ss.str() << std::endl;
+    }
     if (0 == system(ss.str().c_str())) {
         p = dir / target;
     } else {
-        if (gVerbosity >= 2) std::cerr << __LINE__ << " makefile " << dir / target << " failed !!!" << std::endl;
+        if (gVerbosity >= 2) {
+            std::cerr << __LINE__ << " makefile " << dir / target << " failed !!!" << std::endl;
+        }
         p = "";
     }
-    if (gVerbosity >= 2) std::cerr << "EXIT MAKE " << p << std::endl;
+    if (gVerbosity >= 2) {
+        std::cerr << "EXIT MAKE " << p << std::endl;
+    }
 
     return p;
 }
@@ -1233,26 +950,29 @@ int FaustServer::get_params(void* cls, enum MHD_ValueKind, const char* key, cons
  * is effectuated.
  */
 
-int FaustServer::send_page(struct MHD_Connection* connection, const char* page, int length, int status_code,
-                           const char* type = 0, const char* location = 0)
+int FaustServer::send_page(struct MHD_Connection* connection, const char* page, int length,
+                           int status_code, const char* type = 0, const char* location = 0)
 {
-    struct MHD_Response* response = MHD_create_response_from_buffer(length, (void*)page, MHD_RESPMEM_MUST_COPY);
+    struct MHD_Response* response =
+        MHD_create_response_from_buffer(length, (void*)page, MHD_RESPMEM_MUST_COPY);
 
     if (response == 0) {
         return MHD_NO;
     }
     // Add security headers
-    MHD_add_response_header(response, "Content-Security-Policy",
-                            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
-                            "img-src 'self'; frame-ancestors "
-                            "'none'; form-action 'self';");
+    MHD_add_response_header(
+        response, "Content-Security-Policy",
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self'; frame-ancestors "
+        "'none'; form-action 'self';");
     MHD_add_response_header(response, "X-Frame-Options", "DENY");
     MHD_add_response_header(response, "X-Content-Type-Options", "nosniff");
 
     MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, type ? type : "text/plain");
     if (location) {
         MHD_add_response_header(response, MHD_HTTP_HEADER_LOCATION, location);
-        MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS, MHD_HTTP_HEADER_LOCATION);
+        MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS,
+                                MHD_HTTP_HEADER_LOCATION);
     }
     if (gAnyOrigin) {
         MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, "*");
@@ -1273,10 +993,12 @@ int FaustServer::send_page(struct MHD_Connection* connection, const char* page, 
  * @param connection connection to use
  */
 
-static int page_not_found(struct MHD_Connection* connection, const char* page, int length, const char* mimetype)
+static int page_not_found(struct MHD_Connection* connection, const char* page, int length,
+                          const char* mimetype)
 {
-    struct MHD_Response* response = MHD_create_response_from_buffer(length, (void*)page, MHD_RESPMEM_MUST_COPY);
-    int                  ret      = MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, response);
+    struct MHD_Response* response =
+        MHD_create_response_from_buffer(length, (void*)page, MHD_RESPMEM_MUST_COPY);
+    int ret = MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, response);
     MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_ENCODING, mimetype);
     MHD_destroy_response(response);
     return ret;
@@ -1289,9 +1011,12 @@ static int page_not_found(struct MHD_Connection* connection, const char* page, i
  * this is called after every chunk.
  */
 
-void FaustServer::request_completed(void*, struct MHD_Connection*, void** con_cls, enum MHD_RequestTerminationCode)
+void FaustServer::request_completed(void*, struct MHD_Connection*, void** con_cls,
+                                    enum MHD_RequestTerminationCode)
 {
-    if (gVerbosity >= 2) std::cerr << "FaustServer::request_completed()" << endl;
+    if (gVerbosity >= 2) {
+        std::cerr << "FaustServer::request_completed()" << endl;
+    }
 
     struct connection_info_struct* con_info = (connection_info_struct*)*con_cls;
     *con_cls                                = NULL;
@@ -1404,16 +1129,20 @@ static bool isValidTarget(const fs::path& target, const char*& mimetype)
  * Function that sends a file in response to a GET
  */
 
-int FaustServer::send_file(struct MHD_Connection* connection, const fs::path& filepath, const char* mimetype)
+int FaustServer::send_file(struct MHD_Connection* connection, const fs::path& filepath,
+                           const char* mimetype)
 {
     struct stat sbuf;
     int         fd;
 
-    if (gVerbosity >= 2) std::cerr << __LINE__ << " ENTER send_file : " << filepath << endl;
+    if (gVerbosity >= 2) {
+        std::cerr << __LINE__ << " ENTER send_file : " << filepath << endl;
+    }
 
     if ((-1 == (fd = open(filepath.string().c_str(), O_RDONLY))) || (0 != fstat(fd, &sbuf))) {
         std::cerr << __LINE__ << " error accessing file : " << filepath << endl;
-        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(),
+                         MHD_HTTP_BAD_REQUEST, "text/html");
     }
 
     struct MHD_Response* response = MHD_create_response_from_fd(sbuf.st_size, fd);
@@ -1434,7 +1163,9 @@ int FaustServer::send_file(struct MHD_Connection* connection, const fs::path& fi
     }
     MHD_destroy_response(response);
 
-    if (gVerbosity >= 2) std::cerr << __LINE__ << " EXIT send_file : " << filepath << endl;
+    if (gVerbosity >= 2) {
+        std::cerr << __LINE__ << " EXIT send_file : " << filepath << endl;
+    }
     return ret;
 }
 
@@ -1448,9 +1179,10 @@ static void panicCallback(void*, const char* file, unsigned int line, const char
 bool FaustServer::start()
 {
     MHD_set_panic_func(&panicCallback, NULL);
-    fDaemon = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION, fPort, NULL, NULL,
-                               (MHD_AccessHandlerCallback)&staticAnswerToConnection, this, MHD_OPTION_NOTIFY_COMPLETED,
-                               request_completed, NULL, MHD_OPTION_END);
+    fDaemon =
+        MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION, fPort, NULL, NULL,
+                         (MHD_AccessHandlerCallback)&staticAnswerToConnection, this,
+                         MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL, MHD_OPTION_END);
 
     return fDaemon != NULL;
 }
@@ -1471,12 +1203,15 @@ void FaustServer::stop()
  * by the server.
  */
 
-int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* connection, const char* rawurl,
-                                          const char* method, const char* version, const char* upload_data,
+int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* connection,
+                                          const char* rawurl, const char* method,
+                                          const char* version, const char* upload_data,
                                           size_t* upload_data_size, void** con_cls)
 {
-    if (gVerbosity >= 1)
-        std::cerr << "\n==> ANSWER CONNECTION (" << rawurl << ", " << method << ", " << version << ")" << std::endl;
+    if (gVerbosity >= 1) {
+        std::cerr << "\n==> ANSWER CONNECTION (" << rawurl << ", " << method << ", " << version
+                  << ")" << std::endl;
+    }
     std::string URL = simplifyURL(rawurl);
 
     FaustServer* server = (FaustServer*)cls;
@@ -1493,7 +1228,8 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
                 if (con_info) {
                     std::cerr << "Content of con_cls:" << std::endl;
                     std::cerr << "  Directory: " << '"' << con_info->directory << '"' << std::endl;
-                    std::cerr << "  Makefile Directory: " << '"' << con_info->makefile_directory << '"' << std::endl;
+                    std::cerr << "  Makefile Directory: " << '"' << con_info->makefile_directory
+                              << '"' << std::endl;
                     std::cerr << "  Filename: " << '"' << con_info->filename << '"' << std::endl;
                     std::cerr << "  TmpPath: " << '"' << con_info->tmppath << '"' << std::endl;
                     // Add more fields as needed
@@ -1501,13 +1237,16 @@ int FaustServer::staticAnswerToConnection(void* cls, struct MHD_Connection* conn
                     std::cerr << "con_cls is NULL" << std::endl;
                 }
             }
-            return server->dispatchPOSTConnections(connection, URL, upload_data, upload_data_size, con_cls);
+            return server->dispatchPOSTConnections(connection, URL, upload_data, upload_data_size,
+                                                   con_cls);
         } else {
-            return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+            return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST,
+                             "text/html");
         }
     } catch (exception const& e) {
         std::cerr << "ERROR: GLOBAL ERROR CATCHED " << e.what() << std::endl;
-        return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+        return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST,
+                         "text/html");
     }
 }
 
@@ -1519,10 +1258,13 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 {
     // TArgs args;
     // MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, get_params, &args);
-    if (gVerbosity >= 2) std::cerr << "ANSWER GET CONNECTION " << url << std::endl;
+    if (gVerbosity >= 2) {
+        std::cerr << "ANSWER GET CONNECTION " << url << std::endl;
+    }
 
     if (matchExtension(url, ".php") ||
-        (url.length() > 100 && url.find("/webapp/") == std::string::npos) /*matchExtension(url, ".js")*/) {
+        (url.length() > 100 &&
+         url.find("/webapp/") == std::string::npos) /*matchExtension(url, ".js")*/) {
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
 
     } else if (matchURL(url, "/")) {
@@ -1531,13 +1273,15 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
 
     } else if (matchURL(url, "/targets")) {
-        return send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK, "application/json");
+        return send_page(connection, fTargets.c_str(), fTargets.size(), MHD_HTTP_OK,
+                         "application/json");
 
     } else if (matchURL(url, "/version")) {
         // Get Faust version by running faust --version
-        std::string version_cmd = "faust --version 2>&1 | head -1 | grep -o '[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+'";
-        FILE*       pipe        = popen(version_cmd.c_str(), "r");
-        std::string version     = "2.81.2";  // fallback
+        std::string version_cmd =
+            "faust --version 2>&1 | head -1 | grep -o '[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+'";
+        FILE*       pipe    = popen(version_cmd.c_str(), "r");
+        std::string version = "2.81.2";  // fallback
         if (pipe) {
             char buffer[128];
             if (fgets(buffer, sizeof(buffer), pipe)) {
@@ -1604,7 +1348,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             }
         }
         std::string error_msg = "SVG diagram not found";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "image/svg+xml");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "image/svg+xml");
 
     } else if (matchURL(url, "/*/generated.cpp")) {
         // Serve the generated C++ file from validate_faust
@@ -1616,7 +1361,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             }
         }
         std::string error_msg = "File not found";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
 
     } else if (matchURL(url, "/*/errors.log")) {
         // Serve the compilation errors log file from validate_faust
@@ -1628,7 +1374,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             }
         }
         std::string error_msg = "No errors.log file found";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
 
     } else if (matchURL(url, "/*/filename")) {
         // Serve the original filename for drag-and-drop functionality
@@ -1640,7 +1387,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             }
         }
         std::string error_msg = "No filename information found";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
 
     } else if (matchURL(url, "/*/svg.zip")) {
         // Create and serve a ZIP file containing all SVG diagrams
@@ -1658,7 +1406,9 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
                         fs::remove(temp_zip);
                     } catch (const fs::filesystem_error& e) {
                         if (gVerbosity >= 1) {
-                            std::cerr << "Warning: Could not remove temp ZIP: " << e.code().message() << std::endl;
+                            std::cerr
+                                << "Warning: Could not remove temp ZIP: " << e.code().message()
+                                << std::endl;
                         }
                     }
                     return result;
@@ -1666,7 +1416,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             }
         }
         std::string error_msg = "No SVG diagrams found or could not create ZIP";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
 
     } else if (matchURL(url, "/*/webapp.zip")) {
         // Create and serve a ZIP file containing all webapp files
@@ -1681,7 +1432,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
                                    error_msg.find("No DSP file found") != std::string::npos)
                                       ? MHD_HTTP_NOT_FOUND
                                       : MHD_HTTP_INTERNAL_SERVER_ERROR;
-                return send_page(connection, error_msg.c_str(), error_msg.size(), status_code, "text/plain");
+                return send_page(connection, error_msg.c_str(), error_msg.size(), status_code,
+                                 "text/plain");
             }
 
             fs::path webapp_dir = fDirectory / sha1 / "webapp";
@@ -1696,8 +1448,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
                         fs::remove(temp_zip);
                     } catch (const fs::filesystem_error& e) {
                         if (gVerbosity >= 1) {
-                            std::cerr << "Warning: Could not remove temp webapp ZIP: " << e.code().message()
-                                      << std::endl;
+                            std::cerr << "Warning: Could not remove temp webapp ZIP: "
+                                      << e.code().message() << std::endl;
                         }
                     }
                     return result;
@@ -1705,7 +1457,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             }
         }
         std::string error_msg = "No webapp files found or could not create ZIP";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
 
     } else if (matchURL(url, "/*/svg/*") && matchExtension(url, ".svg")) {
         // Serve SVG files from the svg/ directory created by validate_faust
@@ -1719,7 +1472,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             }
         }
         std::string error_msg = "SVG file not found";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "image/svg+xml");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "image/svg+xml");
 
     } else if (matchBeginURL(url, "/*/web/pwa") || matchBeginURL(url, "/*/web/pwa-poly")) {
         return makeAndSendResourceFile(connection, url);
@@ -1759,20 +1513,21 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
                     // Determine MIME type based on file extension
                     std::string ext       = webapp_file.extension().string();
                     const char* mime_type = "application/octet-stream";
-                    if (ext == ".html")
+                    if (ext == ".html") {
                         mime_type = "text/html";
-                    else if (ext == ".js")
+                    } else if (ext == ".js") {
                         mime_type = "application/javascript";
-                    else if (ext == ".css")
+                    } else if (ext == ".css") {
                         mime_type = "text/css";
-                    else if (ext == ".wasm")
+                    } else if (ext == ".wasm") {
                         mime_type = "application/wasm";
-                    else if (ext == ".json")
+                    } else if (ext == ".json") {
                         mime_type = "application/json";
-                    else if (ext == ".png")
+                    } else if (ext == ".png") {
                         mime_type = "image/png";
-                    else if (ext == ".svg")
+                    } else if (ext == ".svg") {
                         mime_type = "image/svg+xml";
+                    }
 
                     return send_file(connection, webapp_file, mime_type);
                 }
@@ -1783,13 +1538,15 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             std::cerr << "DEBUG: Webapp asset not found for URL: " << url << std::endl;
         }
         std::string error_msg = "Webapp asset not found";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
 
     } else if (url.find(".js") != std::string::npos || url.find(".wasm") != std::string::npos ||
                url.find(".css") != std::string::npos || url.find(".json") != std::string::npos ||
                url.find(".png") != std::string::npos) {
         // Handle webapp asset requests that come as direct paths (for iframe compatibility)
-        // Expected patterns: /<sha>/index.js, /<sha>/faust-ui/index.css, /<sha>/faustwasm/create-node.js, etc.
+        // Expected patterns: /<sha>/index.js, /<sha>/faust-ui/index.css,
+        // /<sha>/faustwasm/create-node.js, etc.
         std::vector<std::string> parts = decomposeURL(url);
         if (parts.size() >= 2) {
             std::string sha1 = parts[1];
@@ -1797,7 +1554,9 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             // Reconstruct the full asset path (everything after /<sha>/)
             std::string asset_path = "";
             for (size_t i = 2; i < parts.size(); i++) {
-                if (!asset_path.empty()) asset_path += "/";
+                if (!asset_path.empty()) {
+                    asset_path += "/";
+                }
                 asset_path += parts[i];
             }
 
@@ -1808,23 +1567,25 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
                 // Determine MIME type based on file extension
                 std::string ext       = webapp_file.extension().string();
                 const char* mime_type = "application/octet-stream";
-                if (ext == ".html")
+                if (ext == ".html") {
                     mime_type = "text/html";
-                else if (ext == ".js")
+                } else if (ext == ".js") {
                     mime_type = "application/javascript";
-                else if (ext == ".css")
+                } else if (ext == ".css") {
                     mime_type = "text/css";
-                else if (ext == ".wasm")
+                } else if (ext == ".wasm") {
                     mime_type = "application/wasm";
-                else if (ext == ".json")
+                } else if (ext == ".json") {
                     mime_type = "application/json";
-                else if (ext == ".png")
+                } else if (ext == ".png") {
                     mime_type = "image/png";
-                else if (ext == ".svg")
+                } else if (ext == ".svg") {
                     mime_type = "image/svg+xml";
+                }
 
                 if (gVerbosity >= 2) {
-                    std::cerr << "Serving webapp asset: " << webapp_file << " as " << mime_type << std::endl;
+                    std::cerr << "Serving webapp asset: " << webapp_file << " as " << mime_type
+                              << std::endl;
                 }
 
                 return send_file(connection, webapp_file, mime_type);
@@ -1833,7 +1594,8 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
 
         // If not found as webapp asset, return 404
         std::string error_msg = "Webapp asset not found: " + url;
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
 
     } else if (matchURL(url, "/sessions/list")) {
         return serveSessionsList(connection);
@@ -1848,13 +1610,16 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             }
         }
         std::string error_msg = "DSP file not found";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
 
     } else if (matchURL(url, "/favicon.ico")) {
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
 
     } else {
-        if (gVerbosity >= 1) std::cerr << "WARNING: INVALID URL " << url << std::endl;
+        if (gVerbosity >= 1) {
+            std::cerr << "WARNING: INVALID URL " << url << std::endl;
+        }
         return page_not_found(connection, "/favicon.ico", 12, "image/x-icon");
     }
 }
@@ -1893,7 +1658,8 @@ std::string             FaustServer::getMakefileArtifactName(const fs::path& mak
 // Handle a GET command by "making" the appropriate resource file
 // and returning it
 
-int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, const std::string& raw_url)
+int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection,
+                                         const std::string&     raw_url)
 {
     std::vector<std::string> U   = decomposeURL(raw_url);
     fs::path                 url = fs::path(raw_url);
@@ -1932,11 +1698,17 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
     const char* mimetype;
     bool        precompile = false;
 
-    if (gVerbosity >= 2) std::cerr << "\nUSING SESSION " << U[1] << "\n\n";
+    if (gVerbosity >= 2) {
+        std::cerr << "\nUSING SESSION " << U[1] << "\n\n";
+    }
     fSessionCache.refer(U[1]);
 
-    if (gVerbosity >= 2) std::cerr << "fulldir : " << fulldir << std::endl;
-    if (gVerbosity >= 2) std::cerr << "makefile : " << makefile << std::endl;
+    if (gVerbosity >= 2) {
+        std::cerr << "fulldir : " << fulldir << std::endl;
+    }
+    if (gVerbosity >= 2) {
+        std::cerr << "makefile : " << makefile << std::endl;
+    }
 
     // Check if we need to create the target directory on demand
     // URL format: /{sha1}/{platform}/{architecture}/{target} or /{sha1}/web/{architecture}/{asset}
@@ -1957,19 +1729,25 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
         }
 
         // Create the target directory on demand
-        if (!create_target_directory(source_dir, session_dir, fMakefileDirectory, platform, architecture)) {
+        if (!create_target_directory(source_dir, session_dir, fMakefileDirectory, platform,
+                                     architecture)) {
             if (gVerbosity >= 1) {
-                std::cerr << "Failed to create target directory for " << platform << "/" << architecture << std::endl;
+                std::cerr << "Failed to create target directory for " << platform << "/"
+                          << architecture << std::endl;
             }
         }
     }
 
     // Check for svg block-diagram requests first
     if (url.extension() == ".svg") {
-        if (gVerbosity >= 2) std::cerr << "Processing SVG file request" << std::endl;
+        if (gVerbosity >= 2) {
+            std::cerr << "Processing SVG file request" << std::endl;
+        }
         fs::path fullfile = fulldir / target;
         if (!fs::exists(fullfile)) {
-            if (gVerbosity >= 2) std::cerr << "Diagram not created yet" << std::endl;
+            if (gVerbosity >= 2) {
+                std::cerr << "Diagram not created yet" << std::endl;
+            }
             make(fullfile.parent_path().parent_path(), fs::path("diagram"));
         }
         return send_file(connection, fullfile, "image/svg+xml");
@@ -1991,10 +1769,14 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 
     // Check for files in mimeTypes map
     if (mimeTypes.count(ext) > 0) {
-        if (gVerbosity >= 2) std::cerr << "Processing " << mimeTypes[ext] << " request" << std::endl;
+        if (gVerbosity >= 2) {
+            std::cerr << "Processing " << mimeTypes[ext] << " request" << std::endl;
+        }
         fs::path fullfile = fulldir / target;
         if (!fs::exists(fullfile)) {
-            if (gVerbosity >= 2) std::cerr << mimeTypes[ext] << " doesn't exist!" << std::endl;
+            if (gVerbosity >= 2) {
+                std::cerr << mimeTypes[ext] << " doesn't exist!" << std::endl;
+            }
         }
         return send_file(connection, fullfile, mimeTypes[ext].c_str());
     }
@@ -2008,13 +1790,14 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 
     // Analyze possible cases of errors
     if (!isValidTarget(target, mimetype)) {
-        std::cerr << "Error : not a valid target " << target << " in raw_url " << raw_url << std::endl;
-        return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST,
-                         "text/html");
+        std::cerr << "Error : not a valid target " << target << " in raw_url " << raw_url
+                  << std::endl;
+        return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(),
+                         MHD_HTTP_BAD_REQUEST, "text/html");
     } else if (!fs::is_regular_file(makefile)) {
         std::cerr << "Error : no makefile found in raw_url " << raw_url << std::endl;
-        return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(), MHD_HTTP_BAD_REQUEST,
-                         "text/html");
+        return send_page(connection, invalidinstruction.c_str(), invalidinstruction.size(),
+                         MHD_HTTP_BAD_REQUEST, "text/html");
     }
 
     // We can call make
@@ -2022,7 +1805,8 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 
     if (!fs::is_regular_file(filename)) {
         std::cerr << "Error : make failed in raw_url " << raw_url << std::endl;
-        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+        return send_page(connection, cannotcompile.c_str(), cannotcompile.size(),
+                         MHD_HTTP_BAD_REQUEST, "text/html");
     } else {
         if (!precompile) {
             return send_file(connection, filename, mimetype);
@@ -2036,18 +1820,24 @@ int FaustServer::makeAndSendResourceFile(struct MHD_Connection* connection, cons
 // dispatchPOSTConnections(), handle POST of a Faust source file
 
 int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, const std::string& url,
-                                         const char* upload_data, size_t* upload_data_size, void** con_cls)
+                                         const char* upload_data, size_t* upload_data_size,
+                                         void** con_cls)
 {
     time_t tmNow = time(0);
 
     std::cerr << "New POST connection: " << ctime(&tmNow) << " URL: " << url << std::endl;
-    if (gVerbosity >= 2) std::cerr << "ANSWER POST CONNECTION " << url << std::endl;
+    if (gVerbosity >= 2) {
+        std::cerr << "ANSWER POST CONNECTION " << url << std::endl;
+    }
     if (NULL == *con_cls) {
-        if (gVerbosity >= 2) std::cerr << "PRE POST processing" << std::endl;
+        if (gVerbosity >= 2) {
+            std::cerr << "PRE POST processing" << std::endl;
+        }
         struct connection_info_struct* con_info;
 
         if (nr_of_uploading_clients >= getMaxClients()) {
-            return send_page(connection, busypage.c_str(), busypage.size(), MHD_HTTP_SERVICE_UNAVAILABLE, "text/html");
+            return send_page(connection, busypage.c_str(), busypage.size(),
+                             MHD_HTTP_SERVICE_UNAVAILABLE, "text/html");
         }
 
         con_info = new connection_info_struct();
@@ -2057,9 +1847,9 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
         con_info->directory          = getDirectory().string();
         con_info->makefile_directory = getMakefileDirectory().string();
 
-        con_info->fp = NULL;
-        con_info->postprocessor =
-            MHD_create_post_processor(connection, POSTBUFFERSIZE, (MHD_PostDataIterator)iterate_post, (void*)con_info);
+        con_info->fp            = NULL;
+        con_info->postprocessor = MHD_create_post_processor(
+            connection, POSTBUFFERSIZE, (MHD_PostDataIterator)iterate_post, (void*)con_info);
 
         if (NULL == con_info->postprocessor) {
             delete con_info;
@@ -2077,22 +1867,30 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
         return MHD_YES;
 
     } else {
-        if (gVerbosity >= 2) std::cerr << "HEY! POST processing" << std::endl;
+        if (gVerbosity >= 2) {
+            std::cerr << "HEY! POST processing" << std::endl;
+        }
         struct connection_info_struct* con_info = (connection_info_struct*)*con_cls;
 
         if (0 != *upload_data_size) {
             // Still data to upload
-            if (gVerbosity >= 2) std::cerr << "POST processing, we have data to upload !" << std::endl;
-            int result        = MHD_post_process(con_info->postprocessor, upload_data, *upload_data_size);
+            if (gVerbosity >= 2) {
+                std::cerr << "POST processing, we have data to upload !" << std::endl;
+            }
+            int result = MHD_post_process(con_info->postprocessor, upload_data, *upload_data_size);
             *upload_data_size = 0;
             return result;
         } else {
             // No more data to upload, we can close the file
-            if (gVerbosity >= 2) std::cerr << "POST processing, NO MORE data to upload !" << std::endl;
+            if (gVerbosity >= 2) {
+                std::cerr << "POST processing, NO MORE data to upload !" << std::endl;
+            }
             // need to close the file before request_completed
             // so that it can be opened by the methods below
             if (con_info->fp) {
-                if (gVerbosity >= 2) std::cerr << "POST processing, we can close the file !" << std::endl;
+                if (gVerbosity >= 2) {
+                    std::cerr << "POST processing, we can close the file !" << std::endl;
+                }
                 fclose(con_info->fp);
                 con_info->fp = 0;
             }
@@ -2102,30 +1900,36 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
                 // warning validate_faust returns errocode 0 when the faust code is correct !
                 std::vector<std::string> segments;
                 sha1 = generate_sha1(con_info);  // TODO: Duplicated computation of the SHA key
-                if (gVerbosity >= 2)
-                    if (gVerbosity >= 1)
-                        std::cerr << "POST processing, we have valid faust code. Its SHA1 key is = " << sha1
-                                  << std::endl;
+                if (gVerbosity >= 2) {
+                    if (gVerbosity >= 1) {
+                        std::cerr << "POST processing, we have valid faust code. Its SHA1 key is = "
+                                  << sha1 << std::endl;
+                    }
+                }
                 if (matchURL(url, "/compile/*/*/*", segments)) {
                     std::string newurl("/");
                     newurl += sha1 + "/" + segments[2] + "/" + segments[3] + "/" + segments[4];
-                    if (gVerbosity >= 2)
-                        std::cerr << "DIRECT COMPILATION: we are trying a direct compilation at " << newurl << endl;
+                    if (gVerbosity >= 2) {
+                        std::cerr << "DIRECT COMPILATION: we are trying a direct compilation at "
+                                  << newurl << endl;
+                    }
                     return makeAndSendResourceFile(connection, newurl.c_str());
                 } else {
-                    return send_page(connection, con_info->answerstring.c_str(), con_info->answerstring.size(),
-                                     con_info->answercode, "text/html");
+                    return send_page(connection, con_info->answerstring.c_str(),
+                                     con_info->answerstring.size(), con_info->answercode,
+                                     "text/html");
                 }
             } else {
                 std::cerr << "POST processing, we have an INVALID faust code" << std::endl;
                 std::string errormessage = "Invalid Faust Code";
-                return send_page(connection, errormessage.c_str(), errormessage.size(), con_info->answercode,
-                                 "text/html");
+                return send_page(connection, errormessage.c_str(), errormessage.size(),
+                                 con_info->answercode, "text/html");
             }
         }
 
         std::cerr << "NEVER EXECUTED" << std::endl;
-        return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST, "text/html");
+        return send_page(connection, errorpage.c_str(), errorpage.size(), MHD_HTTP_BAD_REQUEST,
+                         "text/html");
     }
 }
 
@@ -2147,32 +1951,35 @@ static const char* secure_string(const char* str)
     }
 }
 
-int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const char* key, const char* filename,
-                              const char* content_type, const char* /*transfer_encoding*/, const char* data,
-                              uint64_t /*off*/, size_t size)
+int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const char* key,
+                              const char* filename, const char*              content_type,
+                              const char* /*transfer_encoding*/, const char* data, uint64_t /*off*/,
+                              size_t size)
 {
     struct connection_info_struct* con_info = (connection_info_struct*)coninfo_cls;
     FILE*                          fp;
 
     // check all char* pointers are valid
-    bool valid = key != NULL && key[0] != 0 && strlen(key) < 100 && filename != NULL && filename[0] != 0 &&
-                 strlen(filename) < 100 && content_type != NULL && content_type[0] != 0 && strlen(content_type) < 100 &&
-                 data != NULL;
+    bool valid = key != NULL && key[0] != 0 && strlen(key) < 100 && filename != NULL &&
+                 filename[0] != 0 && strlen(filename) < 100 && content_type != NULL &&
+                 content_type[0] != 0 && strlen(content_type) < 100 && data != NULL;
 
     if (!valid) {
         // we dont' have a valid post
         std::cerr << "ERROR: some null or empty data in iterate_post" << std::endl;
         std::cerr << "ERROR iterate_post ("
-                  << "kind : " << kind << ", key : " << secure_string(key) << ", filename: " << secure_string(filename)
-                  << ", content type: " << secure_string(content_type) << ", data pointer: " << (void*)data
-                  << ", size: " << size << ")" << std::endl;
+                  << "kind : " << kind << ", key : " << secure_string(key)
+                  << ", filename: " << secure_string(filename)
+                  << ", content type: " << secure_string(content_type)
+                  << ", data pointer: " << (void*)data << ", size: " << size << ")" << std::endl;
         return MHD_NO;  // We return
     }
 
     // We have a valid post
     if (gVerbosity >= 2) {
         std::cerr << "ENTER iterate_post ("
-                  << "kind : " << kind << ", key : " << key << ", filename: " << filename << ", content type: "
+                  << "kind : " << kind << ", key : " << key << ", filename: " << filename
+                  << ", content type: "
                   << content_type
                   //<< ", transfer_encoding: " << transfer_encoding
                   << ", data pointer: " << (void*)data << ", size: " << size << ")" << std::endl;
@@ -2205,7 +2012,9 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
     con_info->answercode   = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
     if (0 != strcmp(key, "file")) {
-        if (gVerbosity >= 2) std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+        if (gVerbosity >= 2) {
+            std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+        }
         return MHD_NO;
     }
 
@@ -2215,20 +2024,26 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
 
             con_info->answerstring = fileexistspage;
             con_info->answercode   = MHD_HTTP_FORBIDDEN;
-            if (gVerbosity >= 2) std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+            if (gVerbosity >= 2) {
+                std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+            }
             return MHD_NO;
         }
 
         con_info->fp = fopen(full_path.c_str(), "ab");
         if (con_info->fp == 0) {
-            if (gVerbosity >= 2) std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+            if (gVerbosity >= 2) {
+                std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+            }
             return MHD_NO;
         }
     }
 
     if (size > 0) {
         if (!fwrite(data, size, sizeof(char), con_info->fp)) {
-            if (gVerbosity >= 2) std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+            if (gVerbosity >= 2) {
+                std::cerr << __LINE__ << " FaustServer::iterate_post" << std::endl;
+            }
             return MHD_NO;
         }
     }
@@ -2238,8 +2053,9 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
     return MHD_YES;
 }
 
-FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory,
-                         const fs::path& logfile, int maxSessions)
+FaustServer::FaustServer(int port, int max_clients, const fs::path& directory,
+                         const fs::path& makefile_directory, const fs::path& logfile,
+                         int maxSessions)
     : fPort(port),
       fMaxClients(max_clients),
       fDirectory(directory),
@@ -2249,9 +2065,9 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
       fTargets(""),
       fSessionCache(directory, maxSessions)
 {
-    // create a string containing the list possible targets by scanning the makefile directory. The list is
-    // JSON formatted :   { "os1" : ["arch11", "arch12", ...],  "os2" : ["arch21", "arch22", ...], ...}
-    // and stored in field targets
+    // create a string containing the list possible targets by scanning the makefile directory. The
+    // list is JSON formatted :   { "os1" : ["arch11", "arch12", ...],  "os2" : ["arch21", "arch22",
+    // ...], ...} and stored in field targets
     std::stringstream ss;
 
     ss << '{';
@@ -2275,7 +2091,9 @@ FaustServer::FaustServer(int port, int max_clients, const fs::path& directory, c
                 std::sort(V.begin(), V.end());
                 ss << sep1 << std::endl << '"' << OSname << '"' << ": [";
                 for (size_t i = 0; i < V.size(); i++) {
-                    if (i > 0) ss << ',';
+                    if (i > 0) {
+                        ss << ',';
+                    }
                     ss << '"' << V[i] << '"';
                 }
                 ss << ']';
@@ -2299,16 +2117,19 @@ int FaustServer::serveAppInterface(struct MHD_Connection* connection)
     fs::path app_file_path = fs::current_path() / "app.html";
 
     if (!fs::exists(app_file_path)) {
-        return send_page(connection, "App interface not found", 23, MHD_HTTP_NOT_FOUND, "text/html");
+        return send_page(connection, "App interface not found", 23, MHD_HTTP_NOT_FOUND,
+                         "text/html");
     }
 
     try {
         std::ifstream file(app_file_path);
         if (!file.is_open()) {
-            return send_page(connection, "Cannot read app interface", 25, MHD_HTTP_INTERNAL_SERVER_ERROR, "text/html");
+            return send_page(connection, "Cannot read app interface", 25,
+                             MHD_HTTP_INTERNAL_SERVER_ERROR, "text/html");
         }
 
-        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        std::string content((std::istreambuf_iterator<char>(file)),
+                            std::istreambuf_iterator<char>());
         file.close();
 
         return send_page(connection, content.c_str(), content.size(), MHD_HTTP_OK, "text/html");
@@ -2317,7 +2138,8 @@ int FaustServer::serveAppInterface(struct MHD_Connection* connection)
         if (gVerbosity >= 1) {
             std::cerr << "Error serving app interface: " << e.what() << std::endl;
         }
-        return send_page(connection, "Error loading app interface", 27, MHD_HTTP_INTERNAL_SERVER_ERROR, "text/html");
+        return send_page(connection, "Error loading app interface", 27,
+                         MHD_HTTP_INTERNAL_SERVER_ERROR, "text/html");
     }
 }
 
@@ -2329,7 +2151,8 @@ int FaustServer::serveSignalsSvg(struct MHD_Connection* connection, const std::s
     std::vector<std::string> U = decomposeURL(url);
     if (U.size() < 2) {
         std::string error_msg = "Invalid URL format for signals.svg";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
     }
 
     std::string sha1             = U[1];
@@ -2352,7 +2175,8 @@ int FaustServer::serveSignalsSvg(struct MHD_Connection* connection, const std::s
     // Generate signals.svg if it doesn't exist
     if (!fs::exists(sourcecode_dir) || !fs::is_directory(sourcecode_dir)) {
         std::string error_msg = "Source code directory not found for session: " + sha1;
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
     }
 
     // Find the main DSP file in sourcecode directory
@@ -2366,11 +2190,13 @@ int FaustServer::serveSignalsSvg(struct MHD_Connection* connection, const std::s
 
     if (main_dsp_file.empty()) {
         std::string error_msg = "No DSP file found in session: " + sha1;
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
     }
 
     if (gVerbosity >= 2) {
-        std::cerr << "Generating signals.svg for " << main_dsp_file << " in session " << sha1 << std::endl;
+        std::cerr << "Generating signals.svg for " << main_dsp_file << " in session " << sha1
+                  << std::endl;
     }
 
     // Generate signals diagram
@@ -2380,10 +2206,10 @@ int FaustServer::serveSignalsSvg(struct MHD_Connection* connection, const std::s
     // Faust -sg: strict limits (30s, stack protection) - same DSP as main compilation
     // dot: generous timeout (180s = 3min) but no stack limit - can be legitimately slow
     // Note: ulimit -v (virtual memory) not supported on macOS, removed for compatibility
-    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && (ulimit -s 8192; ulimit -t 30; faust " +
-                               options_str + (options_str.empty() ? "" : " ") + "-sg " + main_dsp_file +
-                               " -o /dev/null)" + " && (ulimit -t 180; dot -Tsvg " + dot_file + " -o ../signals.svg)" +
-                               " && rm " + dot_file;
+    std::string generate_cmd =
+        "cd " + sourcecode_dir.string() + " && (ulimit -s 8192; ulimit -t 30; faust " +
+        options_str + (options_str.empty() ? "" : " ") + "-sg " + main_dsp_file + " -o /dev/null)" +
+        " && (ulimit -t 180; dot -Tsvg " + dot_file + " -o ../signals.svg)" + " && rm " + dot_file;
 
     if (gVerbosity >= 2) {
         std::cerr << "Executing: " << generate_cmd << std::endl;
@@ -2392,11 +2218,12 @@ int FaustServer::serveSignalsSvg(struct MHD_Connection* connection, const std::s
     int result = system(generate_cmd.c_str());
     if (result != 0) {
         if (gVerbosity >= 1) {
-            std::cerr << "Failed to generate signals.svg for session " << sha1 << " (exit code: " << result << ")"
-                      << std::endl;
+            std::cerr << "Failed to generate signals.svg for session " << sha1
+                      << " (exit code: " << result << ")" << std::endl;
         }
         std::string error_msg = "Failed to generate signal diagram";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(),
+                         MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
     }
 
     // Check if generation was successful
@@ -2407,10 +2234,12 @@ int FaustServer::serveSignalsSvg(struct MHD_Connection* connection, const std::s
         return send_file(connection, signals_svg_path, "image/svg+xml");
     } else {
         if (gVerbosity >= 1) {
-            std::cerr << "signals.svg was not created despite successful command execution" << std::endl;
+            std::cerr << "signals.svg was not created despite successful command execution"
+                      << std::endl;
         }
         std::string error_msg = "Signal diagram generation completed but file not found";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(),
+                         MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
     }
 }
 
@@ -2422,7 +2251,8 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
     std::vector<std::string> U = decomposeURL(url);
     if (U.size() < 2) {
         std::string error_msg = "Invalid URL format for tasks.svg";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
     }
 
     std::string sha1           = U[1];
@@ -2445,7 +2275,8 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
     // Generate tasks.svg if it doesn't exist
     if (!fs::exists(sourcecode_dir) || !fs::is_directory(sourcecode_dir)) {
         std::string error_msg = "Source code directory not found for session: " + sha1;
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
     }
 
     // Find the main DSP file in sourcecode directory
@@ -2459,19 +2290,22 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
 
     if (main_dsp_file.empty()) {
         std::string error_msg = "No DSP file found in session: " + sha1;
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
+                         "text/plain");
     }
 
     if (gVerbosity >= 2) {
-        std::cerr << "Generating tasks.svg for " << main_dsp_file << " in session " << sha1 << std::endl;
+        std::cerr << "Generating tasks.svg for " << main_dsp_file << " in session " << sha1
+                  << std::endl;
     }
 
     // Generate task diagram
     std::string options_str  = readFaustOptions(session_dir);
     std::string dot_file     = main_dsp_file + ".dot";
     std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust " + options_str +
-                               (options_str.empty() ? "" : " ") + "-vec -tg " + main_dsp_file + " -o /dev/null" +
-                               " && dot -Tsvg " + dot_file + " -o ../tasks.svg" + " && rm " + dot_file;
+                               (options_str.empty() ? "" : " ") + "-vec -tg " + main_dsp_file +
+                               " -o /dev/null" + " && dot -Tsvg " + dot_file + " -o ../tasks.svg" +
+                               " && rm " + dot_file;
 
     if (gVerbosity >= 2) {
         std::cerr << "Executing: " << generate_cmd << std::endl;
@@ -2480,11 +2314,12 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
     int result = system(generate_cmd.c_str());
     if (result != 0) {
         if (gVerbosity >= 1) {
-            std::cerr << "Failed to generate tasks.svg for session " << sha1 << " (exit code: " << result << ")"
-                      << std::endl;
+            std::cerr << "Failed to generate tasks.svg for session " << sha1
+                      << " (exit code: " << result << ")" << std::endl;
         }
         std::string error_msg = "Failed to generate task diagram";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(),
+                         MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
     }
 
     // Check if generation was successful
@@ -2495,10 +2330,12 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
         return send_file(connection, task_svg_path, "image/svg+xml");
     } else {
         if (gVerbosity >= 1) {
-            std::cerr << "tasks.svg was not created despite successful command execution" << std::endl;
+            std::cerr << "tasks.svg was not created despite successful command execution"
+                      << std::endl;
         }
         std::string error_msg = "Task diagram generation completed but file not found";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(),
+                         MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
     }
 }
 
@@ -2549,12 +2386,13 @@ bool FaustServer::ensure_webapp_exists(const std::string& sha1, std::string& err
     }
 
     if (gVerbosity >= 2) {
-        std::cerr << "Generating webapp for " << main_dsp_file << " in session " << sha1 << std::endl;
+        std::cerr << "Generating webapp for " << main_dsp_file << " in session " << sha1
+                  << std::endl;
     }
 
     // Generate web application using faust2wasm-ts
-    std::string generate_cmd =
-        "cd " + sourcecode_dir.string() + " && faust2wasm-ts " + main_dsp_file + " ../webapp -pwa 2> ../errors.log";
+    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust2wasm-ts " +
+                               main_dsp_file + " ../webapp -pwa 2> ../errors.log";
 
     if (gVerbosity >= 2) {
         std::cerr << "Executing: " << generate_cmd << std::endl;
@@ -2563,8 +2401,8 @@ bool FaustServer::ensure_webapp_exists(const std::string& sha1, std::string& err
     int result = system(generate_cmd.c_str());
     if (result != 0) {
         if (gVerbosity >= 1) {
-            std::cerr << "Failed to generate webapp for session " << sha1 << " (exit code: " << result << ")"
-                      << std::endl;
+            std::cerr << "Failed to generate webapp for session " << sha1
+                      << " (exit code: " << result << ")" << std::endl;
         }
         error_msg = "Failed to generate web application";
         return false;
@@ -2596,7 +2434,8 @@ int FaustServer::generate_webapp_view(struct MHD_Connection* connection, const s
                            error_msg.find("No DSP file found") != std::string::npos)
                               ? MHD_HTTP_NOT_FOUND
                               : MHD_HTTP_INTERNAL_SERVER_ERROR;
-        return send_page(connection, error_msg.c_str(), error_msg.size(), status_code, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(), status_code,
+                         "text/plain");
     }
 
     // Webapp exists, serve index.html
@@ -2631,7 +2470,8 @@ int FaustServer::serveSessionsList(struct MHD_Connection* connection)
 
                     // Only include sessions that have a filename.txt file
                     if (fs::exists(filename_file)) {
-                        std::time_t mod_time = fs::last_write_time(session_dir).time_since_epoch().count();
+                        std::time_t mod_time =
+                            fs::last_write_time(session_dir).time_since_epoch().count();
                         sessions.emplace_back(session_dir, mod_time);
                     }
                 }
@@ -2658,8 +2498,8 @@ int FaustServer::serveSessionsList(struct MHD_Connection* connection)
                     }
                 } catch (const std::exception& e) {
                     if (gVerbosity >= 1) {
-                        std::cerr << "Warning: Could not read filename for session " << sha1 << ": " << e.what()
-                                  << std::endl;
+                        std::cerr << "Warning: Could not read filename for session " << sha1 << ": "
+                                  << e.what() << std::endl;
                     }
                 }
 
@@ -2680,15 +2520,18 @@ int FaustServer::serveSessionsList(struct MHD_Connection* connection)
             std::cerr << "Error reading sessions directory: " << e.what() << std::endl;
         }
         std::string error_msg = "Error reading sessions";
-        return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
+        return send_page(connection, error_msg.c_str(), error_msg.size(),
+                         MHD_HTTP_INTERNAL_SERVER_ERROR, "text/plain");
     }
 
     json << "\n  ]\n}";
 
     std::string json_str = json.str();
     if (gVerbosity >= 2) {
-        std::cerr << "Returning " << (first ? 0 : json_str.length()) << " bytes of sessions data" << std::endl;
+        std::cerr << "Returning " << (first ? 0 : json_str.length()) << " bytes of sessions data"
+                  << std::endl;
     }
 
-    return send_page(connection, json_str.c_str(), json_str.size(), MHD_HTTP_OK, "application/json");
+    return send_page(connection, json_str.c_str(), json_str.size(), MHD_HTTP_OK,
+                     "application/json");
 }
