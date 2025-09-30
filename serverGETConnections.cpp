@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -66,7 +67,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
             if (fgets(buffer, sizeof(buffer), pipe)) {
                 version = std::string(buffer);
                 // Remove trailing newline
-                version.erase(std::remove(version.begin(), version.end(), '\n'), version.end());
+                version.erase(::std::remove(version.begin(), version.end(), '\n'), version.end());
             }
             pclose(pipe);
         }
