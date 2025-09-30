@@ -43,13 +43,13 @@ namespace fs = std::filesystem;
 struct connection_info_struct {
     int                       connectiontype;  // GET or POST
     struct MHD_PostProcessor* postprocessor;   // the POST processor used internally by microhttpd
-    FILE*                     fp;              // a pointer to the file to which the data is being written
-    string                    tmppath;         // the path in which the provisional file exists
-    string                    filename;        // the name of the file
-    string                    answerstring;    // the answer sent to the user after upload
-    int                       answercode;      // used internally by microhttpd to see where things went wrong or right
-    string                    directory;       // the path in which the final file exists
-    string                    makefile_directory;  // the path from which makefiles should be copied
+    FILE*                     fp;        // a pointer to the file to which the data is being written
+    string                    tmppath;   // the path in which the provisional file exists
+    string                    filename;  // the name of the file
+    string                    answerstring;  // the answer sent to the user after upload
+    int    answercode;  // used internally by microhttpd to see where things went wrong or right
+    string directory;   // the path in which the final file exists
+    string makefile_directory;  // the path from which makefiles should be copied
 };
 
 struct string_and_exitstatus {
@@ -68,8 +68,8 @@ class FaustServer {
     LRUSessionsCache   fSessionCache;
 
    public:
-    FaustServer(int port, int max_clients, const fs::path& directory, const fs::path& makefile_directory,
-                const fs::path& logfile, int maxSessions);
+    FaustServer(int port, int max_clients, const fs::path& directory,
+                const fs::path& makefile_directory, const fs::path& logfile, int maxSessions);
 
     virtual ~FaustServer() = default;
     ;
@@ -101,30 +101,33 @@ class FaustServer {
     static unsigned int nr_of_uploading_clients;
 
     static int get_params(void* cls, enum MHD_ValueKind, const char* key, const char* data);
-    static int send_page(struct MHD_Connection* connection, const char* page, int length, int status_code,
-                         const char* type, const char* location);
-    static int send_file(struct MHD_Connection* connection, const fs::path& filepath, const char* mimetype);
-    static int iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const char* key, const char* filename,
-                            const char* content_type, const char* transfer_encoding, const char* data, uint64_t off,
+    static int send_page(struct MHD_Connection* connection, const char* page, int length,
+                         int status_code, const char* type = 0, const char* location = 0);
+    static int send_file(struct MHD_Connection* connection, const fs::path& filepath,
+                         const char* mimetype);
+    static int iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const char* key,
+                            const char* filename, const char* content_type,
+                            const char* transfer_encoding, const char* data, uint64_t off,
                             size_t size);
 
     static void request_completed(void* cls, struct MHD_Connection* connection, void** con_cls,
                                   enum MHD_RequestTerminationCode toe);
-    static int  staticAnswerToConnection(void* cls, struct MHD_Connection* connection, const char* url,
-                                         const char* method, const char* version, const char* upload_data,
-                                         size_t* upload_data_size, void** con_cls);
+    static int  staticAnswerToConnection(void* cls, struct MHD_Connection* connection,
+                                         const char* url, const char* method, const char* version,
+                                         const char* upload_data, size_t* upload_data_size,
+                                         void** con_cls);
 
-    int dispatchGETConnections(struct MHD_Connection* connection, const std::string& url);
-    int dispatchPOSTConnections(struct MHD_Connection* connection, const std::string& url, const char* upload_data,
-                                size_t* upload_data_size, void** con_cls);
-    int serveAppInterface(struct MHD_Connection* connection);
-    int serveSignalsSvg(struct MHD_Connection* connection, const std::string& url);
-    int serveTaskSvg(struct MHD_Connection* connection, const std::string& url);
-    int serveSessionsList(struct MHD_Connection* connection);
+    int  dispatchGETConnections(struct MHD_Connection* connection, const std::string& url);
+    int  dispatchPOSTConnections(struct MHD_Connection* connection, const std::string& url,
+                                 const char* upload_data, size_t* upload_data_size, void** con_cls);
+    int  serveAppInterface(struct MHD_Connection* connection);
+    int  serveSignalsSvg(struct MHD_Connection* connection, const std::string& url);
+    int  serveTaskSvg(struct MHD_Connection* connection, const std::string& url);
+    int  serveSessionsList(struct MHD_Connection* connection);
     bool ensure_webapp_exists(const std::string& sha1, std::string& error_msg);
-    int generate_webapp_view(struct MHD_Connection* connection, const std::string& sha1);
+    int  generate_webapp_view(struct MHD_Connection* connection, const std::string& sha1);
 
-    int makeAndSendResourceFile(struct MHD_Connection* connection, const string& raw_url);
+    int         makeAndSendResourceFile(struct MHD_Connection* connection, const string& raw_url);
     std::string getMakefileArtifactName(const fs::path&);
 };
 
