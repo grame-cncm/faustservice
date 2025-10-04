@@ -186,7 +186,7 @@ static int validate_faust(connection_info_struct* con_info)
             }
 
             // Extract all files with multiple protections against zip bombs
-            const size_t MAX_EXTRACTED_SIZE  = 102400;                   // 100KB limit
+            const size_t MAX_EXTRACTED_SIZE  = 5 * 102400;               // 500KB limit
             const size_t MAX_ENTRIES         = 100;                      // 100 files max
             const auto   MAX_EXTRACTION_TIME = std::chrono::seconds(5);  // 5 seconds max
 
@@ -322,7 +322,7 @@ static int validate_faust(connection_info_struct* con_info)
                 fs::path      toobig_dsp_path = sourcecode_path / main_dsp_filename;
                 std::ofstream toobig_file(toobig_dsp_path);
                 toobig_file << "// archive too large when decompressed\n";
-                toobig_file << "// maximum allowed: 100KB\n";
+                toobig_file << "// maximum allowed: 500KB\n";
                 toobig_file.close();
             }
             // Handle multiple DSP files case
