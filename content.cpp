@@ -68,8 +68,9 @@ bool isSecureFilename(const std::string& filename)
         return false;
     }
 
-    // Check for hidden files (starting with .)
-    if (filename[0] == '.') {
+    // Check for hidden files (starting with .) and names read as options (starting with -) by
+    // the commands that receive them (cp, faust)
+    if (filename[0] == '.' || filename[0] == '-') {
         if (gVerbosity >= 2) {
             std::cerr << "Hidden files not allowed: " << filename << std::endl;
         }

@@ -29,6 +29,7 @@
 #include <chrono>
 #include <cstring>
 #include <ctime>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -372,17 +373,13 @@ static int validate_faust(connection_info_struct* con_info)
             std::cerr << "SINGLE COMPILATION validate_faust" << std::endl;
         }
 
-        // First, copy the DSP file
-        std::string copy_cmd =
-            "cd " + sourcecode_path.string() + " && cp " + main_dsp_filename + " ../user_code.dsp";
-        if (gVerbosity >= 2) {
-            std::cerr << "Executing copy: " << copy_cmd << std::endl;
-        }
-
-        int copy_result = system(copy_cmd.c_str());
-        if (copy_result != 0) {
+        // First, copy the DSP file (no shell : the name comes from the upload)
+        std::error_code copy_error;
+        fs::copy_file(sourcecode_path / main_dsp_filename, session_path / "user_code.dsp",
+                      fs::copy_options::overwrite_existing, copy_error);
+        if (copy_error) {
             if (gVerbosity >= 1) {
-                std::cerr << "Failed to copy DSP file" << std::endl;
+                std::cerr << "Failed to copy DSP file: " << copy_error.message() << std::endl;
             }
             con_info->answerstring = completebutnopipe;
             return 1;
@@ -651,6 +648,17 @@ void FaustServer::request_completed(void*, struct MHD_Connection*, void** con_cl
                 fclose(con_info->fp);
                 con_info->fp = 0;
             }
+            // the uploaded file is no longer needed : the session keeps its own copy. Removed
+            // whatever the outcome (compiled, invalid, refused), so that nothing sent to the
+            // service stays in the temporary directory
+            if (!con_info->tmppath.empty()) {
+                std::error_code error;
+                fs::remove_all(con_info->tmppath, error);
+                if (error && gVerbosity >= 1) {
+                    std::cerr << "Cannot remove " << con_info->tmppath << ": " << error.message()
+                              << std::endl;
+                }
+            }
         }
 
         delete con_info;
@@ -796,8 +804,27 @@ static void panicCallback(void*, const char* file, unsigned int line, const char
     cerr << "PANIC " << line << ':' << file << ' ' << reason << endl;
 }
 
+// Removes the upload directories (tmp_*) a previous run left in the temporary directory, after a
+// crash or a kill : a running server removes its own at the end of each request.
+static void removeStaleUploads()
+{
+    std::error_code error;
+    for (const auto& entry : fs::directory_iterator(fs::temp_directory_path(), error)) {
+        const std::string name = entry.path().filename().string();
+        // the name iterate_post gives them : tmp_<5 digits>_<5 digits>
+        bool upload = name.size() == 15 && name.rfind("tmp_", 0) == 0 && name[9] == '_';
+        for (size_t i = 4; upload && i < name.size(); i++) {
+            upload = (i == 9) || std::isdigit(static_cast<unsigned char>(name[i]));
+        }
+        if (upload && entry.is_directory(error)) {
+            fs::remove_all(entry.path(), error);
+        }
+    }
+}
+
 bool FaustServer::start()
 {
+    removeStaleUploads();
     MHD_set_panic_func(&panicCallback, NULL);
     fDaemon =
         MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION, fPort, NULL, NULL,
