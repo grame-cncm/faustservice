@@ -42,6 +42,7 @@ namespace fs = std::filesystem;
 int  gPort        = 8888;
 int  gMaxClients  = 2;
 bool gAnyOrigin   = true;
+bool gDebugAPI    = false;  ///< serves the diagnostic routes (/sessions/list, /verbosityN)
 int  gMaxSessions = 50;
 int  gVerbosity   = 0;
 
@@ -63,6 +64,9 @@ static void process_cmdline(int argc, char* argv[])
     
     app.add_option("-d,--sessions-dir", sessions_dir, "directory in which sessions files will be written");
     app.add_flag("-a,--any-origin", gAnyOrigin, "Adds any origin when answering requests");
+    app.add_flag("--debug-api", gDebugAPI,
+                 "Serves the diagnostic routes: /sessions/list (every session key) and /verbosityN. "
+                 "Never in production");
     app.add_option("-m,--max-clients", gMaxClients, "maximum number of clients allowed to concurrently upload")
         ->default_val(2);
     app.add_option("-p,--port", gPort, "the listening port")

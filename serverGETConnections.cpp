@@ -19,6 +19,8 @@ extern int gVerbosity;
  * @param connection connection to use
  */
 
+extern bool gDebugAPI;  // serves the diagnostic routes (see main.cpp)
+
 static int page_not_found(struct MHD_Connection* connection, const char* page, int length,
                           const char* mimetype)
 {
@@ -76,19 +78,19 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
     } else if (matchURL(url, "/app")) {
         return serveAppInterface(connection);
 
-    } else if (matchURL(url, "/verbosity0")) {
+    } else if (gDebugAPI && matchURL(url, "/verbosity0")) {
         gVerbosity = 0;
         std::stringstream ss;
         ss << "Verbosity " << gVerbosity;
         return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
 
-    } else if (matchURL(url, "/verbosity1")) {
+    } else if (gDebugAPI && matchURL(url, "/verbosity1")) {
         gVerbosity = 1;
         std::stringstream ss;
         ss << "Verbosity " << gVerbosity;
         return send_page(connection, ss.str().c_str(), ss.str().size(), MHD_HTTP_OK, "text/html");
 
-    } else if (matchURL(url, "/verbosity2")) {
+    } else if (gDebugAPI && matchURL(url, "/verbosity2")) {
         gVerbosity = 2;
         std::stringstream ss;
         ss << "Verbosity " << gVerbosity;
@@ -377,7 +379,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         return send_page(connection, error_msg.c_str(), error_msg.size(), MHD_HTTP_NOT_FOUND,
                          "text/plain");
 
-    } else if (matchURL(url, "/sessions/list")) {
+    } else if (gDebugAPI && matchURL(url, "/sessions/list")) {
         return serveSessionsList(connection);
 
     } else if (matchURL(url, "/*/user_code.dsp")) {
