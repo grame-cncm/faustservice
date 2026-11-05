@@ -75,7 +75,7 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
         }
         return send_page(connection, version.c_str(), version.size(), MHD_HTTP_OK, "text/plain");
 
-    } else if (matchURL(url, "/app")) {
+    } else if (gDebugAPI && matchURL(url, "/app")) {
         return serveAppInterface(connection);
 
     } else if (gDebugAPI && matchURL(url, "/verbosity0")) {
