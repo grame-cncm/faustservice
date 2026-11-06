@@ -222,6 +222,26 @@ static int validate_faust(connection_info_struct* con_info)
 
                 fs::path entry_path = fs::path(archive_entry_pathname(entry));
 
+                // SECURITY: An entry must stay inside sourcecode/ and be a plain file or a
+                // directory: its path is joined to sourcecode/, and a link would redirect the
+                // entries that follow it
+                bool inside_sourcecode = entry_path.is_relative();
+                for (const fs::path& component : entry_path) {
+                    inside_sourcecode = inside_sourcecode && component != "..";
+                }
+                const auto entry_type = archive_entry_filetype(entry);
+                const bool plain_entry =
+                    (entry_type == AE_IFREG || entry_type == AE_IFDIR) &&
+                    archive_entry_hardlink(entry) == nullptr;
+                if (!inside_sourcecode || !plain_entry) {
+                    if (gVerbosity >= 1) {
+                        std::cerr << "SECURITY: Silently removing unsafe entry from ZIP: "
+                                  << entry_path << std::endl;
+                    }
+                    entry_count--;  // Don't count removed files
+                    continue;
+                }
+
                 // SECURITY: Skip files with unsafe names (silent removal)
                 std::string entry_filename = entry_path.filename().string();
                 if (!entry_filename.empty() && !isSecureFilename(entry_filename)) {
@@ -265,7 +285,8 @@ static int validate_faust(connection_info_struct* con_info)
                 fs::path dest_path = sourcecode_path / entry_path;
                 fs::create_directories(dest_path.parent_path());
                 archive_entry_set_pathname(entry, dest_path.string().c_str());
-                archive_read_extract(archive, entry, ARCHIVE_EXTRACT_PERM);
+                // SECURITY: No ARCHIVE_EXTRACT_PERM, it would restore setuid and setgid bits
+                archive_read_extract(archive, entry, 0);
 
                 total_extracted += entry_size;
             }
