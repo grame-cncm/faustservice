@@ -332,17 +332,6 @@ static int validate_faust(connection_info_struct* con_info)
                     continue;
                 }
 
-                // Check extraction size limit before processing
-                size_t entry_size = archive_entry_size(entry);
-                if (total_extracted + entry_size > MAX_EXTRACTED_SIZE) {
-                    if (gVerbosity >= 1) {
-                        std::cerr << "Extraction size limit exceeded - stopping at "
-                                  << total_extracted << " bytes" << std::endl;
-                    }
-                    size_limit_exceeded = true;
-                    break;
-                }
-
                 // Collect DSP files
                 if (entry_path.extension() == ".dsp") {
                     dsp_files.push_back(entry_path.filename().string());
@@ -351,14 +340,33 @@ static int validate_faust(connection_info_struct* con_info)
                     }
                 }
 
-                // Extract file to sourcecode/
+                // Extract to sourcecode/
                 fs::path dest_path = sourcecode_path / entry_path;
+                if (entry_type == AE_IFDIR) {
+                    fs::create_directories(dest_path);
+                    continue;
+                }
                 fs::create_directories(dest_path.parent_path());
-                archive_entry_set_pathname(entry, dest_path.string().c_str());
-                // SECURITY: No ARCHIVE_EXTRACT_PERM, it would restore setuid and setgid bits
-                archive_read_extract(archive, entry, 0);
 
-                total_extracted += entry_size;
+                // SECURITY: The size limit counts the bytes really extracted: the size an
+                // archive declares for an entry can be wrong, or missing for a streamed entry
+                std::ofstream dest(dest_path, std::ios::binary | std::ios::trunc);
+                char          buffer[8192];
+                auto          count = archive_read_data(archive, buffer, sizeof(buffer));
+                while (count > 0 &&
+                       total_extracted + static_cast<size_t>(count) <= MAX_EXTRACTED_SIZE) {
+                    dest.write(buffer, count);
+                    total_extracted += static_cast<size_t>(count);
+                    count = archive_read_data(archive, buffer, sizeof(buffer));
+                }
+                if (count > 0) {
+                    if (gVerbosity >= 1) {
+                        std::cerr << "Extraction size limit exceeded - stopping at "
+                                  << total_extracted << " bytes" << std::endl;
+                    }
+                    size_limit_exceeded = true;
+                    break;
+                }
             }
 
             archive_read_free(archive);
