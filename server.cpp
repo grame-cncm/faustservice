@@ -84,11 +84,21 @@ static const ProcessLimits kDotLimits = {0, 180};
  * Generates an SHA-1 key for Faust file or archive.
  */
 
+/*
+ * The uploaded file is stored under a name chosen by the server: only its
+ * extension comes from the client. The client's name is kept for the DSP file
+ * compiled in sourcecode/, since it names the generated applications.
+ */
+
+static fs::path uploaded_file_path(const connection_info_struct* con_info)
+{
+    return fs::path(con_info->tmppath) /
+           ("upload" + fs::path(con_info->filename).extension().string());
+}
+
 static std::string generate_sha1(connection_info_struct* con_info)
 {
-    fs::path filepath = fs::path(con_info->tmppath) / fs::path(con_info->filename);
-
-    return generateFileSHA1(filepath);
+    return generateFileSHA1(uploaded_file_path(con_info));
 }
 
 /*
@@ -132,7 +142,7 @@ static std::string generate_sha1(connection_info_struct* con_info)
 static int validate_faust(connection_info_struct* con_info)
 {
     fs::path filename      = fs::path(con_info->filename);
-    fs::path uploaded_file = fs::path(con_info->tmppath) / filename;
+    fs::path uploaded_file = uploaded_file_path(con_info);
 
     if (gVerbosity >= 1) {
         std::cerr << "\nENTER validate_faust for file: " << uploaded_file << std::endl;
@@ -1294,7 +1304,7 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
         fs::create_directory(con_info->tmppath);
     }
 
-    std::string full_path = (fs::path(con_info->tmppath) / fs::path(con_info->filename)).string();
+    std::string full_path = uploaded_file_path(con_info).string();
 
     con_info->answerstring = servererrorpage;
     con_info->answercode   = MHD_HTTP_INTERNAL_SERVER_ERROR;
