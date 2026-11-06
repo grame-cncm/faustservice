@@ -1,4 +1,5 @@
 #include "faustOptions.hh"
+#include "process.hh"
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -35,18 +36,17 @@ bool initializeFaustOptions()
     }
 
     // Run faust -h and capture output
-    FILE* faust_help = popen("faust -h 2>/dev/null", "r");
-    if (!faust_help) {
+    std::string help;
+    if (captureProgram({"faust", "-h"}, help) != 0) {
         std::cerr << "Warning: Cannot run 'faust -h' for option initialization" << std::endl;
         return false;
     }
 
-    std::string line;
-    char        buffer[1024];
-    bool        in_code_generation_section = false;
+    std::istringstream help_lines(help);
+    std::string        line;
+    bool               in_code_generation_section = false;
 
-    while (fgets(buffer, sizeof(buffer), faust_help)) {
-        line = buffer;
+    while (std::getline(help_lines, line)) {
 
         // Detect Code generation options section
         if (line.find("Code generation options:") != std::string::npos) {
@@ -103,8 +103,6 @@ bool initializeFaustOptions()
             }
         }
     }
-
-    pclose(faust_help);
 
     if (gVerbosity >= 2) {
         std::cerr << "Initialized " << g_code_generation_options.size()

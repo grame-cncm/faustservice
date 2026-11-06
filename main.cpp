@@ -34,6 +34,7 @@
 #include <unistd.h>
 #include <string>
 
+#include "process.hh"
 #include "server.hh"
 #include "utilities.hh"
 
@@ -96,7 +97,7 @@ static void process_cmdline(int argc, char* argv[])
 
 static void printFaustVersion()
 {
-    int err = system("faust -v");
+    int err = runProgram({"faust", "-v"});
     if (err != 0) std::cerr << "ERROR: Faust not found";
 }
 

@@ -2,10 +2,12 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <regex>
 #include <sstream>
 #include "content.hh"
 #include "htmlPages.hh"
 #include "match.hh"
+#include "process.hh"
 #include "server.hh"
 
 extern int gVerbosity;
@@ -59,19 +61,14 @@ int FaustServer::dispatchGETConnections(struct MHD_Connection* connection, const
                          "application/json");
 
     } else if (matchURL(url, "/version")) {
-        // Get Faust version by running faust --version
-        std::string version_cmd =
-            "faust --version 2>&1 | head -1 | grep -o '[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+'";
-        FILE*       pipe    = popen(version_cmd.c_str(), "r");
+        // Get Faust version from the first line of faust --version
         std::string version = "2.81.2";  // fallback
-        if (pipe) {
-            char buffer[128];
-            if (fgets(buffer, sizeof(buffer), pipe)) {
-                version = std::string(buffer);
-                // Remove trailing newline
-                version.erase(::std::remove(version.begin(), version.end(), '\n'), version.end());
-            }
-            pclose(pipe);
+        std::string output;
+        captureProgram({"faust", "--version"}, output, true);
+        std::string first_line = output.substr(0, output.find('\n'));
+        std::smatch number;
+        if (std::regex_search(first_line, number, std::regex(R"([0-9]+\.[0-9]+\.[0-9]+)"))) {
+            version = number.str(0);
         }
         return send_page(connection, version.c_str(), version.size(), MHD_HTTP_OK, "text/plain");
 

@@ -52,6 +52,7 @@
 
 #include "content.hh"
 #include "faustOptions.hh"
+#include "process.hh"
 #include "htmlPages.hh"
 #include "match.hh"
 #include "server.hh"
@@ -71,6 +72,13 @@ extern int gVerbosity;
 extern bool gAnyOrigin;  // when true adds Access-Control-Allow-Origin to http answers
 
 #define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
+
+// SECURITY: Protect faust against stack overflow and resource exhaustion: 8 MB of stack
+// (the default can be much larger on Linux) and 30 seconds of CPU time
+static const ProcessLimits kFaustLimits = {8 * 1024 * 1024, 30};
+
+// dot can be legitimately slow: a generous CPU time and no stack limit
+static const ProcessLimits kDotLimits = {0, 180};
 
 /*
  * Generates an SHA-1 key for Faust file or archive.
@@ -424,43 +432,31 @@ static int validate_faust(connection_info_struct* con_info)
         }
 
         // Now compile using the extracted options
-        std::string options_str = readFaustOptions(session_path);
-        // SECURITY: Protect against stack overflow and resource exhaustion
-        // - ulimit -s 8192: Limit stack size to 8MB (default is often 8MB on macOS, can be much
-        // larger on Linux)
-        // - ulimit -t 30: Limit CPU time to 30 seconds
-        // Note: ulimit -v (virtual memory) not supported on macOS, removed for compatibility
-        std::string faust_cmd = "cd " + sourcecode_path.string() +
-                                " && (ulimit -s 8192; ulimit -t 30; faust " + options_str +
-                                (options_str.empty() ? "" : " ") + main_dsp_filename +
-                                " -o ../generated.cpp -svg 2> ../errors.log)";
+        std::vector<std::string> faust_args = splitArguments(readFaustOptions(session_path));
+        faust_args.insert(faust_args.begin(), "faust");
+        faust_args.insert(faust_args.end(), {main_dsp_filename, "-o", "../generated.cpp", "-svg"});
 
         if (gVerbosity >= 2) {
-            std::cerr << "Executing compilation: " << faust_cmd << std::endl;
+            std::cerr << "Executing compilation in " << sourcecode_path << ":";
+            for (const std::string& arg : faust_args) {
+                std::cerr << " " << arg;
+            }
+            std::cerr << std::endl;
         }
 
         // Execute Faust compilation
-        FILE* faust_process = popen(faust_cmd.c_str(), "r");
-        if (!faust_process) {
+        int return_code = runProgram(faust_args, sourcecode_path, "/dev/null",
+                                     session_path / "errors.log", kFaustLimits);
+        if (return_code < 0) {
             if (gVerbosity >= 1) {
                 std::cerr << "Cannot launch faust command" << std::endl;
             }
             con_info->answerstring = completebutnopipe;
             return 1;
         }
-
-        // Read command output
-        std::string compilation_output;
-        char        buffer[1024];
-        while (fgets(buffer, sizeof(buffer), faust_process) != nullptr) {
-            compilation_output += buffer;
-        }
-
-        int return_code = pclose(faust_process);
         if (return_code != 0) {
             if (gVerbosity >= 1) {
                 std::cerr << "Faust compilation failed with code " << return_code << std::endl;
-                std::cerr << "Output: " << compilation_output << std::endl;
             }
             // Continue processing even with compilation errors - errors.log will contain the
             // details Client will check errors.log to determine if there were compilation errors
@@ -569,14 +565,12 @@ static int validate_faust(connection_info_struct* con_info)
 
 static fs::path make(const fs::path& dir, const fs::path& target)
 {
-    fs::path          p;
-    std::stringstream ss;
-    ss << "make -C " << dir << " " << target;
+    fs::path p;
 
     if (gVerbosity >= 2) {
-        std::cerr << "ENTER MAKE " << ss.str() << std::endl;
+        std::cerr << "ENTER MAKE -C " << dir << " " << target << std::endl;
     }
-    if (0 == system(ss.str().c_str())) {
+    if (0 == runProgram({"make", "-C", dir.string(), target.string()})) {
         p = dir / target;
     } else {
         if (gVerbosity >= 2) {
@@ -1494,22 +1488,23 @@ int FaustServer::serveSignalsSvg(struct MHD_Connection* connection, const std::s
     }
 
     // Generate signals diagram
-    std::string options_str = readFaustOptions(session_dir);
-    std::string dot_file    = main_dsp_file + "-sig.dot";
-    // SECURITY: Separate protections for faust vs dot commands
-    // Faust -sg: strict limits (30s, stack protection) - same DSP as main compilation
-    // dot: generous timeout (180s = 3min) but no stack limit - can be legitimately slow
-    // Note: ulimit -v (virtual memory) not supported on macOS, removed for compatibility
-    std::string generate_cmd =
-        "cd " + sourcecode_dir.string() + " && (ulimit -s 8192; ulimit -t 30; faust " +
-        options_str + (options_str.empty() ? "" : " ") + "-sg " + main_dsp_file + " -o /dev/null)" +
-        " && (ulimit -t 180; dot -Tsvg " + dot_file + " -o ../signals.svg)" + " && rm " + dot_file;
+    std::vector<std::string> faust_args = splitArguments(readFaustOptions(session_dir));
+    faust_args.insert(faust_args.begin(), "faust");
+    faust_args.insert(faust_args.end(), {"-sg", main_dsp_file, "-o", "/dev/null"});
+    std::string dot_file = main_dsp_file + "-sig.dot";
 
     if (gVerbosity >= 2) {
-        std::cerr << "Executing: " << generate_cmd << std::endl;
+        std::cerr << "Executing faust -sg and dot in " << sourcecode_dir << std::endl;
     }
 
-    int result = system(generate_cmd.c_str());
+    // Faust has the limits of the main compilation (same DSP), dot its own
+    int result = runProgram(faust_args, sourcecode_dir, {}, {}, kFaustLimits);
+    if (result == 0) {
+        result = runProgram({"dot", "-Tsvg", dot_file, "-o", "../signals.svg"}, sourcecode_dir, {},
+                            {}, kDotLimits);
+    }
+    std::error_code remove_error;
+    fs::remove(sourcecode_dir / dot_file, remove_error);
     if (result != 0) {
         if (gVerbosity >= 1) {
             std::cerr << "Failed to generate signals.svg for session " << sha1
@@ -1594,18 +1589,21 @@ int FaustServer::serveTaskSvg(struct MHD_Connection* connection, const std::stri
     }
 
     // Generate task diagram
-    std::string options_str  = readFaustOptions(session_dir);
-    std::string dot_file     = main_dsp_file + ".dot";
-    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust " + options_str +
-                               (options_str.empty() ? "" : " ") + "-vec -tg " + main_dsp_file +
-                               " -o /dev/null" + " && dot -Tsvg " + dot_file + " -o ../tasks.svg" +
-                               " && rm " + dot_file;
+    std::vector<std::string> faust_args = splitArguments(readFaustOptions(session_dir));
+    faust_args.insert(faust_args.begin(), "faust");
+    faust_args.insert(faust_args.end(), {"-vec", "-tg", main_dsp_file, "-o", "/dev/null"});
+    std::string dot_file = main_dsp_file + ".dot";
 
     if (gVerbosity >= 2) {
-        std::cerr << "Executing: " << generate_cmd << std::endl;
+        std::cerr << "Executing faust -tg and dot in " << sourcecode_dir << std::endl;
     }
 
-    int result = system(generate_cmd.c_str());
+    int result = runProgram(faust_args, sourcecode_dir);
+    if (result == 0) {
+        result = runProgram({"dot", "-Tsvg", dot_file, "-o", "../tasks.svg"}, sourcecode_dir);
+    }
+    std::error_code remove_error;
+    fs::remove(sourcecode_dir / dot_file, remove_error);
     if (result != 0) {
         if (gVerbosity >= 1) {
             std::cerr << "Failed to generate tasks.svg for session " << sha1
@@ -1685,14 +1683,12 @@ bool FaustServer::ensure_webapp_exists(const std::string& sha1, std::string& err
     }
 
     // Generate web application using faust2wasm-ts
-    std::string generate_cmd = "cd " + sourcecode_dir.string() + " && faust2wasm-ts " +
-                               main_dsp_file + " ../webapp -pwa 2> ../errors.log";
-
     if (gVerbosity >= 2) {
-        std::cerr << "Executing: " << generate_cmd << std::endl;
+        std::cerr << "Executing faust2wasm-ts in " << sourcecode_dir << std::endl;
     }
 
-    int result = system(generate_cmd.c_str());
+    int result = runProgram({"faust2wasm-ts", main_dsp_file, "../webapp", "-pwa"}, sourcecode_dir,
+                            {}, session_dir / "errors.log");
     if (result != 0) {
         if (gVerbosity >= 1) {
             std::cerr << "Failed to generate webapp for session " << sha1
