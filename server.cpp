@@ -80,6 +80,10 @@ static const ProcessLimits kFaustLimits = {8 * 1024 * 1024, 30};
 // dot can be legitimately slow: a generous CPU time and no stack limit
 static const ProcessLimits kDotLimits = {0, 180};
 
+// SECURITY: Maximum size of an uploaded file, before any decompression (the content of an
+// archive is limited to 500 KB when extracted)
+static const size_t kMaxUploadSize = 1024 * 1024;
+
 /*
  * Generates an SHA-1 key for Faust file or archive.
  */
@@ -1206,6 +1210,7 @@ int FaustServer::dispatchPOSTConnections(struct MHD_Connection* connection, cons
         con_info->makefile_directory = getMakefileDirectory().string();
 
         con_info->fp            = NULL;
+        con_info->uploadsize    = 0;
         con_info->postprocessor = MHD_create_post_processor(
             connection, POSTBUFFERSIZE, (MHD_PostDataIterator)iterate_post, (void*)con_info);
 
@@ -1395,6 +1400,15 @@ int FaustServer::iterate_post(void* coninfo_cls, enum MHD_ValueKind kind, const 
             }
             return MHD_NO;
         }
+    }
+
+    // SECURITY: The connection is closed past kMaxUploadSize
+    con_info->uploadsize += size;
+    if (con_info->uploadsize > kMaxUploadSize) {
+        if (gVerbosity >= 1) {
+            std::cerr << "SECURITY: Upload larger than " << kMaxUploadSize << " bytes" << std::endl;
+        }
+        return MHD_NO;
     }
 
     if (size > 0) {

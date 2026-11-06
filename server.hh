@@ -44,6 +44,7 @@ struct connection_info_struct {
     int                       connectiontype;  // GET or POST
     struct MHD_PostProcessor* postprocessor;   // the POST processor used internally by microhttpd
     FILE*                     fp;        // a pointer to the file to which the data is being written
+    size_t                    uploadsize;  // the number of bytes written so far to fp
     string                    tmppath;   // the path in which the provisional file exists
     string                    filename;  // the name of the file
     string                    answerstring;  // the answer sent to the user after upload
