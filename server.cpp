@@ -102,6 +102,54 @@ static std::string generate_sha1(connection_info_struct* con_info)
 }
 
 /*
+ * SECURITY: A foreign function names a header that the generated C++ code
+ * includes. A .lib file of the upload named that way would be compiled as C++
+ * code, so the generated code may only include headers of the system or of
+ * Faust: an included path must be relative, without "..", and name no file of
+ * sourcecode/. Faust copies strings into the generated code without letting
+ * them add lines, so every #include line comes from an include directive.
+ */
+
+static bool includes_only_system_headers(const fs::path& generated_file,
+                                         const fs::path& sourcecode_path)
+{
+    std::ifstream generated(generated_file);
+    std::string   line;
+    while (std::getline(generated, line)) {
+        size_t hash = line.find_first_not_of(" \t");
+        if (hash == std::string::npos || line[hash] != '#') {
+            continue;
+        }
+        size_t keyword = line.find_first_not_of(" \t", hash + 1);
+        if (keyword == std::string::npos || line.compare(keyword, 7, "include") != 0) {
+            continue;
+        }
+        size_t open = line.find_first_not_of(" \t", keyword + 7);
+        if (open == std::string::npos || (line[open] != '<' && line[open] != '"')) {
+            return false;
+        }
+        size_t close = line.find(line[open] == '<' ? '>' : '"', open + 1);
+        if (close == std::string::npos) {
+            return false;
+        }
+        fs::path header = line.substr(open + 1, close - open - 1);
+        if (header.empty() || !header.is_relative()) {
+            return false;
+        }
+        for (const fs::path& component : header) {
+            if (component == "..") {
+                return false;
+            }
+        }
+        std::error_code error;
+        if (fs::exists(sourcecode_path / header, error)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/*
  * Validates that a Faust file or archive is sane and returns 0 for success
  * or 1 for failure. If the evaluation fails, the appropriate error message
  * is set. More info on the con_info structure is in server.hh.
@@ -470,6 +518,18 @@ static int validate_faust(connection_info_struct* con_info)
             }
             // Continue processing even with compilation errors - errors.log will contain the
             // details Client will check errors.log to determine if there were compilation errors
+        }
+
+        // SECURITY: The session is removed, so that a new upload of the same file is checked
+        // again and that no target can be made from it
+        if (!includes_only_system_headers(session_path / "generated.cpp", sourcecode_path)) {
+            if (gVerbosity >= 1) {
+                std::cerr << "SECURITY: generated code includes a file of the session" << std::endl;
+            }
+            std::error_code error;
+            fs::remove_all(session_path, error);
+            con_info->answerstring = completebuterrorpage;
+            return 1;
         }
 
         // Move generated SVG files to dedicated svg/ directory
