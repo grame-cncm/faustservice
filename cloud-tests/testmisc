@@ -4,7 +4,7 @@
 [ ! -z "$1" ] && SERVICE="$1" || SERVICE=${CLOUDSERVICE:="https://faustservicecloud.grame.fr"}
 
 PLATFORM=misc
-ARCHLIST="csv"
+ARCHLIST="mathdoc"
 
 echo "$PLATFORM"
 for ARCH in $ARCHLIST; do
